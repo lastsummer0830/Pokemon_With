@@ -15,6 +15,14 @@
 - **Phaser 3** (게임 엔진) · **TypeScript** · **Vite** (개발 서버/빌드).
 - 실행: 프로젝트 폴더에서 `npm run dev` → 브라우저로 **http://localhost:5180** (포트 고정).
 - 빌드: `npm run build` · 에셋 다운로드: `npm run fetch [도감번호...]`
+- **데스크톱 앱(Electron) 실행:**
+  - 🟢 가장 쉬움: 폴더의 **`게임실행.bat` 더블클릭** (Windows. 최초엔 자동 npm install 후 실행)
+  - 한 줄 명령: **`npm run app`** = dev서버 + 창을 한 번에 (wait-on으로 서버 뜬 뒤 electron 실행, 창 닫으면 둘 다 종료)
+  - 수동(2터미널): `npm run dev` + `npm run electron`
+  - 진입점(main) = `electron/main.cjs`. .exe 패키징 = `npm run app:build`
+  - WSLg에서 WebGL 막히면 `electron/main.cjs`의 `ignore-gpu-blocklist`/`enable-unsafe-swiftshader` 플래그가 풀어줌(실제 윈도우엔 영향 없음). WSL 실행 시 `--no-sandbox` 필요할 수 있음.
+  - ⚠️ `npm install` 시 Electron 본체(~216MB)를 GitHub에서 받는데 `504` 뜨면 미러 사용:
+    `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm install` (윈도우 CMD는 `set ELECTRON_MIRROR=...`)
 
 ### ⚠️ 반드시 기억할 함정 (이것 때문에 몇 시간 날림)
 - 이 프로젝트는 **D 드라이브(`/mnt/d`)** 에 있다. WSL에서 윈도우 드라이브는 **파일 변경 감지(inotify)가 안 됨.**
@@ -29,17 +37,22 @@ myPokemon_AJ/
 ├─ index.html              게임이 열리는 첫 페이지
 ├─ public/                 ★ 정적 에셋은 전부 여기. (string 경로로 로드하는 파일은 반드시 여기 둬야 build에 포함됨)
 │  └─ assets/
-│     ├─ sprites/          캐릭터/트레이너 도트 스프라이트시트 (예: trainers.png)
-│     ├─ tilesets/         맵 타일셋
-│     ├─ audio/            효과음/BGM
-│     └─ pokemon/<도감번호>/  다운로드한 고화질 포켓몬 에셋 (artwork.png / home.png / anim.gif)
+│     ├─ sprites/          캐릭터 도트 시트 (예: trainers.png = FRLG 트레이너)
+│     ├─ characters/       Another Red 오버월드 (주인공 boy_/girl_, HGSS_trainer_*, NPC_*)
+│     ├─ tilesets/         맵 타일셋 (town.png + Another Red 타일셋들, 이름에 공백/유니코드 있음)
+│     ├─ audio/            효과음/BGM (현재 비움 — 필요시 import)
+│     └─ pokemon/
+│        ├─ front/         ★ Another Red 9세대 포함 "애니메이션" 배틀 스프라이트 (이름 대문자, 예: KORAIDON.png)
+│        ├─ icons/         파티/박스 아이콘 시트 (128x64 = 64x64 2프레임)
+│        └─ <도감번호>/    PokeAPI에서 받은 고화질 (artwork/home/anim.gif)
 ├─ src/
 │  ├─ main.ts              진입점. Phaser 게임 설정(해상도/스케일/씬 등록).
 │  ├─ api/                 외부 데이터/이미지 소스 (pokeapi.ts = PokeAPI 헬퍼)
+│  ├─ game/                게임 공용 렌더 헬퍼 (pokemonSprite.ts = Another Red 애니 스프라이트 로더)
 │  ├─ scenes/              화면 단위. Phaser.Scene 상속. (Title/World/Battle/House)
 │  ├─ data/                "정보"만 담는 타입/데이터 (Pokemon, Player, HouseLayout, furniture)
 │  └─ systems/             계산·규칙 로직 (battle 데미지, homeBonus 집보너스, save 저장)
-├─ tools/                  개발용 스크립트 (fetch-pokemon.mjs = 에셋 다운로더)
+├─ tools/                  스크립트 (fetch-pokemon.mjs = PokeAPI 다운로더 / import-from-anotherred.mjs = AR 추가복사)
 └─ vite.config.ts          ★ usePolling 설정 (위 함정 참고)
 ```
 **규칙:**
@@ -68,8 +81,18 @@ myPokemon_AJ/
 - URL 패턴: `https://img.pokemondb.net/sprites/{게임}/{normal|shiny}/{이름}.png`,
   애니 `.../{게임}/anim/normal/{이름}.gif`, HOME `sprites/home/normal/{이름}.png`, 아트워크 `artwork/large/{이름}.jpg`.
 
+### C. Another Red (RPG Maker XP 팬게임, 로컬 원본) ⭐ 9세대 픽셀의 핵심
+- 원본 위치(현재 PC): `D:/Pokemon Another Red_PWT_250829/` (Graphics/ Audio/ Data/ ...).
+- **쓸 수 있는 것:** `Graphics/`(PNG 이미지) + `Audio/`(음악·효과음) + `Fonts/`. → public/assets로 복사해서 사용.
+- **못 쓰는 것:** `Data/*.rxdata` = RPG Maker 바이너리(맵 배치·Ruby 스크립트). **맵/스토리 로직은 직접 못 가져옴** → 타일셋 "그림"만 쓰고 맵 배열·로직은 Phaser로 재구성(참고용).
+- **포켓몬 Front 스프라이트 = 가로로 이어붙인 정사각 프레임 애니메이션 시트** (프레임=이미지높이, 개수=너비/높이). 9세대 전부 애니 포함(KORAIDON/OGERPON/SPRIGATITO...). 파일명 **대문자**, 변형은 `_1`,`_female` 등.
+  → 로더: `src/game/pokemonSprite.ts` 의 `frontPath(name)` + `makeAnimatedFront(scene, key, x, y, scale)`.
+- 이미 복사된 핵심 세트: Front(전체) / Icons / Characters(Followers 제외) / Tilesets. **약 62MB.**
+- 더 필요할 때(뒷모습·Followers·트레이너배틀·배경·UI): `node tools/import-from-anotherred.mjs "<AR경로>" <back|followers|trainers|battlebacks|ui>`.
+- ⚠️ 팬게임 에셋 → **개인 포트폴리오·비상업 한정.** 재배포/상업화 금지. 무거우니 git엔 쓰는 것만 골라 넣는다.
+
 ### 공통 규칙
-- **GIF는 Phaser가 첫 프레임만 읽는다.** 움직이는 도트가 필요하면 GIF → 스프라이트시트로 변환 후 로드. (TODO 도구)
+- **GIF는 Phaser가 첫 프레임만 읽는다.** 움직이는 도트가 필요하면 GIF → 스프라이트시트로 변환 후 로드. (Another Red Front는 이미 PNG 시트라 바로 애니됨)
 - 자주 쓰는 에셋은 `npm run fetch <도감번호...>` 로 받아 `public/assets/pokemon/`에 두면 빠르고 오프라인 OK.
 - 더 좋은 고화질 소스를 찾으면 써도 된다. **단 CORS 여부를 먼저 확인**하고(없으면 다운로드 방식), 화질은 최대로.
 - 트레이너/오버월드·타일맵은 github의 phaser 포켓몬 클론 레포에서 가져옴
@@ -84,6 +107,9 @@ myPokemon_AJ/
 ## 6. 진행 상황 / 다음 할 일
 - [x] 기본 골격(폴더/씬/타입), 타이틀 화면(스타팅 3마리 일러스트), 맵 이동(FRLG 트레이너 4방향)
 - [x] PokeAPI 연동 + 에셋 다운로더 + 고화질 소스 정리
-- [ ] **진짜 마을 맵** (FRLG/HGSS 타일셋으로 Tiled 타일맵) ← 다음 우선순위
-- [ ] 칸(격자) 단위 이동 + 충돌
-- [ ] 스타팅 선택 → 배틀(PokeAPI 스탯/애니 스프라이트) → 집 꾸미기 → homeBonus 연결
+- [x] Electron(데스크톱 앱/.exe) 설정
+- [x] Another Red 에셋 도입(9세대 포함) + 배틀 데모(맵에서 B키 → 9세대 애니 스프라이트 2마리)
+- [ ] **진짜 마을 맵** (Another Red Tilesets 로 Tiled 타일맵) ← 다음 우선순위
+- [ ] 칸(격자) 단위 이동 + 충돌, 주인공을 Another Red 오버월드(boy_)로 교체
+- [ ] 배틀 제대로: 내 포켓몬 Back 스프라이트(import back) + PokeAPI 스탯 + 데미지 계산
+- [ ] 스타팅 선택 → 배틀 → 집 꾸미기 → homeBonus 연결
