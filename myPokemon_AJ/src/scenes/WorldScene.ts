@@ -43,6 +43,13 @@ export default class WorldScene extends Phaser.Scene {
 
     this.player = this.add.sprite(width / 2, height / 2, "trainer", 1).setScale(4);
     this.cursors = this.input.keyboard!.createCursorKeys();
+
+    // 안내 + B키로 배틀 데모 진입 (9세대 애니 스프라이트 확인용)
+    this.add.text(12, 12, "방향키: 이동   |   B: 배틀 데모(9세대)", {
+      fontFamily: "sans-serif", fontSize: "18px", color: "#ffffff",
+      backgroundColor: "#00000066", padding: { x: 8, y: 4 },
+    });
+    this.input.keyboard!.on("keydown-B", () => this.scene.start("BattleScene"));
   }
 
   update(): void {
