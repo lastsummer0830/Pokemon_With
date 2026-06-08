@@ -1,0 +1,10 @@
+같이 쓰는 프로그램들
+
+보통 이렇게 조합함:
+
+역할	프로그램
+게임 제작	Godot
+코드 편집	Visual Studio Code
+도트 그림	Aseprite
+무료 도트	LibreSprite
+맵 제작	Tiled

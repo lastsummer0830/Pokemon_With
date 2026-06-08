@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>포켓몬 게임 개발 시작 가이드 — 도구 · 뼈대 · 참고 사이트</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+:root{
+  --bg:#f8f1d9; --bg-2:#f6ece0; --surface:#fffdfa; --surface-soft:#faf4ec;
+  --ink:#403a31; --ink-soft:#867c6d; --line:#ece1d2;
+  --coral:#e3886e;  --coral-d:#b05538;  --coral-s:#f9e7df;
+  --teal:#6aa6c0;   --teal-d:#346e88;   --teal-s:#e7f1f6;
+  --mint:#7ab277;   --mint-d:#46823f;   --mint-s:#ebf4e6;
+  --amber:#e3b748;  --amber-d:#94740f;  --amber-s:#f9f0d2;
+  --pink:#dc94a6;   --pink-d:#a25469;   --pink-s:#f8e8ed;
+  --violet:#9a8fce; --violet-d:#62569b; --violet-s:#eeeafb;
+  --danger:#d6604d; --danger-d:#a13a2d; --danger-s:#f9e3dd;
+  --radius:20px; --radius-sm:13px;
+  --shadow:0 12px 30px -18px rgba(120,98,60,.28);
+  --shadow-soft:0 6px 16px -12px rgba(120,98,60,.20);
+  --maxw:980px;
+  --code-font:"JetBrains Mono","Cascadia Code","Consolas","D2Coding",monospace;
+  --body-font:"Pretendard","Pretendard Variable","Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;font-family:var(--body-font);color:var(--ink);
+  background:
+    radial-gradient(1000px 480px at 90% -12%, #faf2d2 0%, transparent 60%),
+    radial-gradient(820px 420px at -8% 4%, #f2eedd 0%, transparent 62%),
+    linear-gradient(180deg,var(--bg) 0%, #f4edd6 100%);
+  line-height:1.72;font-size:16.5px;letter-spacing:-0.1px;-webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px 90px;}
+#progress{position:fixed;top:0;left:0;height:4px;width:0;
+  background:linear-gradient(90deg,var(--teal),var(--coral));z-index:100;transition:width .08s linear;}
+#top-btn{position:fixed;right:20px;bottom:22px;z-index:90;width:46px;height:46px;border:none;border-radius:50%;
+  cursor:pointer;background:var(--coral);color:#fff;font-size:20px;box-shadow:var(--shadow);
+  opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;}
+#top-btn.show{opacity:1;pointer-events:auto;}
+#top-btn:hover{transform:translateY(-3px);}
+
+/* 히어로 (폴더 카드) */
+.hero{position:relative;overflow:visible;margin:52px 0 36px;padding:38px 38px 36px;
+  border-radius:4px 14px 22px 22px;color:var(--ink);
+  background:linear-gradient(165deg,#fef2b6 0%, #fbe592 60%, #f7da7f 100%);
+  box-shadow:0 20px 46px -28px rgba(180,150,60,.5), inset 0 1px 0 rgba(255,255,255,.55);}
+.hero::before{content:"";position:absolute;left:0;right:0;top:-20px;height:60px;
+  background:#f3d275;border-radius:16px 16px 0 0;z-index:-2;}
+.hero::after{content:"";position:absolute;left:26px;top:-40px;width:200px;height:46px;
+  background:#f3d275;z-index:-1;border-radius:14px 22px 0 0;}
+.hero-eyebrow{display:inline-block;font-size:12px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;
+  color:var(--coral-d);background:#fffdf6;padding:5px 11px;border-radius:999px;
+  box-shadow:0 2px 6px -3px rgba(150,110,40,.45);margin-bottom:13px;position:relative;z-index:3;}
+.hero h1{margin:0 0 13px;font-size:31px;line-height:1.3;font-weight:800;letter-spacing:-0.6px;
+  color:#4a3d1c;position:relative;z-index:3;text-shadow:0 1px 0 rgba(255,255,255,.4);}
+.hero h1 .accent{display:inline-block;background:#fffdf6;color:var(--coral-d);padding:0 11px;border-radius:11px;
+  box-shadow:0 3px 10px -5px rgba(150,110,40,.5);}
+.hero p{margin:0 0 19px;font-size:15.5px;line-height:1.7;max-width:680px;color:#5e5234;position:relative;z-index:3;}
+.hero-badges{display:flex;flex-wrap:wrap;gap:8px;position:relative;z-index:3;}
+.hb{display:inline-flex;align-items:center;gap:7px;background:#fffefa;color:#7a4e2e;font-weight:700;font-size:12.5px;
+  padding:6px 13px 6px 11px;border-radius:999px;box-shadow:0 3px 9px -5px rgba(150,110,40,.55);}
+.hb::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--coral);flex:none;}
+.hb.t::before{background:var(--teal);} .hb.m::before{background:var(--mint);} .hb.v::before{background:var(--violet);}
+.hb.p::before{background:var(--pink);} .hb.a::before{background:var(--amber);}
+.hero-meta{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;position:relative;z-index:3;}
+.hero-meta span{font-size:12.5px;font-weight:600;color:#6a5a30;background:rgba(255,255,255,.62);
+  padding:6px 13px;border-radius:9px;box-shadow:inset 0 0 0 1px rgba(220,190,110,.55);}
+
+/* 목차 */
+.toc{background:var(--surface);border-radius:var(--radius);padding:24px 26px;box-shadow:var(--shadow-soft);
+  border:1px solid var(--line);margin-bottom:34px;}
+.toc h2{margin:0 0 16px;font-size:18px;display:flex;align-items:center;gap:9px;}
+.toc h2 .dot{width:11px;height:11px;border-radius:50%;background:var(--coral);}
+.toc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.toc-item{display:flex;gap:12px;align-items:center;text-decoration:none;color:var(--ink);padding:11px 14px;
+  border-radius:13px;background:var(--surface-soft);border:1px solid var(--line);
+  transition:transform .14s,box-shadow .14s,border-color .14s;}
+.toc-item:hover{transform:translateY(-2px);box-shadow:var(--shadow-soft);border-color:var(--teal);}
+.toc-n{flex:none;width:28px;height:28px;border-radius:9px;background:var(--teal-s);color:var(--teal-d);
+  font-weight:800;font-size:13px;display:grid;place-items:center;}
+.toc-item:nth-child(2n) .toc-n{background:var(--coral-s);color:var(--coral-d);}
+.toc-item:nth-child(3n) .toc-n{background:var(--mint-s);color:var(--mint-d);}
+.toc-item:nth-child(5n) .toc-n{background:var(--violet-s);color:var(--violet-d);}
+.toc-t{font-size:14.5px;font-weight:600;}
+
+/* 섹션 */
+.sec{background:var(--surface);border-radius:var(--radius);padding:30px 30px 32px;box-shadow:var(--shadow-soft);
+  border:1px solid var(--line);margin-bottom:26px;scroll-margin-top:24px;}
+.sec-head{display:flex;gap:16px;align-items:flex-start;margin-bottom:20px;padding-bottom:18px;
+  border-bottom:2px dashed var(--line);}
+.sec-num{flex:none;width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-weight:800;
+  font-size:18px;color:#fff;background:linear-gradient(140deg,#6f9ec0,#8579c0);box-shadow:var(--shadow-soft);}
+.sec:nth-child(odd) .sec-num{background:linear-gradient(140deg,#e89986,#cf6f57);}
+.sec-kicker{display:inline-block;font-size:11.5px;font-weight:800;letter-spacing:.7px;color:var(--coral-d);
+  background:var(--coral-s);padding:3px 9px;border-radius:7px;text-transform:uppercase;}
+.sec-title{margin:7px 0 0;font-size:22px;font-weight:800;letter-spacing:-0.4px;color:#3a3228;}
+.sec-body > p{margin:0 0 14px;}
+.sec-body h3{font-size:18px;font-weight:800;margin:26px 0 12px;color:#46352b;display:flex;align-items:center;gap:10px;
+  padding-bottom:9px;letter-spacing:-0.3px;border-bottom:1.5px solid var(--line);}
+.sec-body h3::before{content:"";width:7px;height:21px;border-radius:4px;flex:none;
+  background:linear-gradient(160deg,var(--coral),var(--coral-d));box-shadow:0 2px 7px -3px rgba(191,104,80,.7);}
+.sec-body h3.tt::before{background:linear-gradient(160deg,var(--teal),var(--teal-d));}
+.sec-body h3.mm::before{background:linear-gradient(160deg,var(--mint),var(--mint-d));}
+.sec-body h3.vv::before{background:linear-gradient(160deg,var(--violet),var(--violet-d));}
+.sec-body strong{color:var(--teal-d);font-weight:700;}
+.sec-body code:not(pre code){background:var(--teal-s);color:var(--teal-d);font-family:var(--code-font);font-size:13.5px;
+  padding:1.5px 6px;border-radius:6px;font-weight:600;}
+.lead{font-size:16px;}
+
+/* 개념 카드 */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:16px 0;}
+.concept-card{border-radius:var(--radius-sm);padding:17px 18px;border:1px solid var(--line);
+  background:var(--surface-soft);box-shadow:var(--shadow-soft);}
+.concept-head{display:flex;align-items:center;gap:9px;margin-bottom:8px;}
+.concept-head h3{margin:0;font-size:15.5px;padding:0;border:none;}
+.concept-head h3::before{display:none;}
+.card-ic{font-size:20px;}
+.concept-body{font-size:14px;color:var(--ink-soft);line-height:1.62;}
+.concept-body strong{color:inherit;}
+.tone-teal{border-top:4px solid var(--teal);} .tone-mint{border-top:4px solid var(--mint);}
+.tone-coral{border-top:4px solid var(--coral);} .tone-amber{border-top:4px solid var(--amber);}
+.tone-pink{border-top:4px solid var(--pink);} .tone-violet{border-top:4px solid var(--violet);}
+
+/* stat 카드 */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:13px;margin:16px 0;}
+.stat{display:flex;align-items:center;gap:13px;border-radius:var(--radius-sm);padding:15px 17px;color:#fff;box-shadow:var(--shadow-soft);}
+.stat.tone-teal{background:linear-gradient(135deg,#86b8cd,#5f97b2);}
+.stat.tone-coral{background:linear-gradient(135deg,#e89986,#cf6f57);}
+.stat.tone-amber{background:linear-gradient(135deg,#ecc873,#caa23a);}
+.stat.tone-pink{background:linear-gradient(135deg,#e3a7b5,#c47f93);}
+.stat.tone-violet{background:linear-gradient(135deg,#aaa0d7,#8579c0);}
+.stat.tone-mint{background:linear-gradient(135deg,#93c08e,#669a61);}
+.stat-ic{font-size:25px;background:rgba(255,255,255,.22);width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex:none;}
+.stat-meta{display:flex;flex-direction:column;line-height:1.3;}
+.stat-big{font-size:16px;font-weight:800;} .stat-small{font-size:12px;opacity:.92;}
+
+/* 콜아웃 */
+.callout{border-radius:var(--radius-sm);padding:15px 18px;margin:16px 0;border:1px solid;border-left-width:5px;background:var(--surface-soft);}
+.callout-head{display:flex;align-items:center;gap:9px;margin-bottom:6px;font-weight:800;font-size:15px;}
+.callout-ic{font-size:18px;}
+.callout-body{font-size:14.5px;color:var(--ink);line-height:1.7;}
+.callout-body p{margin:6px 0;} .callout-body strong{color:inherit;}
+.c-core{border-color:var(--teal);background:var(--teal-s);} .c-core .callout-title{color:var(--teal-d);}
+.c-warn{border-color:var(--amber);background:var(--amber-s);} .c-warn .callout-title{color:var(--amber-d);}
+.c-mistake{border-color:var(--danger);background:var(--danger-s);} .c-mistake .callout-title{color:var(--danger-d);}
+.c-tip{border-color:var(--mint);background:var(--mint-s);} .c-tip .callout-title{color:var(--mint-d);}
+.c-analogy{border-color:var(--coral);background:var(--coral-s);} .c-analogy .callout-title{color:var(--coral-d);}
+.c-flow{border-color:var(--violet);background:var(--violet-s);} .c-flow .callout-title{color:var(--violet-d);}
+.c-exam{border-color:var(--pink);background:var(--pink-s);} .c-exam .callout-title{color:var(--pink-d);}
+.c-check{border-color:var(--mint);background:var(--mint-s);} .c-check .callout-title{color:var(--mint-d);}
+
+/* 비교표 */
+.table-wrap{overflow-x:auto;margin:18px 0 20px;}
+table.cmp{border-collapse:separate;border-spacing:0;width:100%;font-size:14px;background:var(--surface);min-width:440px;
+  border:1px solid var(--line);border-radius:var(--radius-sm);box-shadow:var(--shadow-soft);}
+table.cmp caption{caption-side:top;text-align:left;font-weight:800;color:var(--ink);font-size:15.5px;letter-spacing:-0.2px;
+  line-height:1.45;padding:0 2px 11px;}
+table.cmp caption::before{content:"";display:inline-block;width:6px;height:14px;border-radius:3px;background:var(--teal);margin-right:9px;vertical-align:-1px;}
+table.cmp th{background:var(--teal-s);color:var(--teal-d);font-weight:800;padding:12px 16px;text-align:left;border-bottom:2px solid #cfe2ea;}
+table.cmp thead th:first-child{border-top-left-radius:var(--radius-sm);}
+table.cmp thead th:last-child{border-top-right-radius:var(--radius-sm);}
+table.cmp td{padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top;}
+table.cmp tbody tr:last-child td{border-bottom:none;}
+table.cmp tbody tr:nth-child(even){background:var(--surface-soft);}
+table.cmp tbody tr:hover{background:var(--coral-s);}
+table.cmp td code{background:var(--bg-2);color:var(--coral-d);font-family:var(--code-font);font-size:12.5px;padding:1px 5px;border-radius:5px;}
+table.cmp .yes{color:var(--mint-d);font-weight:700;} table.cmp .no{color:var(--danger-d);font-weight:700;}
+
+/* 흐름도 */
+.flowbox{display:flex;flex-direction:column;align-items:stretch;gap:0;margin:16px 0;background:var(--surface-soft);
+  border:1px dashed var(--violet);border-radius:var(--radius-sm);padding:18px;}
+.flow-step{display:flex;align-items:center;gap:13px;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;padding:11px 15px;box-shadow:var(--shadow-soft);}
+.flow-badge{flex:none;font-weight:800;font-size:12.5px;color:#fff;background:var(--violet);padding:4px 11px;border-radius:8px;min-width:90px;text-align:center;}
+.flow-badge.t{background:var(--teal);} .flow-badge.c{background:var(--coral);} .flow-badge.m{background:var(--mint);} .flow-badge.a{background:var(--amber-d);} .flow-badge.p{background:var(--pink-d);}
+.flow-label{font-size:14px;font-weight:600;}
+.flow-sep{align-self:center;color:var(--violet-d);font-size:18px;font-weight:800;margin:5px 0;}
+
+/* 파일 구조 박스 */
+.filetree{background:#fbf6ea;border:1px solid var(--line);border-radius:var(--radius-sm);padding:18px 16px;margin:16px 0;
+  font-family:var(--code-font);font-size:13.5px;line-height:2.05;overflow-x:auto;}
+.tree-row{display:flex;align-items:center;gap:9px;white-space:nowrap;position:relative;}
+.tree-row.d1{padding-left:24px;} .tree-row.d2{padding-left:48px;} .tree-row.d3{padding-left:72px;} .tree-row.d4{padding-left:96px;}
+.tree-ic{font-size:15px;}
+.tree-name{font-weight:700;color:var(--ink);}
+.tree-badge{font-size:10.5px;font-weight:800;padding:1px 8px;border-radius:7px;font-family:var(--body-font);}
+.b-folder{background:var(--amber-s);color:var(--amber-d);} .b-pkg{background:var(--violet-s);color:var(--violet-d);}
+.b-code{background:var(--mint-s);color:var(--mint-d);} .b-view{background:var(--pink-s);color:var(--pink-d);}
+.b-config{background:#efe9dd;color:#7a7163;} .b-asset{background:var(--teal-s);color:var(--teal-d);} .b-data{background:var(--coral-s);color:var(--coral-d);}
+.tree-role{font-family:var(--body-font);font-size:12.5px;color:var(--ink-soft);font-weight:600;}
+
+/* 코드블록 */
+.code-role{margin:16px 0 0;font-size:13.5px;color:var(--ink-soft);font-weight:600;display:flex;gap:7px;align-items:flex-start;}
+.code-role::before{content:"📝";}
+.codecard{margin:9px 0 4px;border-radius:14px;overflow:hidden;border:1px solid #d9d0c2;box-shadow:var(--shadow-soft);}
+.code-title{display:flex;justify-content:space-between;align-items:center;background:#1f2733;color:#dde6f0;padding:9px 15px;
+  font-family:var(--code-font);font-size:13px;}
+.code-fname{font-weight:700;} .code-fname::before{content:"●  ";color:#ff8b80;}
+.code-lang{font-size:10.5px;background:rgba(255,255,255,.12);padding:2px 9px;border-radius:6px;letter-spacing:.4px;}
+.codecard pre{margin:0;background:#11161f;color:#e6edf3;padding:16px 18px;overflow-x:auto;}
+.codecard code{font-family:var(--code-font);font-size:13.5px;line-height:1.78;white-space:pre;}
+.code-keyword{color:#7cc4ff;font-weight:700;} .code-string{color:#9ae6a0;} .code-comment{color:#9aa7b3;font-style:italic;}
+.code-annotation{color:#d3b9ff;font-weight:700;} .code-class{color:#ffd66b;font-weight:600;} .code-method{color:#67e8f9;}
+.code-number{color:#ffaf9a;} .code-tag{color:#7cc4ff;font-weight:700;} .code-attr{color:#ffd66b;}
+.code-notes{margin:8px 0 4px;padding-left:0;list-style:none;}
+.code-notes li{position:relative;padding:5px 0 5px 24px;font-size:13.5px;color:var(--ink);border-bottom:1px dashed var(--line);}
+.code-notes li:last-child{border-bottom:none;}
+.code-notes li::before{content:"↳";position:absolute;left:4px;color:var(--teal-d);font-weight:800;}
+.code-notes li code{background:var(--teal-s);color:var(--teal-d);font-family:var(--code-font);font-size:12.5px;padding:1px 5px;border-radius:5px;}
+
+/* 링크 리스트 */
+.linklist{list-style:none;padding:0;margin:10px 0;}
+.linklist li{padding:9px 12px;border-bottom:1px dashed var(--line);font-size:14px;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;}
+.linklist li:last-child{border-bottom:none;}
+.linklist .lk-name{font-weight:800;color:var(--coral-d);}
+.linklist a{color:var(--teal-d);text-decoration:none;font-family:var(--code-font);font-size:12.5px;word-break:break-all;}
+.linklist a:hover{text-decoration:underline;}
+.linklist .lk-desc{color:var(--ink-soft);font-size:13px;}
+
+/* 마무리 카드 */
+.endcard{background:linear-gradient(135deg,#9a90cf,#7aa6c3);color:#fff;border-radius:var(--radius);padding:26px 28px;margin-top:30px;box-shadow:var(--shadow);}
+.endcard h2{margin:0 0 12px;font-size:20px;}
+.endcard ul{margin:0;padding-left:20px;} .endcard li{margin:7px 0;font-size:14.5px;} .endcard strong{color:#fdf0d8;}
+.foot{text-align:center;color:var(--ink-soft);font-size:12.5px;margin-top:26px;}
+
+/* 체크리스트 */
+.callout-body ol{margin:6px 0;padding-left:22px;} .callout-body ol li{margin:7px 0;}
+ul.checklist{list-style:none;padding-left:0;margin:6px 0;}
+ul.checklist li{position:relative;padding:7px 0 7px 30px;border-bottom:1px dashed rgba(0,0,0,.08);}
+ul.checklist li:last-child{border-bottom:none;}
+ul.checklist li::before{content:"☐";position:absolute;left:4px;font-size:18px;color:var(--mint-d);}
+
+@media (max-width:720px){
+  body{font-size:15.5px;}
+  .toc-grid{grid-template-columns:1fr;}
+  .hero{padding:30px 22px;} .hero h1{font-size:24px;}
+  .sec{padding:24px 18px;} .sec-num{width:40px;height:40px;font-size:16px;} .sec-title{font-size:19px;}
+}
+
+@page{size:A4;margin:14mm;}
+@media print{
+  html,body{background:#fff !important;color:#111 !important;}
+  #progress,#top-btn{display:none !important;}
+  .wrap{max-width:none;padding:0;}
+  .hero{background:#fff !important;color:#403a31 !important;border:1.5px solid #e7cf86;box-shadow:none !important;}
+  .hero::before,.hero::after{background:#fbf0c8 !important;}
+  .hb{background:#fbeee2 !important;color:var(--coral-d) !important;border:1px solid #efd7c2;}
+  .hero-meta span{background:#f6f1e6 !important;color:#5b5346 !important;border:1px solid #e7dcc8;}
+  .sec,.toc,.concept-card,.callout,.flowbox,.filetree,.endcard,table.cmp{box-shadow:none !important;break-inside:avoid;page-break-inside:avoid;}
+  .endcard{background:#fff !important;color:#111 !important;border:2px solid var(--violet);}
+  .endcard h2,.endcard strong{color:var(--violet-d) !important;}
+  .stat{color:#111 !important;background:#f7f3ea !important;border:1px solid #ddd;} .stat-ic{background:#eee !important;}
+  .codecard{border:1px solid #d8cfbf !important;}
+  .code-title{background:#f1eadc !important;color:#403a31 !important;border-bottom:1px solid #d8cfbf;}
+  .code-fname::before{color:var(--coral-d) !important;} .code-lang{background:#e7ddc9 !important;color:#5b5346 !important;}
+  .codecard pre{background:#faf7f0 !important;color:#241f17 !important;}
+  .codecard code{white-space:pre-wrap;word-break:break-word;}
+  .code-keyword,.code-tag{color:#1d4ed8 !important;} .code-string{color:#1c7a3a !important;} .code-comment{color:#6b7280 !important;}
+  .code-annotation{color:#7c3aed !important;} .code-class,.code-attr{color:#b45309 !important;} .code-method{color:#0e7490 !important;} .code-number{color:#be3a2b !important;}
+  .sec{margin-bottom:14px;} a{color:inherit !important;text-decoration:none !important;}
+}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<button id="top-btn" aria-label="맨 위로">↑</button>
+<div class="wrap">
+
+<header class="hero">
+  <div class="hero-eyebrow">Portfolio Project · 2D Pokémon-like</div>
+  <h1>포켓몬 게임 개발 <span class="accent">시작 가이드</span><br>도구 · 기본 뼈대 · 참고 사이트</h1>
+  <p>하트골드 같은 2D 탑다운 게임에 <strong>"집 꾸미기"와 배틀을 연결한 나만의 색</strong>을 입히는 프로젝트.
+  처음부터 어떤 프로그램을 깔고, 폴더와 코드 뼈대를 어떻게 잡고, 어디를 참고하면 되는지를
+  한 번도 안 만들어본 사람 기준으로 처음부터 끝까지 정리했어요.</p>
+  <div class="hero-badges">
+    <span class="hb">Phaser 3</span>
+    <span class="hb t">TypeScript</span>
+    <span class="hb m">VS Code</span>
+    <span class="hb v">Node.js / npm</span>
+    <span class="hb p">집 꾸미기 시스템</span>
+    <span class="hb a">턴제 배틀</span>
+    <span class="hb">지닌 도구</span>
+    <span class="hb t">(선택) Spring Boot + MyBatis</span>
+  </div>
+  <div class="hero-meta">
+    <span>난이도 ★★☆ 입문~기초</span>
+    <span>읽는 데 25~35분</span>
+    <span>설치 + 첫 실행까지 안내</span>
+    <span>예전 스윙 프로젝트 재활용 포함</span>
+  </div>
+</header>
+
+<div class="toc">
+  <h2><span class="dot"></span>이 가이드를 읽는 순서</h2>
+  <div class="toc-grid">
+    <a class="toc-item" href="#overview"><span class="toc-n">01</span><span class="toc-t">전체 그림 — 우리가 만들 게임</span></a>
+    <a class="toc-item" href="#stack"><span class="toc-n">02</span><span class="toc-t">길 정하기 — 왜 Phaser + TypeScript인가</span></a>
+    <a class="toc-item" href="#tools"><span class="toc-n">03</span><span class="toc-t">필요한 프로그램(도구) 설치하기</span></a>
+    <a class="toc-item" href="#reuse"><span class="toc-n">04</span><span class="toc-t">예전 스윙 프로젝트 = 우리의 설계도</span></a>
+    <a class="toc-item" href="#structure"><span class="toc-n">05</span><span class="toc-t">기본 뼈대 — 프로젝트 폴더 구조</span></a>
+    <a class="toc-item" href="#scene"><span class="toc-n">06</span><span class="toc-t">게임의 뼈대 — Phaser 씬(Scene) 구조</span></a>
+    <a class="toc-item" href="#data"><span class="toc-n">07</span><span class="toc-t">포켓몬 데이터 설계 — "정보 카드"</span></a>
+    <a class="toc-item" href="#house"><span class="toc-n">08</span><span class="toc-t">집 꾸미기 시스템 설계 — 내 색의 핵심</span></a>
+    <a class="toc-item" href="#backend"><span class="toc-n">09</span><span class="toc-t">(선택) 스프링부트 백엔드로 저장하기</span></a>
+    <a class="toc-item" href="#sites"><span class="toc-n">10</span><span class="toc-t">참고 사이트 총정리</span></a>
+    <a class="toc-item" href="#roadmap"><span class="toc-n">11</span><span class="toc-t">처음 4주 로드맵 + 체크리스트</span></a>
+  </div>
+</div>
+
+<!-- 01 ───────────────────────────────────────────── -->
+<section class="sec" id="overview">
+  <div class="sec-head">
+    <span class="sec-num">01</span>
+    <div><div class="sec-kicker">Big Picture</div><h2 class="sec-title">먼저 전체 그림 — 우리가 만들 게임</h2></div>
+  </div>
+  <div class="sec-body">
+    <p class="lead">코드부터 들어가기 전에 <strong>"무엇을 만드는가"</strong>를 한 문장으로 못 박아두면, 도구를 고를 때도 뼈대를 잡을 때도 헷갈리지 않아요. 우리 프로젝트의 한 문장은 이거예요.</p>
+
+    <div class="callout c-core">
+      <div class="callout-head"><span class="callout-ic">🎯</span><span class="callout-title">이 게임을 한 문장으로</span></div>
+      <div class="callout-body"><p><strong>"하트골드처럼 맵을 돌아다니며 포켓몬을 모으고 배틀하되, 내 집을 꾸미면 그 환경이 포켓몬의 컨디션을 만들고 그게 배틀로 이어지는 게임."</strong></p>
+      <p>즉 포켓몬의 원래 컨셉(모으고 · 기르고 · 싸운다)은 그대로 두고, 본편에서 비어 있던 <strong>"같이 산다"</strong>는 축을 진하게 채우는 거예요. 집 꾸미기가 단순 장식이 아니라 배틀에 영향을 주는 순간, 흔한 클론들 사이에서 확 튀게 됩니다.</p></div>
+    </div>
+
+    <h3 class="tt">게임을 부품으로 쪼개보면</h3>
+    <p>아무리 큰 게임도 결국 작은 부품들의 조합이에요. 하트골드 같은 2D 탑다운 RPG는 보통 이런 부품으로 나뉩니다. 처음부터 다 만들 필요 없이, <strong>위에서부터 하나씩</strong> 쌓아 올리면 됩니다.</p>
+
+    <div class="card-grid">
+      <div class="concept-card tone-teal"><div class="concept-head"><span class="card-ic">🗺️</span><h3>① 맵 이동</h3></div>
+        <div class="concept-body">타일(격자) 위에서 캐릭터가 걸어다니고, 벽·물에 막히는 충돌 처리. <strong>제일 먼저</strong> 만드는 토대.</div></div>
+      <div class="concept-card tone-amber"><div class="concept-head"><span class="card-ic">💬</span><h3>② NPC · 대화</h3></div>
+        <div class="concept-body">말 걸면 대사가 나오고, 이야기(스토리 플래그)가 진행. 하트골드의 "진행" 느낌이 여기서 나옴.</div></div>
+      <div class="concept-card tone-coral"><div class="concept-head"><span class="card-ic">⚔️</span><h3>③ 턴제 배틀</h3></div>
+        <div class="concept-body">제일 덩치 큰 부품. <strong>맨 마지막에</strong> 얹어야 안 지침. 서로 때리고 HP 깎는 단순 버전부터.</div></div>
+      <div class="concept-card tone-pink"><div class="concept-head"><span class="card-ic">🏠</span><h3>④ 집 꾸미기</h3></div>
+        <div class="concept-body">가구를 격자에 놓고 그 배치를 저장. <strong>내 색</strong>이 들어가는 핵심 차별 기능.</div></div>
+      <div class="concept-card tone-mint"><div class="concept-head"><span class="card-ic">👕</span><h3>⑤ 꾸미기(레이어)</h3></div>
+        <div class="concept-body">옷·지닌 도구를 캐릭터/포켓몬 그림 위에 겹쳐 그리기. 코드는 쉽고 그림이 병목.</div></div>
+      <div class="concept-card tone-violet"><div class="concept-head"><span class="card-ic">💾</span><h3>⑥ 저장</h3></div>
+        <div class="concept-body">잡은 포켓몬, 집 배치, 진행 상태를 파일/DB에 저장하고 다시 불러오기.</div></div>
+    </div>
+
+    <div class="callout c-tip">
+      <div class="callout-head"><span class="callout-ic">🪜</span><span class="callout-title">"한 방에 다 만들기" 금지 — 쌓아 올리기</span></div>
+      <div class="callout-body"><p>초보자가 게임 만들다 지치는 1번 이유는 <strong>배틀 같은 큰 부품을 맨 처음 손대는 것</strong>이에요. 우리는 <strong>① 맵 이동</strong>이 되는 가장 작은 버전(수직 슬라이스)부터 만들고, 재밌다 싶으면 ②③… 순으로 살을 붙입니다. 각 단계가 끝날 때마다 "돌아가는 게임"이 손에 남는 게 핵심이에요.</p></div>
+    </div>
+
+    <div class="callout c-exam">
+      <div class="callout-head"><span class="callout-ic">🧠</span><span class="callout-title">복습 질문</span></div>
+      <div class="callout-body"><p>이 게임을 한 문장으로 말해보세요. 그리고 ①~⑥ 중 <strong>가장 먼저</strong> 만들 것과 <strong>가장 마지막에</strong> 만들 것은 각각 무엇인가요?</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 02 ───────────────────────────────────────────── -->
+<section class="sec" id="stack">
+  <div class="sec-head">
+    <span class="sec-num">02</span>
+    <div><div class="sec-kicker">Decision</div><h2 class="sec-title">길 정하기 — 왜 Phaser + TypeScript인가</h2></div>
+  </div>
+  <div class="sec-body">
+    <p class="lead">게임은 "어떤 언어 + 어떤 도구"로 만들지부터 정해야 해요. 결론부터 말하면 이번 프로젝트는 <strong>TypeScript(언어) + Phaser 3(게임 도구 모음) + VS Code(편집기)</strong> 조합을 추천합니다. 왜 그런지 천천히 풀어볼게요.</p>
+
+    <h3 class="tt">먼저 용어부터 — Phaser? TypeScript?</h3>
+    <div class="callout c-analogy">
+      <div class="callout-head"><span class="callout-ic">🍳</span><span class="callout-title">비유 — 요리에 빗대면</span></div>
+      <div class="callout-body">
+        <p><strong>Phaser(페이저) = 잘 갖춰진 주방 도구 세트.</strong> 게임을 맨손으로 만들면 "캐릭터를 화면에 그려라", "키보드 누르면 움직여라", "두 물체가 부딪쳤나 계산해라"를 전부 직접 코드로 짜야 해요. Phaser는 이런 자주 쓰는 기능을 미리 다 만들어두고 "가져다 써"라고 주는 도구 모음입니다. 그래서 우리는 게임 내용에만 집중할 수 있어요. 특히 <strong>2D(평면) 게임</strong>에 딱 맞고, 웹 브라우저에서 돌아갑니다.</p>
+        <p><strong>TypeScript(타입스크립트, TS) = 안전장치가 달린 언어.</strong> 웹의 기본 언어는 JavaScript인데, TS는 거기에 "이 칸엔 숫자만 들어가야 해" 같은 규칙을 미리 정해두는 안전장치를 더한 버전이에요. 실수로 글자를 넣으면 컴퓨터가 미리 "잘못됐어!"라고 알려줍니다. <strong>지금 배우는 Java도 똑같이 타입(자료형)이 있는 언어</strong>라, TS는 생각보다 금방 익숙해질 거예요.</p>
+        <p>정리하면 <strong>TS(언어)로 코드를 쓰고, Phaser(도구)로 2D 게임을 만든다</strong> — 이런 조합입니다.</p>
+      </div>
+    </div>
+
+    <h3>왜 이 조합인가 — 우리 목표에 맞는 이유</h3>
+    <p>도구 선택은 유행이 아니라 <strong>"내가 만들 게임"과 "내 상황"</strong>에 맞춰야 해요. 우리 상황은 ① 2D 탑다운, ② 집 꾸미기 같은 자기만의 기능, ③ 포트폴리오로 남에게 쉽게 보여주기, ④ Java를 공부 중 — 이 네 가지죠.</p>
+    <div class="card-grid">
+      <div class="concept-card tone-coral"><div class="concept-head"><span class="card-ic">🌐</span><h3>링크 하나로 플레이</h3></div>
+        <div class="concept-body">웹 게임이라 빌드해서 itch.io나 GitHub Pages에 올리면 <strong>"이 링크 눌러봐"</strong> 한 줄로 누구나 바로 해볼 수 있어요. 포트폴리오로는 이게 최강.</div></div>
+      <div class="concept-card tone-teal"><div class="concept-head"><span class="card-ic">📚</span><h3>참고 자료가 많음</h3></div>
+        <div class="concept-body">Phaser로 만든 <strong>포켓몬 스타일 튜토리얼</strong>이 워낙 많아서, 막힐 때 따라 보며 갈 수 있어요. 요즘 AI 도움까지 더하면 충분히 완주 가능.</div></div>
+      <div class="concept-card tone-mint"><div class="concept-head"><span class="card-ic">☕</span><h3>Java 감각과 비슷</h3></div>
+        <div class="concept-body">TS는 타입·클래스 개념이 Java와 닮아서, 지금 공부 흐름과 충돌이 적어요. 나중에 백엔드를 Spring으로 붙이기도 자연스럽고요.</div></div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="cmp">
+        <caption>2D 포켓몬류를 만들 수 있는 길 — 무엇이 우리에게 맞나</caption>
+        <thead><tr><th>길</th><th>언어</th><th>장점</th><th>이번에 추천?</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Phaser 3</strong> + VS Code</td><td>TypeScript</td><td>2D 웹 게임에 최적, 링크로 공유, 자료 풍부</td><td class="yes">★ 메인 추천</td></tr>
+          <tr><td><strong>Godot</strong></td><td>GDScript</td><td>게임 전용 엔진, 타일맵·씬 강력 (예전 정리 md의 추천)</td><td>좋지만 새 엔진·새 언어 부담</td></tr>
+          <tr><td><strong>LibGDX</strong> + IntelliJ</td><td>Java</td><td>지금 쓰는 Java 그대로, 기술 스택 일관성</td><td>웹 공유가 번거로움</td></tr>
+          <tr><td><strong>순수 Swing</strong> (예전 방식)</td><td>Java</td><td>이미 해봄, 추가 설치 거의 없음</td><td class="no">타일맵·배포가 비효율</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout c-warn">
+      <div class="callout-head"><span class="callout-ic">⚠️</span><span class="callout-title">솔직하게 — 새 언어·새 도구라 처음엔 헤맨다</span></div>
+      <div class="callout-body"><p>TS와 Phaser를 둘 다 처음 본다면 첫 1~2주는 좀 답답할 수 있어요. 그래도 이 분야는 따라 만들 자료가 많아서 막히면 참고하며 갈 수 있습니다. 부담 갖지 말고, 02→03 순서대로 환경만 먼저 깔아두면 절반은 한 거예요. (예전 정리 md는 <code>Godot</code>을 밀었지만, "웹 링크로 보여주기 + Java 감각"이라는 우리 목표엔 Phaser가 더 맞아서 이번엔 이쪽으로 잡았어요.)</p></div>
+    </div>
+
+    <div class="callout c-exam">
+      <div class="callout-head"><span class="callout-ic">🧠</span><span class="callout-title">복습 질문</span></div>
+      <div class="callout-body"><p>Phaser와 TypeScript는 각각 "언어"와 "도구 모음" 중 무엇인가요? 그리고 우리가 Godot이나 LibGDX 대신 Phaser를 고른 가장 큰 이유 하나를 말해보세요.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 ───────────────────────────────────────────── -->
+<section class="sec" id="tools">
+  <div class="sec-head">
+    <span class="sec-num">03</span>
+    <div><div class="sec-kicker">Setup</div><h2 class="sec-title">필요한 프로그램(도구) 설치하기</h2></div>
+  </div>
+  <div class="sec-body">
+    <p class="lead">이제 책상 위에 무엇을 깔아야 하는지 봅시다. 도구는 <strong>"꼭 필요한 것"</strong>과 <strong>"있으면 좋은 것"</strong>으로 나눠서, 처음엔 꼭 필요한 것만 깔면 됩니다.</p>
+
+    <h3 class="tt">꼭 필요한 것 (이것부터 설치)</h3>
+    <div class="card-grid">
+      <div class="concept-card tone-violet"><div class="concept-head"><span class="card-ic">⚙️</span><h3>Node.js</h3></div>
+        <div class="concept-body"><strong>역할:</strong> TS·Phaser 코드를 개발·실행하는 "엔진실". 설치하면 <code>npm</code>(부품 설치 도구)이 같이 깔려요. <strong>없으면?</strong> Phaser 프로젝트를 아예 못 돌립니다. → <strong>1순위 설치</strong></div></div>
+      <div class="concept-card tone-mint"><div class="concept-head"><span class="card-ic">🧰</span><h3>VS Code</h3></div>
+        <div class="concept-body"><strong>역할:</strong> 코드를 쓰고 고치는 편집기. TS·Git과 궁합이 좋고 가벼워요. 이미 써봤으니 그대로 사용.</div></div>
+      <div class="concept-card tone-coral"><div class="concept-head"><span class="card-ic">🌿</span><h3>Git + GitHub</h3></div>
+        <div class="concept-body"><strong>역할:</strong> 코드의 "세이브 포인트"와 백업. 포트폴리오에선 <strong>"이 과정을 직접 만들었다"</strong>는 증거가 됩니다. 계정도 미리 만들어 두기.</div></div>
+    </div>
+
+    <h3>있으면 좋은 것 (나중에 필요할 때)</h3>
+    <div class="card-grid">
+      <div class="concept-card tone-amber"><div class="concept-head"><span class="card-ic">🎨</span><h3>Aseprite / LibreSprite</h3></div>
+        <div class="concept-body"><strong>역할:</strong> 도트(픽셀) 그림 그리기 — 캐릭터·가구·아이템. Aseprite는 유료지만 편하고, <strong>LibreSprite</strong>는 무료 대체품. 처음엔 무료 에셋으로 시작해도 OK.</div></div>
+      <div class="concept-card tone-teal"><div class="concept-head"><span class="card-ic">🗺️</span><h3>Tiled</h3></div>
+        <div class="concept-body"><strong>역할:</strong> 타일맵(맵) 그리기 도구. 그린 맵을 파일로 내보내면 Phaser가 그대로 읽어요. 맵이 커지면 큰 도움.</div></div>
+      <div class="concept-card tone-pink"><div class="concept-head"><span class="card-ic">☕</span><h3>IntelliJ / STS / Oracle</h3></div>
+        <div class="concept-body"><strong>역할:</strong> 9번 "백엔드 저장" 단계로 갈 때만. 이미 익숙한 도구라 추가 학습 부담이 없어요.</div></div>
+    </div>
+
+    <div class="callout c-flow">
+      <div class="callout-head"><span class="callout-ic">🧭</span><span class="callout-title">설치 흐름 — 위에서부터 차례로</span></div>
+      <div class="callout-body">
+        <div class="flowbox" style="margin-top:6px;">
+          <div class="flow-step"><span class="flow-badge v">1단계</span><span class="flow-label">Node.js 설치 (LTS 버전 권장) → 컴퓨터에 "엔진실" 장착</span></div>
+          <span class="flow-sep">↓</span>
+          <div class="flow-step"><span class="flow-badge m">2단계</span><span class="flow-label">VS Code 설치 → 코드 편집기 준비</span></div>
+          <span class="flow-sep">↓</span>
+          <div class="flow-step"><span class="flow-badge c">3단계</span><span class="flow-label">Git 설치 + GitHub 가입 → 세이브/백업 준비</span></div>
+          <span class="flow-sep">↓</span>
+          <div class="flow-step"><span class="flow-badge t">4단계</span><span class="flow-label">VS Code 확장 설치 (ESLint, Prettier 정도) → 코드 자동 정리</span></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="code-role">설치가 끝났는지 확인하는 명령. VS Code의 터미널(상단 메뉴 Terminal → New Terminal)에 한 줄씩 입력해 보세요.</p>
+    <div class="codecard">
+      <div class="code-title"><span class="code-fname">터미널 (설치 확인)</span><span class="code-lang">BASH</span></div>
+<pre><code><span class="code-comment"># Node.js와 npm이 깔렸는지 확인 — 버전 숫자가 나오면 성공</span>
+node -v
+npm -v
+
+<span class="code-comment"># Git이 깔렸는지 확인</span>
+git --version</code></pre>
+    </div>
+    <ul class="code-notes">
+      <li><code>node -v</code>는 "노드 버전 보여줘"라는 뜻. <strong>버전 숫자(예: v20.x)</strong>가 보이면 정상 설치된 것.</li>
+      <li><code>npm</code>은 Node와 함께 깔리는 부품 설치 도구예요. 다음 단계에서 Phaser를 이걸로 가져옵니다.</li>
+      <li>셋 중 하나라도 <strong>"command not found"</strong>가 뜨면 그 프로그램이 설치 안 됐거나, 설치 후 터미널을 새로 안 연 것. VS Code를 껐다 켜고 다시 확인.</li>
+    </ul>
+
+    <div class="callout c-mistake">
+      <div class="callout-head"><span class="callout-ic">🚫</span><span class="callout-title">자주 하는 실수</span></div>
+      <div class="callout-body"><p>① 설치 직후 터미널에서 명령이 안 먹힘 → 보통 <strong>터미널(또는 VS Code)을 새로 열면</strong> 해결돼요. ② Node를 너무 최신/실험 버전으로 깔기 → <strong>LTS(안정 버전)</strong>를 받으세요. ③ Git만 깔고 GitHub 가입을 안 함 → 둘은 다른 거예요. Git은 내 컴퓨터의 도구, GitHub는 코드를 올려두는 웹사이트.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 ───────────────────────────────────────────── -->
+<section class="sec" id="reuse">
+  <div class="sec-head">
+    <span class="sec-num">04</span>
+    <div><div class="sec-kicker">Reuse</div><h2 class="sec-title">예전 스윙 프로젝트 = 우리의 설계도</h2></div>
+  </div>
+  <div class="sec-body">
+    <p class="lead">"예전에 스윙으로 간단히 해봤다"고 했죠. 그 프로젝트(<code>javaprj</code>의 <code>swing_version</code>)는 <strong>버리는 게 아니라 설계도로 재활용</strong>합니다. 이미 게임의 핵심 부품을 클래스로 나눠놨거든요. 그 구조를 Phaser/TS로 그대로 옮기면 됩니다.</p>
+
+    <div class="callout c-analogy">
+      <div class="callout-head"><span class="callout-ic">📐</span><span class="callout-title">비유 — 집을 옮겨 짓기</span></div>
+      <div class="callout-body"><p>예전 스윙 코드는 <strong>"이 집에는 방이 몇 개, 부엌은 어디"</strong>가 그려진 설계도예요. 우리는 그 설계도(어떤 클래스가 무슨 일을 하는지)를 그대로 들고, <strong>재료만 Java→TS로 바꿔서</strong> 새 땅(Phaser)에 다시 짓는 겁니다. 고민을 한 번 했던 구조라 두 번째는 훨씬 빨라요.</p></div>
+    </div>
+
+    <h3 class="mm">예전 클래스 → 새 구조 매핑</h3>
+    <p>스윙 버전에 이미 있던 핵심 클래스들이 새 프로젝트에서 어디에 해당하는지 짝을 지어봤어요.</p>
+    <div class="table-wrap">
+      <table class="cmp">
+        <caption>스윙 버전(Java) → Phaser 버전(TS) 대응표</caption>
+        <thead><tr><th>예전 (swing_version)</th><th>그 역할</th><th>새 구조에서는</th></tr></thead>
+        <tbody>
+          <tr><td><code>Map</code> · <code>Location</code></td><td>7×7 격자, 각 칸이 풀숲/마을/센터/체육관</td><td>Phaser <strong>TileMap</strong> (또는 Tiled로 그린 맵)</td></tr>
+          <tr><td><code>MapPanel</code> · <code>MapMain</code></td><td>맵을 그리고 WASD 키로 이동</td><td><code>WorldScene</code> (씬 하나)</td></tr>
+          <tr><td><code>Player</code> / <code>MapPlayer</code></td><td>이름·좌표·파티 6마리 보관</td><td><code>Player</code> 데이터 + 맵 위 sprite</td></tr>
+          <tr><td><code>Pokemon</code> · <code>Skill</code> · <code>TypeEffect</code></td><td>포켓몬 한 마리의 정보, 기술, 상성</td><td><code>Pokemon</code> 타입(인터페이스/클래스)</td></tr>
+          <tr><td><code>BattleEngine</code></td><td>턴제 배틀 계산</td><td><code>BattleScene</code> + 배틀 로직</td></tr>
+          <tr><td><code>SaveManager</code></td><td>파티를 파일에 저장/불러오기</td><td>브라우저 저장 또는 (9번) 백엔드</td></tr>
+          <tr><td>—</td><td>(예전엔 없던) 집 꾸미기</td><td><code>HouseScene</code> + <code>HouseLayout</code> ★ 새 기능</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout c-tip">
+      <div class="callout-head"><span class="callout-ic">💡</span><span class="callout-title">팁 — 코드가 아니라 "역할 분리"를 가져오기</span></div>
+      <div class="callout-body"><p>옮길 때 Java 코드를 한 줄씩 직역하지 마세요. 가져올 건 <strong>"맵 / 플레이어 / 포켓몬 / 배틀 / 저장을 따로 둔다"</strong>는 역할 분리 감각이에요. 이미 그걸 해봤다는 게 큰 자산입니다. 새 기능인 <strong>집 꾸미기</strong>도 똑같이 "데이터(배치) / 화면(씬) / 저장"으로 쪼개서 끼워 넣으면 됩니다.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 ───────────────────────────────────────────── -->
+<section class="sec" id="structure">
+  <div class="sec-head">
+    <span class="sec-num">05</span>
+    <div><div class="sec-kicker">Skeleton</div><h2 class="sec-title">기본 뼈대 — 프로젝트 폴더 구조</h2></div>
+  </div>
+  <div class="sec-body">
+    <p class="lead">게임이 커져도 안 헤매려면, 처음부터 <strong>"무엇을 어디에 둘지"</strong>를 정해두는 게 중요해요. 파일이 100개가 돼도 "포켓몬 데이터는 data 폴더, 화면은 scenes 폴더"라는 규칙이 있으면 길을 잃지 않습니다. 아래가 권장 뼈대예요.</p>
+
+    <div class="filetree">
+      <div class="tree-row d0"><span class="tree-ic">📁</span><span class="tree-name">my-pokemon/</span><span class="tree-badge b-folder">프로젝트 루트</span><span class="tree-role">← 게임 전체가 들어가는 폴더</span></div>
+      <div class="tree-row d1"><span class="tree-ic">📄</span><span class="tree-name">index.html</span><span class="tree-badge b-view">HTML</span><span class="tree-role">← 게임이 열리는 첫 웹페이지</span></div>
+      <div class="tree-row d1"><span class="tree-ic">⚙️</span><span class="tree-name">package.json</span><span class="tree-badge b-config">설정</span><span class="tree-role">← 어떤 부품(Phaser 등)을 쓰는지 적힌 명세서</span></div>
+      <div class="tree-row d1"><span class="tree-ic">⚙️</span><span class="tree-name">tsconfig.json</span><span class="tree-badge b-config">설정</span><span class="tree-role">← TypeScript 규칙 설정</span></div>
+      <div class="tree-row d1"><span class="tree-ic">📁</span><span class="tree-name">src/</span><span class="tree-badge b-folder">소스</span><span class="tree-role">← 우리가 직접 짜는 코드 전부</span></div>
+      <div class="tree-row d2"><span class="tree-ic">📄</span><span class="tree-name">main.ts</span><span class="tree-badge b-code">진입점</span><span class="tree-role">← 게임을 켜는 시작 파일 (스윙의 GameMain 역할)</span></div>
+      <div class="tree-row d2"><span class="tree-ic">📁</span><span class="tree-name">scenes/</span><span class="tree-badge b-folder">화면</span><span class="tree-role">← 각 "장면"을 담는 폴더</span></div>
+      <div class="tree-row d3"><span class="tree-ic">🖼️</span><span class="tree-name">WorldScene.ts</span><span class="tree-badge b-view">씬</span><span class="tree-role">← 맵 돌아다니는 화면</span></div>
+      <div class="tree-row d3"><span class="tree-ic">🖼️</span><span class="tree-name">BattleScene.ts</span><span class="tree-badge b-view">씬</span><span class="tree-role">← 배틀 화면</span></div>
+      <div class="tree-row d3"><span class="tree-ic">🖼️</span><span class="tree-name">HouseScene.ts</span><span class="tree-badge b-view">씬</span><span class="tree-role">← 집 꾸미기 화면 ★ 내 색</span></div>
+      <div class="tree-row d2"><span class="tree-ic">📁</span><span class="tree-name">data/</span><span class="tree-badge b-folder">데이터</span><span class="tree-role">← 화면이 아니라 "정보"만 담는 폴더</span></div>
+      <div class="tree-row d3"><span class="tree-ic">📦</span><span class="tree-name">Pokemon.ts</span><span class="tree-badge b-data">타입</span><span class="tree-role">← 포켓몬 정보 카드 정의</span></div>
+      <div class="tree-row d3"><span class="tree-ic">📦</span><span class="tree-name">Player.ts</span><span class="tree-badge b-data">타입</span><span class="tree-role">← 플레이어 정보(이름·파티)</span></div>
+      <div class="tree-row d3"><span class="tree-ic">📦</span><span class="tree-name">HouseLayout.ts</span><span class="tree-badge b-data">타입</span><span class="tree-role">← 집에 놓은 가구 배치</span></div>
+      <div class="tree-row d3"><span class="tree-ic">📦</span><span class="tree-name">furniture.ts</span><span class="tree-badge b-data">목록</span><span class="tree-role">← 놓을 수 있는 가구 카탈로그</span></div>
+      <div class="tree-row d2"><span class="tree-ic">📁</span><span class="tree-name">systems/</span><span class="tree-badge b-folder">규칙</span><span class="tree-role">← 계산·규칙 로직 (배틀, 집 보너스 등)</span></div>
+      <div class="tree-row d3"><span class="tree-ic">📦</span><span class="tree-name">battle.ts</span><span class="tree-badge b-code">로직</span><span class="tree-role">← 데미지·턴 계산</span></div>
+      <div class="tree-row d3"><span class="tree-ic">📦</span><span class="tree-name">homeBonus.ts</span><span class="tree-badge b-code">로직</span><span class="tree-role">← 집 환경 → 컨디션 규칙 ★ 내 색</span></div>
+      <div class="tree-row d3"><span class="tree-ic">📦</span><span class="tree-name">save.ts</span><span class="tree-badge b-code">로직</span><span class="tree-role">← 저장/불러오기</span></div>
+      <div class="tree-row d1"><span class="tree-ic">📁</span><span class="tree-name">assets/</span><span class="tree-badge b-asset">리소스</span><span class="tree-role">← 그림·소리 파일 (코드 아님)</span></div>
+      <div class="tree-row d2"><span class="tree-ic">🖼️</span><span class="tree-name">tilesets/, sprites/, audio/</span><span class="tree-badge b-asset">에셋</span><span class="tree-role">← 타일·캐릭터·효과음</span></div>
+    </div>
+
+    <div class="callout c-flow">
+      <div class="callout-head"><span class="callout-ic">🔁</span><span class="callout-title">이 구조에서 정보가 흐르는 길</span></div>
+      <div class="callout-body">
+        <p>게임이 켜지고, 집 꾸미기가 배틀에 영향을 주기까지의 흐름이에요. 폴더가 왜 이렇게 나뉘는지 이 흐름으로 보면 이해됩니다.</p>
+        <div class="flowbox" style="margin-top:6px;">
+          <div class="flow-step"><span class="flow-badge">1</span><span class="flow-label"><code>main.ts</code>가 게임을 켜고 <code>WorldScene</code>을 띄움</span></div>
+          <span class="flow-sep">↓</span>
+          <div class="flow-step"><span class="flow-badge t">2</span><span class="flow-label">집 문에 들어가면 <code>HouseScene</code>으로 전환 → 가구 배치를 <code>HouseLayout</code>에 저장</span></div>
+          <span class="flow-sep">↓</span>
+          <div class="flow-step"><span class="flow-badge m">3</span><span class="flow-label"><code>systems/homeBonus.ts</code>가 배치를 보고 포켓몬 <code>condition</code>을 올림 ★</span></div>
+          <span class="flow-sep">↓</span>
+          <div class="flow-step"><span class="flow-badge c">4</span><span class="flow-label">야생 포켓몬을 만나면 <code>BattleScene</code> → <code>systems/battle.ts</code>가 컨디션까지 반영해 계산</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout c-warn">
+      <div class="callout-head"><span class="callout-ic">⚠️</span><span class="callout-title">핵심 원칙 — "화면(scenes)"과 "정보(data)"를 섞지 않기</span></div>
+      <div class="callout-body"><p>초보자가 가장 많이 하는 실수가 <strong>그리는 코드와 데이터·규칙을 한 파일에 다 욱여넣는 것</strong>이에요. 그러면 나중에 "배틀 공식만 고치고 싶은데" 할 때 화면 코드 사이에서 헤매게 됩니다. <code>scenes</code>(보여주기) · <code>data</code>(정보) · <code>systems</code>(규칙)을 나눠두면, 고칠 게 생겼을 때 어디를 열지 바로 알 수 있어요. 이게 예전 스윙 프로젝트가 이미 잘 해둔 부분(역할 분리)이고요.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 06 ───────────────────────────────────────────── -->
+<section class="sec" id="scene">
+  <div class="sec-head">
+    <span class="sec-num">06</span>
+    <div><div class="sec-kicker">Scene</div><h2 class="sec-title">게임의 뼈대 — Phaser 씬(Scene) 구조</h2></div>
+  </div>
+  <div class="sec-body">
+    <p class="lead">Phaser 게임의 기본 단위는 <strong>씬(Scene)</strong>이에요. 씬은 게임 속 "한 장면"입니다. 우리 게임엔 맵 씬, 배틀 씬, 집 씬이 있고, 상황에 따라 씬을 갈아끼웁니다.</p>
+
+    <div class="callout c-analogy">
+      <div class="callout-head"><span class="callout-ic">🎬</span><span class="callout-title">비유 — 연극 무대</span></div>
+      <div class="callout-body"><p>씬은 연극의 <strong>한 무대 세트</strong>예요. "마을 장면" 세트에서 놀다가, 배틀이 시작되면 무대를 <strong>"배틀 세트"</strong>로 바꿔 끼웁니다. 각 무대(씬)는 ① 소품을 준비하고(<code>preload</code>) → ② 무대를 차리고(<code>create</code>) → ③ 막이 오른 동안 계속 움직이는(<code>update</code>) 흐름을 가져요. 이 세 단계가 모든 씬의 공통 뼈대입니다.</p></div>
+    </div>
+
+    <h3 class="tt">모든 씬이 가지는 3단계</h3>
+    <div class="flowbox">
+      <div class="flow-step"><span class="flow-badge t">preload</span><span class="flow-label">그림·소리 같은 리소스를 미리 불러오기 (딱 한 번)</span></div>
+      <span class="flow-sep">↓</span>
+      <div class="flow-step"><span class="flow-badge m">create</span><span class="flow-label">화면을 처음 구성 — 캐릭터·타일·입력키 만들기 (딱 한 번)</span></div>
+      <span class="flow-sep">↓</span>
+      <div class="flow-step"><span class="flow-badge c">update</span><span class="flow-label">1초에 약 60번 반복 — 매 순간 위치·상태 갱신 (게임 루프)</span></div>
+    </div>
+
+    <p class="code-role">맵을 돌아다니는 가장 기본 씬. 예전 스윙의 <code>MapPanel(그리기)</code> + <code>MapMain(키 입력)</code>이 이 한 파일로 합쳐진다고 보면 돼요.</p>
+    <div class="codecard">
+      <div class="code-title"><span class="code-fname">src/scenes/WorldScene.ts</span><span class="code-lang">TypeScript</span></div>
+<pre><code><span class="code-keyword">import</span> Phaser <span class="code-keyword">from</span> <span class="code-string">"phaser"</span>;  <span class="code-comment">// Phaser 도구 모음을 통째로 가져온다</span>
+
+<span class="code-comment">// Phaser.Scene을 상속받아 "우리만의 맵 장면"을 만든다 (Java의 extends와 같은 의미)</span>
+<span class="code-keyword">export default class</span> <span class="code-class">WorldScene</span> <span class="code-keyword">extends</span> <span class="code-class">Phaser.Scene</span> {
+  <span class="code-keyword">private</span> player!: <span class="code-class">Phaser.GameObjects.Sprite</span>;            <span class="code-comment">// 맵 위 내 캐릭터 그림</span>
+  <span class="code-keyword">private</span> cursors!: <span class="code-class">Phaser.Types.Input.Keyboard.CursorKeys</span>; <span class="code-comment">// 방향키 입력</span>
+
+  <span class="code-keyword">constructor</span>() {
+    <span class="code-keyword">super</span>(<span class="code-string">"WorldScene"</span>);   <span class="code-comment">// 이 씬의 고유 이름. 나중에 이 이름으로 씬을 부른다</span>
+  }
+
+  <span class="code-method">preload</span>(): <span class="code-keyword">void</span> {        <span class="code-comment">// 1) 리소스 먼저 불러오기 (딱 한 번)</span>
+    <span class="code-keyword">this</span>.load.<span class="code-method">image</span>(<span class="code-string">"tiles"</span>, <span class="code-string">"assets/tilesets/town.png"</span>);
+    <span class="code-keyword">this</span>.load.<span class="code-method">spritesheet</span>(<span class="code-string">"hero"</span>, <span class="code-string">"assets/sprites/hero.png"</span>,
+      { frameWidth: <span class="code-number">16</span>, frameHeight: <span class="code-number">16</span> });
+  }
+
+  <span class="code-method">create</span>(): <span class="code-keyword">void</span> {         <span class="code-comment">// 2) 화면 차리기 (딱 한 번)</span>
+    <span class="code-keyword">this</span>.player = <span class="code-keyword">this</span>.add.<span class="code-method">sprite</span>(<span class="code-number">100</span>, <span class="code-number">100</span>, <span class="code-string">"hero"</span>);
+    <span class="code-keyword">this</span>.cursors = <span class="code-keyword">this</span>.input.keyboard!.<span class="code-method">createCursorKeys</span>();
+  }
+
+  <span class="code-method">update</span>(): <span class="code-keyword">void</span> {         <span class="code-comment">// 3) 매 순간 반복 (게임 루프 = 1초에 약 60번)</span>
+    <span class="code-keyword">if</span> (<span class="code-keyword">this</span>.cursors.left.isDown)  <span class="code-keyword">this</span>.player.x -= <span class="code-number">2</span>;  <span class="code-comment">// 왼쪽 키를 누르고 있으면 x를 줄임</span>
+    <span class="code-keyword">if</span> (<span class="code-keyword">this</span>.cursors.right.isDown) <span class="code-keyword">this</span>.player.x += <span class="code-number">2</span>;
+    <span class="code-keyword">if</span> (<span class="code-keyword">this</span>.cursors.up.isDown)    <span class="code-keyword">this</span>.player.y -= <span class="code-number">2</span>;
+    <span class="code-keyword">if</span> (<span class="code-keyword">this</span>.cursors.down.isDown)  <span class="code-keyword">this</span>.player.y += <span class="code-number">2</span>;
+  }
+}</code></pre>
+    </div>
+    <ul class="code-notes">
+      <li><code>extends Phaser.Scene</code> — Java에서 <code>extends</code>로 부모 클래스를 물려받듯, Phaser가 만든 "씬의 기본 기능"을 물려받아요. 그래서 우리는 <code>preload/create/update</code>만 채우면 됩니다.</li>
+      <li><code>super("WorldScene")</code> — 이 씬에 이름표를 붙이는 부분. 배틀로 넘어갈 때 <code>this.scene.start("BattleScene")</code>처럼 이 이름으로 부릅니다.</li>
+      <li><code>update()</code>가 <strong>1초에 약 60번 자동 반복</strong>된다는 게 게임의 핵심이에요. 예전 스윙에서 키 누를 때마다 한 번 다시 그리던 것과 달리, 여기선 "계속 도는 루프" 안에서 매 순간 상태를 확인합니다.</li>
+      <li>다음 단계: <code>player.x -= 2</code>를 <strong>타일 격자 단위 이동 + 벽 충돌 막기</strong>로 바꾸면 하트골드 같은 칸 이동이 됩니다.</li>
+    </ul>
+
+    <div class="callout c-mistake">
+      <div class="callout-head"><span class="callout-ic">🚫</span><span class="callout-title">자주 하는 실수</span></div>
+      <div class="callout-body"><p>① 무거운 그림 로딩을 <code>create</code>나 <code>update</code>에 넣기 → 반드시 <code>preload</code>에서. ② <code>update</code> 안에 한 번만 해도 되는 일(버튼 만들기 등)을 넣기 → 매 프레임 60번 만들어져 버려요. ③ 씬 이름 오타 → <code>this.scene.start</code>로 호출할 때 이름이 한 글자라도 다르면 "그런 씬 없다"고 조용히 실패합니다.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 07 ───────────────────────────────────────────── -->
+<section class="sec" id="data">
+  <div class="sec-head">
+    <span class="sec-num">07</span>
+    <div><div class="sec-kicker">Data</div><h2 class="sec-title">포켓몬 데이터 설계 — "정보 카드"</h2></div>
+  </div>
+  <div class="sec-body">
+    <p class="lead">컴퓨터 입장에서 포켓몬 한 마리는 <strong>"정보가 적힌 카드"</strong> 한 장이에요. 이름·HP·기술이 적혀 있죠. 여기에 <strong>지닌 도구 칸</strong>과 <strong>컨디션 칸</strong>을 추가하는 게 우리 게임의 두 비밀 무기입니다.</p>
+
+    <div class="callout c-analogy">
+      <div class="callout-head"><span class="callout-ic">🃏</span><span class="callout-title">비유 — 트레이딩 카드</span></div>
+      <div class="callout-body"><p>포켓몬 카드 한 장에 이름·타입·HP·기술이 적혀 있다고 생각해 보세요. 우리는 거기에 <strong>"지닌 도구: ___"</strong> 칸과 <strong>"컨디션: ___"</strong> 칸을 손으로 더 그려 넣는 거예요. 배틀할 때 그 칸을 읽어서 "이 칸에 기력의 조각이 있네? 그럼 공격력 +10" 식으로 효과를 줍니다. 원래 포켓몬의 "지닌 물건" 시스템과 똑같은 원리라 자연스럽게 녹아들어요.</p></div>
+    </div>
+
+    <p class="code-role">포켓몬 한 마리의 정보를 정의하는 타입. <code>interface</code>는 "이 카드엔 이런 칸들이 반드시 있다"는 약속이에요.</p>
+    <div class="codecard">
+      <div class="code-title"><span class="code-fname">src/data/Pokemon.ts</span><span class="code-lang">TypeScript</span></div>
+<pre><code><span class="code-comment">// 포켓몬 한 마리가 가져야 하는 정보들의 "약속"</span>
+<span class="code-keyword">export interface</span> <span class="code-class">Pokemon</span> {
+  id: <span class="code-keyword">number</span>;            <span class="code-comment">// 도감 번호</span>
+  name: <span class="code-keyword">string</span>;          <span class="code-comment">// 이름 (예: "파이리")</span>
+  type: <span class="code-keyword">string</span>;          <span class="code-comment">// 속성 (예: "불꽃")</span>
+  level: <span class="code-keyword">number</span>;         <span class="code-comment">// 레벨</span>
+  maxHp: <span class="code-keyword">number</span>;         <span class="code-comment">// 최대 체력</span>
+  currentHp: <span class="code-keyword">number</span>;     <span class="code-comment">// 현재 체력</span>
+  attack: <span class="code-keyword">number</span>;        <span class="code-comment">// 공격력</span>
+  heldItem: <span class="code-keyword">string</span> | <span class="code-keyword">null</span>; <span class="code-comment">// ★ 지닌 도구 (없으면 null) — 비밀 기능의 핵심</span>
+  condition: <span class="code-keyword">number</span>;     <span class="code-comment">// ★ 컨디션(집에서 쉰 정도) — 집 꾸미기와 배틀을 잇는 값</span>
+}
+
+<span class="code-comment">// 새 포켓몬을 만들어 주는 함수 (스윙의 copy()/생성자 역할)</span>
+<span class="code-keyword">export function</span> <span class="code-method">createPokemon</span>(name: <span class="code-keyword">string</span>, type: <span class="code-keyword">string</span>): <span class="code-class">Pokemon</span> {
+  <span class="code-keyword">return</span> {
+    id: <span class="code-number">0</span>, name, type, level: <span class="code-number">5</span>,
+    maxHp: <span class="code-number">30</span>, currentHp: <span class="code-number">30</span>, attack: <span class="code-number">10</span>,
+    heldItem: <span class="code-keyword">null</span>,   <span class="code-comment">// 처음엔 아무 도구도 안 지님</span>
+    condition: <span class="code-number">0</span>     <span class="code-comment">// 처음 컨디션은 0</span>
+  };
+}</code></pre>
+    </div>
+    <ul class="code-notes">
+      <li><code>interface</code>는 데이터의 "형태"를 정하는 약속이에요. 이렇게 정해두면 <strong>오타나 빠진 칸을 컴퓨터가 미리 잡아줘요</strong> — TS의 안전장치(Java의 타입 검사와 같은 역할).</li>
+      <li><code>heldItem: string | null</code> — "글자가 들어가거나, 아무것도 없으면 <code>null</code>"이라는 뜻. 도구를 안 지닌 상태를 깔끔하게 표현합니다.</li>
+      <li><code>condition</code>이 8번 "집 꾸미기"와 4번 "배틀"을 잇는 다리예요. 집에서 잘 쉬면 이 숫자가 오르고, 배틀 계산이 이 숫자를 참고합니다.</li>
+    </ul>
+
+    <div class="callout c-tip">
+      <div class="callout-head"><span class="callout-ic">🤫</span><span class="callout-title">"지닌 도구를 포켓몬 위에 그리기"는 어떻게?</span></div>
+      <div class="callout-body"><p>귀엽게 도구가 보이게 하는 건 <strong>옷 꾸미기와 똑같은 원리</strong>예요. 포켓몬 그림(아래 레이어) 위에 도구 그림(위 레이어)을 살짝 겹쳐서 그리면 됩니다. 데이터상으론 <code>heldItem</code> 칸에 글자만 들어 있으면 되고, 화면에선 그 글자에 맞는 작은 그림을 포켓몬 위에 얹는 거죠. 코드는 어렵지 않고, <strong>도구 그림(에셋)을 준비하는 게 더 큰 일</strong>이에요.</p></div>
+    </div>
+
+    <div class="callout c-exam">
+      <div class="callout-head"><span class="callout-ic">🧠</span><span class="callout-title">복습 질문</span></div>
+      <div class="callout-body"><p><code>heldItem</code>의 타입이 <code>string | null</code>인 이유는 무엇인가요? 그리고 <code>condition</code> 칸은 어떤 두 시스템을 연결하나요?</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 08 ───────────────────────────────────────────── -->
+<section class="sec" id="house">
+  <div class="sec-head">
+    <span class="sec-num">08</span>
+    <div><div class="sec-kicker">My Color ★</div><h2 class="sec-title">집 꾸미기 시스템 설계 — 내 색의 핵심</h2></div>
+  </div>
+  <div class="sec-body">
+    <p class="lead">이제 이 프로젝트의 진짜 차별점이에요. 기술적으로 집 꾸미기는 어렵지 않아요. <strong>"격자 위에 가구를 놓고, 그 배치를 저장한다"</strong> — 동물의 숲 방 꾸미기와 똑같은 구조거든요. 핵심은 세 가지: <strong>가구 목록 · 격자 배치 · 저장</strong>.</p>
+
+    <div class="callout c-analogy">
+      <div class="callout-head"><span class="callout-ic">🪑</span><span class="callout-title">비유 — 모눈종이 위에 스티커 붙이기</span></div>
+      <div class="callout-body"><p>방을 <strong>모눈종이(격자)</strong>라고 생각하세요. 가구는 <strong>스티커</strong>고요. "이 스티커를 (3,2)칸에 붙였다"는 기록만 모아두면, 나중에 그 기록대로 다시 붙여서 방을 통째로 복원할 수 있어요. 즉 우리가 저장할 건 그림이 아니라 <strong>"무슨 가구를 몇 번 칸에 놨는지 목록"</strong>뿐입니다.</p></div>
+    </div>
+
+    <p class="code-role">집 배치를 표현하는 데이터. 이 작은 목록 하나만 저장하면 방 전체가 복원돼요.</p>
+    <div class="codecard">
+      <div class="code-title"><span class="code-fname">src/data/HouseLayout.ts</span><span class="code-lang">TypeScript</span></div>
+<pre><code><span class="code-comment">// 가구 하나가 "어디에 놓였는지" 한 칸 기록</span>
+<span class="code-keyword">export interface</span> <span class="code-class">PlacedFurniture</span> {
+  itemId: <span class="code-keyword">string</span>;  <span class="code-comment">// 가구 종류 (예: "fireplace" = 벽난로)</span>
+  x: <span class="code-keyword">number</span>;       <span class="code-comment">// 방 격자 칸 x 좌표</span>
+  y: <span class="code-keyword">number</span>;       <span class="code-comment">// 방 격자 칸 y 좌표</span>
+}
+
+<span class="code-comment">// 방 한 칸 전체 = 크기 + 놓인 가구 목록</span>
+<span class="code-keyword">export interface</span> <span class="code-class">HouseLayout</span> {
+  width: <span class="code-keyword">number</span>;                 <span class="code-comment">// 방 가로 칸 수</span>
+  height: <span class="code-keyword">number</span>;                <span class="code-comment">// 방 세로 칸 수</span>
+  furniture: <span class="code-class">PlacedFurniture</span>[];  <span class="code-comment">// 놓아둔 가구 목록 (이 배열만 저장하면 방이 통째로 복원됨)</span>
+}</code></pre>
+    </div>
+    <ul class="code-notes">
+      <li><code>PlacedFurniture[]</code>의 <code>[]</code>는 "여러 개를 담는 목록"이라는 뜻 (Java의 <code>List</code>와 같은 역할).</li>
+      <li>가구 <strong>그림</strong>이 아니라 <strong>"종류 + 좌표"</strong>만 저장한다는 게 핵심. 그래서 저장 용량도 작고, 불러올 때 그 좌표에 그림을 다시 그리기만 하면 됩니다.</li>
+      <li>놓을 수 있는 가구의 그림·이름·효과는 <code>furniture.ts</code>(카탈로그)에 따로 정의해두고, 여기선 <code>itemId</code>로 가리키기만 해요.</li>
+    </ul>
+
+    <h3 class="mm">★ 진짜 차별점 — 집이 배틀에 영향을 준다</h3>
+    <p>여기가 "와 이거 신박하다"가 나오는 지점이에요. 집 꾸미기를 <strong>단순 장식이 아니라</strong>, 포켓몬 컨디션을 올리고 그게 배틀로 이어지게 만듭니다. 어제 얘기했던 <strong>"불꽃 포켓몬을 벽난로 옆에서 재우면 강해진다"</strong>를 코드로 옮기면 이래요.</p>
+
+    <p class="code-role">집 환경을 보고 포켓몬 컨디션을 올려주는 규칙. <code>systems/</code> 폴더에 둬서 배틀·화면과 분리.</p>
+    <div class="codecard">
+      <div class="code-title"><span class="code-fname">src/systems/homeBonus.ts</span><span class="code-lang">TypeScript</span></div>
+<pre><code><span class="code-keyword">import</span> { <span class="code-class">Pokemon</span> } <span class="code-keyword">from</span> <span class="code-string">"../data/Pokemon"</span>;
+<span class="code-keyword">import</span> { <span class="code-class">HouseLayout</span> } <span class="code-keyword">from</span> <span class="code-string">"../data/HouseLayout"</span>;
+
+<span class="code-comment">// 집에서 쉴 때 호출 — 방 안의 가구를 보고 컨디션을 조정한다 (내 색의 핵심 규칙)</span>
+<span class="code-keyword">export function</span> <span class="code-method">applyHomeBonus</span>(pokemon: <span class="code-class">Pokemon</span>, house: <span class="code-class">HouseLayout</span>): <span class="code-keyword">void</span> {
+  <span class="code-comment">// 방에 벽난로가 하나라도 있는지 확인</span>
+  <span class="code-keyword">const</span> hasFireplace = house.furniture.<span class="code-method">some</span>(f => f.itemId === <span class="code-string">"fireplace"</span>);
+
+  <span class="code-keyword">if</span> (pokemon.type === <span class="code-string">"불꽃"</span> && hasFireplace) {
+    pokemon.condition += <span class="code-number">10</span>;  <span class="code-comment">// 불꽃 포켓몬 + 벽난로 → 컨디션 +10</span>
+  }
+
+  <span class="code-comment">// 물 포켓몬은 연못이 있으면 컨디션 상승 (같은 방식으로 규칙을 늘려가면 됨)</span>
+  <span class="code-keyword">const</span> hasPond = house.furniture.<span class="code-method">some</span>(f => f.itemId === <span class="code-string">"pond"</span>);
+  <span class="code-keyword">if</span> (pokemon.type === <span class="code-string">"물"</span> && hasPond) {
+    pokemon.condition += <span class="code-number">10</span>;
+  }
+}</code></pre>
+    </div>
+    <ul class="code-notes">
+      <li><code>house.furniture.some(...)</code> — 목록 중 <strong>"조건에 맞는 게 하나라도 있나?"</strong>를 묻는 것. 벽난로가 있으면 <code>true</code>.</li>
+      <li>타입(불꽃/물)과 가구(벽난로/연못)를 <strong>짝지어</strong> 컨디션을 올려요. 이 <code>if</code>를 늘려가는 것만으로 "집이 의미를 갖는" 규칙이 쌓입니다.</li>
+      <li>이렇게 올린 <code>condition</code>을 <code>systems/battle.ts</code>의 데미지 계산에서 참고하면, "잘 꾸민 집 → 강한 배틀" 고리가 완성돼요.</li>
+    </ul>
+
+    <div class="callout c-flow">
+      <div class="callout-head"><span class="callout-ic">🔗</span><span class="callout-title">두 시스템이 이어지는 한 줄 흐름</span></div>
+      <div class="callout-body">
+        <div class="flowbox" style="margin-top:6px;">
+          <div class="flow-step"><span class="flow-badge p">꾸미기</span><span class="flow-label">불꽃 포켓몬 방에 벽난로를 놓는다 (HouseScene)</span></div>
+          <span class="flow-sep">↓</span>
+          <div class="flow-step"><span class="flow-badge m">휴식</span><span class="flow-label">집에서 쉬면 applyHomeBonus가 condition +10</span></div>
+          <span class="flow-sep">↓</span>
+          <div class="flow-step"><span class="flow-badge c">배틀</span><span class="flow-label">battle.ts가 condition을 반영 → 살짝 더 강하게 싸움</span></div>
+          <span class="flow-sep">↓</span>
+          <div class="flow-step"><span class="flow-badge a">의미</span><span class="flow-label">"내가 꾸민 집이 내 포켓몬을 강하게 만든다" — 사람들이 진심으로 꾸미기 시작</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout c-tip">
+      <div class="callout-head"><span class="callout-ic">🌱</span><span class="callout-title">작게 시작하기 — 한 번에 다 만들지 말 것</span></div>
+      <div class="callout-body"><p>집 꾸미기도 <strong>"가구 1종을 1칸에 놓고 화면에 보이게"</strong>부터 시작하세요. 그게 되면 → 가구 여러 개 → 저장/불러오기 → 컨디션 규칙 → 배틀 반영 순으로. 어제 정한 "할만하면 하나씩 추가" 전략 그대로예요.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 09 ───────────────────────────────────────────── -->
+<section class="sec" id="backend">
+  <div class="sec-head">
+    <span class="sec-num">09</span>
+    <div><div class="sec-kicker">Optional · Full-stack</div><h2 class="sec-title">(선택) 스프링부트 백엔드로 저장하기</h2></div>
+  </div>
+  <div class="sec-body">
+    <p class="lead">이건 <strong>나중에 여유가 생기면</strong> 붙이는 선택 단계예요. 게임 화면은 Phaser로 두되, <strong>잡은 포켓몬·집 배치 같은 데이터를 Spring Boot + MyBatis 백엔드(서버)에 저장</strong>하면, 지금 공부 중인 스프링이 "학습용"이 아니라 "실제 프로젝트에 쓰였다"는 강력한 포트폴리오 서사가 됩니다.</p>
+
+    <div class="callout c-analogy">
+      <div class="callout-head"><span class="callout-ic">🏦</span><span class="callout-title">비유 — 게임은 매장, 서버는 금고</span></div>
+      <div class="callout-body"><p>지금까지는 저장을 <strong>브라우저(내 컴퓨터)</strong>에 했어요. 매장 금고에 보관하는 셈이라, 다른 기기에선 못 봐요. 백엔드를 붙이면 <strong>은행 금고(서버 DB)</strong>에 보관하는 거라, 어디서 접속해도 내 집·포켓몬이 그대로 있습니다. 게임(매장)이 금고(서버)에 "이거 저장해줘 / 꺼내줘"라고 부탁하는 구조죠. 이 흐름이 바로 어제 정리한 MyBatis 자료의 "사서에게 부탁하는 흐름"과 같아요.</p></div>
+    </div>
+
+    <div class="flowbox">
+      <div class="flow-step"><span class="flow-badge t">게임(Phaser)</span><span class="flow-label">집 배치를 JSON으로 서버에 보냄 (fetch)</span></div>
+      <span class="flow-sep">↓</span>
+      <div class="flow-step"><span class="flow-badge">Controller</span><span class="flow-label">요청을 받는 카운터 — DTO로 받음</span></div>
+      <span class="flow-sep">↓</span>
+      <div class="flow-step"><span class="flow-badge m">Repository</span><span class="flow-label">MyBatis가 Mapper XML의 SQL 실행</span></div>
+      <span class="flow-sep">↓</span>
+      <div class="flow-step"><span class="flow-badge a">Oracle DB</span><span class="flow-label">house_layout 테이블에 저장 / 조회</span></div>
+    </div>
+
+    <p class="code-role">서버가 집 배치를 받을 때 쓰는 데이터 그릇(DTO). 게임이 보낸 JSON이 이 모양으로 담겨요.</p>
+    <div class="codecard">
+      <div class="code-title"><span class="code-fname">HouseLayoutDto.java</span><span class="code-lang">Java</span></div>
+<pre><code><span class="code-keyword">package</span> com.mygame.house;   <span class="code-comment">// 이 클래스가 속한 패키지(폴더) 이름</span>
+
+<span class="code-keyword">import</span> java.util.List;        <span class="code-comment">// 목록(List)을 쓰기 위해 가져옴</span>
+
+<span class="code-comment">// 게임에서 보낸 "집 배치"를 담는 그릇 (TS의 HouseLayout과 같은 정보)</span>
+<span class="code-keyword">public class</span> <span class="code-class">HouseLayoutDto</span> {
+    <span class="code-keyword">private</span> <span class="code-keyword">long</span> playerId;                 <span class="code-comment">// 어느 플레이어의 집인지</span>
+    <span class="code-keyword">private</span> <span class="code-class">List</span>&lt;<span class="code-class">PlacedFurnitureDto</span>&gt; furniture; <span class="code-comment">// 놓인 가구 목록</span>
+
+    <span class="code-comment">// getter/setter — 외부에서 값을 넣고 꺼내는 통로 (스프링이 JSON을 자동으로 채워줌)</span>
+    <span class="code-keyword">public</span> <span class="code-keyword">long</span> <span class="code-method">getPlayerId</span>() { <span class="code-keyword">return</span> playerId; }
+    <span class="code-keyword">public</span> <span class="code-keyword">void</span> <span class="code-method">setPlayerId</span>(<span class="code-keyword">long</span> playerId) { <span class="code-keyword">this</span>.playerId = playerId; }
+    <span class="code-keyword">public</span> <span class="code-class">List</span>&lt;<span class="code-class">PlacedFurnitureDto</span>&gt; <span class="code-method">getFurniture</span>() { <span class="code-keyword">return</span> furniture; }
+    <span class="code-keyword">public</span> <span class="code-keyword">void</span> <span class="code-method">setFurniture</span>(<span class="code-class">List</span>&lt;<span class="code-class">PlacedFurnitureDto</span>&gt; furniture) { <span class="code-keyword">this</span>.furniture = furniture; }
+}</code></pre>
+    </div>
+    <ul class="code-notes">
+      <li>게임(TS)의 <code>HouseLayout</code>과 서버(Java)의 <code>HouseLayoutDto</code>는 <strong>같은 정보를 양쪽 언어로 적은 것</strong>이에요. 모양이 맞아야 JSON이 깔끔하게 오갑니다.</li>
+      <li>스프링은 게임이 보낸 JSON을 보고 <strong>이 DTO의 칸을 자동으로 채워줘요</strong>. 그래서 우리는 그릇만 만들어두면 됩니다.</li>
+      <li>이 DTO를 <code>Repository</code> → <code>Mapper XML</code>로 넘기면, 어제 정리한 MyBatis 흐름 그대로 DB에 저장됩니다.</li>
+    </ul>
+
+    <div class="callout c-warn">
+      <div class="callout-head"><span class="callout-ic">⏳</span><span class="callout-title">순서 주의 — 이건 마지막에</span></div>
+      <div class="callout-body"><p>백엔드는 게임이 어느 정도 돌아간 <strong>뒤에</strong> 붙이세요. 처음부터 서버까지 같이 만들면 둘 다 미완성으로 지칩니다. "저장이 필요하네" 하는 순간이 올 때 이 단계로 오면 돼요. 그전까지는 8번까지의 브라우저 저장으로 충분합니다.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 ───────────────────────────────────────────── -->
+<section class="sec" id="sites">
+  <div class="sec-head">
+    <span class="sec-num">10</span>
+    <div><div class="sec-kicker">Resources</div><h2 class="sec-title">참고 사이트 총정리</h2></div>
+  </div>
+  <div class="sec-body">
+    <p class="lead">막힐 때 어디를 볼지 미리 모아뒀어요. 목적별로 묶었으니, 지금 필요한 칸만 보면 됩니다.</p>
+
+    <h3 class="tt">공식 문서 (제일 먼저 믿을 곳)</h3>
+    <ul class="linklist">
+      <li><span class="lk-name">Phaser</span> <a href="https://phaser.io/">https://phaser.io/</a> <span class="lk-desc">— 게임 도구 모음 공식. 예제(Examples)가 보물.</span></li>
+      <li><span class="lk-name">TypeScript</span> <a href="https://www.typescriptlang.org/">https://www.typescriptlang.org/</a> <span class="lk-desc">— 언어 공식 문서. 타입 개념 막히면 여기.</span></li>
+      <li><span class="lk-name">Node.js</span> <a href="https://nodejs.org/">https://nodejs.org/</a> <span class="lk-desc">— LTS(안정) 버전 내려받기.</span></li>
+      <li><span class="lk-name">VS Code</span> <a href="https://code.visualstudio.com/Download">https://code.visualstudio.com/Download</a> <span class="lk-desc">— 코드 편집기.</span></li>
+    </ul>
+
+    <h3 class="mm">그림 · 맵 도구</h3>
+    <ul class="linklist">
+      <li><span class="lk-name">Aseprite</span> <a href="https://www.aseprite.org/">https://www.aseprite.org/</a> <span class="lk-desc">— 도트 그림(유료, 편함).</span></li>
+      <li><span class="lk-name">LibreSprite</span> <a href="https://libresprite.github.io/">https://libresprite.github.io/</a> <span class="lk-desc">— 무료 도트 그림 대체품.</span></li>
+      <li><span class="lk-name">Tiled</span> <a href="https://www.mapeditor.org/">https://www.mapeditor.org/</a> <span class="lk-desc">— 타일맵(맵) 제작, Phaser와 연동.</span></li>
+      <li><span class="lk-name">Lospec</span> <a href="https://lospec.com/palette-list">https://lospec.com/palette-list</a> <span class="lk-desc">— 도트용 색 팔레트 모음.</span></li>
+    </ul>
+
+    <h3>무료 에셋 (그림 · 효과음) — 라이선스 꼭 확인</h3>
+    <ul class="linklist">
+      <li><span class="lk-name">Kenney</span> <a href="https://kenney.nl/assets">https://kenney.nl/assets</a> <span class="lk-desc">— 깔끔한 무료 에셋 다수. 프로토타입에 최고.</span></li>
+      <li><span class="lk-name">OpenGameArt</span> <a href="https://opengameart.org/">https://opengameart.org/</a> <span class="lk-desc">— 무료 에셋, 에셋별 라이선스 확인 필수.</span></li>
+      <li><span class="lk-name">Freesound</span> <a href="https://freesound.org/">https://freesound.org/</a> <span class="lk-desc">— 효과음, 사운드별 라이선스 확인.</span></li>
+      <li><span class="lk-name">Bfxr</span> <a href="https://www.bfxr.net/">https://www.bfxr.net/</a> <span class="lk-desc">— 레트로 효과음을 직접 만들기.</span></li>
+    </ul>
+
+    <h3 class="vv">배포 · 포트폴리오</h3>
+    <ul class="linklist">
+      <li><span class="lk-name">itch.io</span> <a href="https://itch.io/">https://itch.io/</a> <span class="lk-desc">— 웹 게임을 올려 링크로 공유.</span></li>
+      <li><span class="lk-name">GitHub</span> <a href="https://github.com/">https://github.com/</a> <span class="lk-desc">— 소스 코드 + README로 "내가 만든 증거".</span></li>
+    </ul>
+
+    <div class="callout c-mistake">
+      <div class="callout-head"><span class="callout-ic">⚖️</span><span class="callout-title">반드시 — 에셋 라이선스와 "포켓몬" 저작권</span></div>
+      <div class="callout-body"><p>① 무료 에셋도 <strong>"표기 필요 / 상업 이용 가능" 같은 조건</strong>이 제각각이에요. 쓴 에셋은 출처·라이선스를 README에 기록해 두세요(어제 정리 md의 "에셋 라이선스 기록 예시" 참고). ② <strong>"포켓몬"은 닌텐도의 상표·저작물</strong>이라, 공개 배포·포트폴리오용으로는 실제 포켓몬 이름·이미지·음악을 그대로 쓰면 위험합니다. 학습/개인 연습은 괜찮지만, 남에게 보여줄 땐 <strong>"포켓몬에서 영감받은 나만의 몬스터·세계관"</strong>으로 이름과 그림을 바꾸는 걸 권해요. 그게 오히려 "내 색"을 더 분명히 보여주기도 하고요.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 11 ───────────────────────────────────────────── -->
+<section class="sec" id="roadmap">
+  <div class="sec-head">
+    <span class="sec-num">11</span>
+    <div><div class="sec-kicker">Roadmap</div><h2 class="sec-title">처음 4주 로드맵 + 체크리스트</h2></div>
+  </div>
+  <div class="sec-body">
+    <p class="lead">"뭘 먼저 해야 하지?"를 없애려고, 큰 그림을 4주로 쪼갰어요. 각 주가 끝날 때마다 <strong>"돌아가는 무언가"</strong>가 손에 남는 게 목표입니다.</p>
+
+    <div class="table-wrap">
+      <table class="cmp">
+        <caption>처음 4주 — 무엇을, 왜</caption>
+        <thead><tr><th>주차</th><th>목표</th><th>끝나면 손에 남는 것</th></tr></thead>
+        <tbody>
+          <tr><td><strong>1주차</strong></td><td>03번대로 도구 설치 + 빈 Phaser 화면 띄우기</td><td>브라우저에 "내 게임 창"이 뜸</td></tr>
+          <tr><td><strong>2주차</strong></td><td>맵 위에서 캐릭터 이동 (06번 WorldScene)</td><td>걸어다니는 캐릭터</td></tr>
+          <tr><td><strong>3주차</strong></td><td>포켓몬 데이터(07) + 집 꾸미기 1종 놓기(08)</td><td>방에 가구 하나 놓이는 화면</td></tr>
+          <tr><td><strong>4주차</strong></td><td>저장/불러오기 + 간단 배틀 맛보기</td><td>껐다 켜도 내 집·포켓몬이 남음</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout c-check">
+      <div class="callout-head"><span class="callout-ic">✅</span><span class="callout-title">시작 전 환경 체크리스트</span></div>
+      <div class="callout-body">
+        <ul class="checklist">
+          <li>Node.js 설치 후 <code>node -v</code>로 버전 확인됨</li>
+          <li>VS Code 설치 + 터미널 열어봄</li>
+          <li>Git 설치 + GitHub 계정 생성</li>
+          <li>Phaser 공식 사이트의 예제 페이지를 북마크함</li>
+          <li>무료 에셋 사이트(Kenney) 한 번 둘러봄</li>
+          <li>"포켓몬 이름/그림은 나중에 내 것으로 바꾼다"는 점 기억함</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout c-exam">
+      <div class="callout-head"><span class="callout-ic">🧠</span><span class="callout-title">스스로 점검</span></div>
+      <div class="callout-body"><p>① 이 게임을 한 문장으로 설명할 수 있나요? ② 가장 먼저 만들 부품과 마지막에 만들 부품은? ③ 집 꾸미기가 배틀에 영향을 주게 만드는 다리 역할을 하는 데이터 칸의 이름은? (답: <code>condition</code>)</p></div>
+    </div>
+  </div>
+</section>
+
+<div class="endcard">
+  <h2>🌟 한눈에 다시 잡는 핵심</h2>
+  <ul>
+    <li><strong>무엇을 만드나</strong> — 하트골드형 2D 게임 + "집 꾸미기가 배틀로 이어지는" 나만의 색.</li>
+    <li><strong>도구</strong> — 꼭: <strong>Node.js · VS Code · Git/GitHub</strong> / 나중에: Aseprite·Tiled·(백엔드용) IntelliJ.</li>
+    <li><strong>언어·프레임워크</strong> — <strong>TypeScript + Phaser 3</strong>. TS는 Java와 닮아 적응이 빨라요.</li>
+    <li><strong>뼈대</strong> — <code>scenes</code>(화면) · <code>data</code>(정보) · <code>systems</code>(규칙)을 <strong>섞지 말고 분리</strong>. 예전 스윙 프로젝트가 이미 잘 한 부분.</li>
+    <li><strong>차별점</strong> — 집 배치 → <code>condition</code> → 배틀로 잇는 <code>homeBonus</code> 규칙이 "내 색"의 심장.</li>
+    <li><strong>순서</strong> — 맵 이동 → 데이터 → 집 꾸미기 → 저장 → 배틀. <strong>한 방에 다 말고 쌓아 올리기.</strong></li>
+    <li><strong>주의</strong> — 에셋 라이선스 기록, 그리고 공개용은 포켓몬 이름·그림을 <strong>내 것으로 교체.</strong></li>
+  </ul>
+</div>
+
+<p class="foot">포켓몬 게임 개발 시작 가이드 · 도구 / 기본 뼈대 / 참고 사이트 — 화면용 학습 가이드</p>
+</div>
+
+<script>
+(function(){
+  var bar=document.getElementById('progress');
+  var btn=document.getElementById('top-btn');
+  function onScroll(){
+    var h=document.documentElement;
+    var sc=h.scrollTop||document.body.scrollTop;
+    var max=(h.scrollHeight-h.clientHeight)||1;
+    bar.style.width=(sc/max*100)+'%';
+    if(sc>360){btn.classList.add('show');}else{btn.classList.remove('show');}
+  }
+  document.addEventListener('scroll',onScroll,{passive:true});
+  onScroll();
+  btn.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'});});
+})();
+</script>
+</body>
+</html>

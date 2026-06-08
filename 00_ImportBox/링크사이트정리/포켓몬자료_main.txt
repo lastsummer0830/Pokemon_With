@@ -1,0 +1,5 @@
+https://github.com/PokeAPI/sprites
+  => 포켓몬 공식 사진 자료들 등등 많은 깃허브
+
+https://pokemondb.net/
+   => 포켓몬 db 예전에 레쿠자 움직이던 짤 여기서 받음

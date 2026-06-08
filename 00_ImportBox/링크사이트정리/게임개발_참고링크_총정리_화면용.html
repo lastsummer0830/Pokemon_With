@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>게임 개발 참고 링크 총정리 — Phaser 2D 포켓몬류 프로젝트</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+:root{
+  --bg:#f8f1d9; --bg-2:#f6ece0; --surface:#fffdfa; --surface-soft:#faf4ec;
+  --ink:#403a31; --ink-soft:#867c6d; --line:#ece1d2;
+  --coral:#e3886e; --coral-d:#b05538; --coral-s:#f9e7df;
+  --teal:#6aa6c0;  --teal-d:#346e88;  --teal-s:#e7f1f6;
+  --mint:#7ab277;  --mint-d:#46823f;  --mint-s:#ebf4e6;
+  --amber:#e3b748; --amber-d:#94740f; --amber-s:#f9f0d2;
+  --pink:#dc94a6;  --pink-d:#a25469;  --pink-s:#f8e8ed;
+  --violet:#9a8fce;--violet-d:#62569b;--violet-s:#eeeafb;
+  --danger:#d6604d;--danger-d:#a13a2d;--danger-s:#f9e3dd;
+  --radius:20px; --radius-sm:13px;
+  --shadow:0 12px 30px -18px rgba(120,98,60,.28);
+  --shadow-soft:0 6px 16px -12px rgba(120,98,60,.20);
+  --maxw:1000px;
+  --code-font:"JetBrains Mono","Cascadia Code","Consolas","D2Coding",monospace;
+  --body-font:"Pretendard","Pretendard Variable","Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0;font-family:var(--body-font);color:var(--ink);
+  background:radial-gradient(1000px 480px at 90% -12%, #faf2d2 0%, transparent 60%),
+    radial-gradient(820px 420px at -8% 4%, #f2eedd 0%, transparent 62%),
+    linear-gradient(180deg,var(--bg) 0%, #f4edd6 100%);
+  line-height:1.72;font-size:16.5px;letter-spacing:-0.1px;-webkit-font-smoothing:antialiased;}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px 90px;}
+#progress{position:fixed;top:0;left:0;height:4px;width:0;
+  background:linear-gradient(90deg,var(--teal),var(--coral));z-index:100;transition:width .08s linear;}
+#top-btn{position:fixed;right:20px;bottom:22px;z-index:90;width:46px;height:46px;border:none;border-radius:50%;
+  cursor:pointer;background:var(--coral);color:#fff;font-size:20px;box-shadow:var(--shadow);
+  opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;}
+#top-btn.show{opacity:1;pointer-events:auto;}
+#top-btn:hover{transform:translateY(-3px);}
+
+/* ── 히어로 (폴더형) ── */
+.hero{position:relative;overflow:visible;margin:52px 0 36px;padding:38px 38px 36px;
+  border-radius:4px 14px 22px 22px;color:var(--ink);
+  background:linear-gradient(165deg,#fef2b6 0%, #fbe592 60%, #f7da7f 100%);
+  box-shadow:0 20px 46px -28px rgba(180,150,60,.5),inset 0 1px 0 rgba(255,255,255,.55);}
+.hero::before{content:"";position:absolute;left:0;right:0;top:-20px;height:60px;
+  background:#f3d275;border-radius:16px 16px 0 0;z-index:-2;}
+.hero::after{content:"";position:absolute;left:26px;top:-40px;width:200px;height:46px;background:#f3d275;z-index:-1;
+  clip-path:path('M0,46 L0,16 Q0,0 16,0 L132,0 Q143,0 149,9 L200,46 Z');}
+.hero-eyebrow{display:inline-block;font-size:12px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;
+  color:var(--coral-d);background:#fffdf6;padding:5px 11px;border-radius:999px;
+  box-shadow:0 2px 6px -3px rgba(150,110,40,.45);margin-bottom:13px;position:relative;z-index:3;}
+.hero h1{margin:0 0 13px;font-size:31px;line-height:1.3;font-weight:800;letter-spacing:-0.6px;
+  color:#4a3d1c;position:relative;z-index:3;text-shadow:0 1px 0 rgba(255,255,255,.4);}
+.hero h1 .accent{display:inline-block;background:#fffdf6;color:var(--coral-d);padding:0 11px;border-radius:11px;
+  box-shadow:0 3px 10px -5px rgba(150,110,40,.5);}
+.hero p{margin:0 0 19px;font-size:15.5px;line-height:1.7;max-width:720px;color:#5e5234;position:relative;z-index:3;}
+.hero-badges{display:flex;flex-wrap:wrap;gap:8px;position:relative;z-index:3;}
+.hb{display:inline-flex;align-items:center;gap:7px;background:#fffefa;color:#7a4e2e;font-weight:700;font-size:12.5px;
+  padding:6px 13px 6px 11px;border-radius:999px;box-shadow:0 3px 9px -5px rgba(150,110,40,.55);}
+.hb::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--coral);flex:none;}
+.hero-meta{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;position:relative;z-index:3;}
+.hero-meta span{font-size:12.5px;font-weight:600;color:#6a5a30;background:rgba(255,255,255,.62);
+  padding:6px 13px;border-radius:9px;box-shadow:inset 0 0 0 1px rgba(220,190,110,.55);}
+
+/* ── 목차 ── */
+.toc{background:var(--surface);border-radius:var(--radius);padding:24px 26px;
+  box-shadow:var(--shadow-soft);border:1px solid var(--line);margin-bottom:34px;}
+.toc h2{margin:0 0 16px;font-size:18px;display:flex;align-items:center;gap:9px;}
+.toc h2 .dot{width:11px;height:11px;border-radius:50%;background:var(--coral);}
+.toc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.toc-item{display:flex;gap:12px;align-items:center;text-decoration:none;color:var(--ink);
+  padding:11px 14px;border-radius:13px;background:var(--surface-soft);border:1px solid var(--line);
+  transition:transform .14s,box-shadow .14s,border-color .14s;}
+.toc-item:hover{transform:translateY(-2px);box-shadow:var(--shadow-soft);border-color:var(--teal);}
+.toc-n{flex:none;width:28px;height:28px;border-radius:9px;background:var(--teal-s);color:var(--teal-d);
+  font-weight:800;font-size:13px;display:grid;place-items:center;}
+.toc-t{font-size:14px;font-weight:600;}
+
+/* ── 섹션 ── */
+.sec{background:var(--surface);border-radius:var(--radius);padding:30px 30px 32px;
+  box-shadow:var(--shadow-soft);border:1px solid var(--line);margin-bottom:26px;scroll-margin-top:24px;}
+.sec-head{display:flex;gap:16px;align-items:flex-start;margin-bottom:20px;padding-bottom:18px;
+  border-bottom:2px dashed var(--line);}
+.sec-num{flex:none;width:46px;height:46px;border-radius:14px;display:grid;place-items:center;
+  font-weight:800;font-size:18px;color:#fff;background:linear-gradient(140deg,#6f9ec0,#8579c0);box-shadow:var(--shadow-soft);}
+.sec-kicker{display:inline-block;font-size:11.5px;font-weight:800;letter-spacing:.7px;color:var(--coral-d);
+  background:var(--coral-s);padding:3px 9px;border-radius:7px;text-transform:uppercase;}
+.sec-title{margin:7px 0 0;font-size:22px;font-weight:800;letter-spacing:-0.4px;color:#3a3228;}
+.sec-body > p{margin:0 0 14px;}
+.sec-body h3{font-size:17px;font-weight:800;margin:26px 0 12px;color:#46352b;display:flex;align-items:center;gap:10px;
+  padding-bottom:9px;letter-spacing:-0.3px;border-bottom:1.5px solid var(--line);}
+.sec-body h3::before{content:"";width:7px;height:21px;border-radius:4px;flex:none;
+  background:linear-gradient(160deg,var(--coral),var(--coral-d));box-shadow:0 2px 7px -3px rgba(191,104,80,.7);}
+.sec-body strong{color:var(--teal-d);font-weight:700;}
+.sec-body code{background:var(--teal-s);color:var(--teal-d);font-family:var(--code-font);font-size:13px;
+  padding:1.5px 6px;border-radius:6px;font-weight:600;}
+
+/* ── 링크 카드 (이 자료의 핵심 컴포넌트) ── */
+.linkgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:16px 0;}
+.lcard{display:flex;flex-direction:column;border-radius:var(--radius-sm);border:1px solid var(--line);
+  background:var(--surface-soft);box-shadow:var(--shadow-soft);overflow:hidden;}
+.lcard-top{height:5px;width:100%;}
+.lt-teal{background:var(--teal);} .lt-mint{background:var(--mint);} .lt-coral{background:var(--coral);}
+.lt-amber{background:var(--amber);} .lt-pink{background:var(--pink);} .lt-violet{background:var(--violet);}
+.lcard-in{padding:15px 17px 16px;display:flex;flex-direction:column;gap:7px;height:100%;}
+.lcard-head{display:flex;align-items:center;gap:9px;}
+.lcard-ic{font-size:19px;flex:none;}
+.lcard-name{font-size:15px;font-weight:800;color:#3a3228;line-height:1.3;}
+.tagrow{display:flex;flex-wrap:wrap;gap:5px;}
+.tag{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:7px;letter-spacing:.2px;}
+.tag-free{background:var(--mint-s);color:var(--mint-d);}
+.tag-paid{background:var(--amber-s);color:var(--amber-d);}
+.tag-git{background:var(--violet-s);color:var(--violet-d);}
+.tag-tool{background:var(--teal-s);color:var(--teal-d);}
+.tag-ref{background:var(--pink-s);color:var(--pink-d);}
+.tag-doc{background:var(--coral-s);color:var(--coral-d);}
+.tag-cau{background:var(--danger-s);color:var(--danger-d);}
+.lcard-desc{font-size:13.3px;color:var(--ink-soft);line-height:1.6;}
+.lcard-use{font-size:12.7px;color:var(--ink);background:#fff;border:1px dashed var(--line);
+  border-radius:9px;padding:8px 11px;line-height:1.55;}
+.lcard-use b{color:var(--coral-d);font-weight:700;}
+.lcard-links{display:flex;flex-wrap:wrap;gap:7px;margin-top:auto;padding-top:4px;}
+.golink{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;text-decoration:none;
+  color:#fff;background:var(--teal);padding:6px 12px;border-radius:8px;transition:transform .12s,background .12s;}
+.golink:hover{transform:translateY(-1px);background:var(--teal-d);}
+.golink.sub{background:#fff;color:var(--violet-d);border:1px solid var(--violet);}
+.golink.sub:hover{background:var(--violet-s);}
+.golink::before{content:"↗";font-weight:800;}
+.golink.sub::before{content:"⌥";}
+
+/* ── 콜아웃 ── */
+.callout{border-radius:var(--radius-sm);padding:15px 18px;margin:16px 0;border:1px solid;border-left-width:5px;
+  background:var(--surface-soft);}
+.callout-head{display:flex;align-items:center;gap:9px;margin-bottom:6px;font-weight:800;font-size:15px;}
+.callout-ic{font-size:18px;}
+.callout-body{font-size:14.3px;color:var(--ink);line-height:1.7;}
+.callout-body p{margin:6px 0;}
+.callout-body strong{color:inherit;}
+.c-core{border-color:var(--teal);background:var(--teal-s);} .c-core .callout-title{color:var(--teal-d);}
+.c-warn{border-color:var(--amber);background:var(--amber-s);} .c-warn .callout-title{color:var(--amber-d);}
+.c-mistake{border-color:var(--danger);background:var(--danger-s);} .c-mistake .callout-title{color:var(--danger-d);}
+.c-tip{border-color:var(--mint);background:var(--mint-s);} .c-tip .callout-title{color:var(--mint-d);}
+.c-flow{border-color:var(--violet);background:var(--violet-s);} .c-flow .callout-title{color:var(--violet-d);}
+
+/* ── 우선순위 스타카드 ── */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:13px;margin:16px 0;}
+.stat{display:flex;align-items:center;gap:13px;border-radius:var(--radius-sm);padding:15px 17px;color:#fff;box-shadow:var(--shadow-soft);}
+.stat.tone-teal{background:linear-gradient(135deg,#86b8cd,#5f97b2);}
+.stat.tone-coral{background:linear-gradient(135deg,#e89986,#cf6f57);}
+.stat.tone-amber{background:linear-gradient(135deg,#ecc873,#caa23a);}
+.stat.tone-violet{background:linear-gradient(135deg,#aaa0d7,#8579c0);}
+.stat.tone-mint{background:linear-gradient(135deg,#93c08e,#669a61);}
+.stat-ic{font-size:25px;background:rgba(255,255,255,.22);width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex:none;}
+.stat-meta{display:flex;flex-direction:column;line-height:1.3;}
+.stat-big{font-size:15.5px;font-weight:800;}
+.stat-small{font-size:12px;opacity:.92;}
+
+/* ── 흐름도 ── */
+.flowbox{display:flex;flex-direction:column;align-items:stretch;gap:0;margin:16px 0;
+  background:var(--surface-soft);border:1px dashed var(--violet);border-radius:var(--radius-sm);padding:18px;}
+.flow-step{display:flex;align-items:center;gap:13px;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;padding:11px 15px;box-shadow:var(--shadow-soft);}
+.flow-badge{flex:none;font-weight:800;font-size:12.5px;color:#fff;background:var(--violet);
+  padding:4px 11px;border-radius:8px;min-width:90px;text-align:center;}
+.flow-label{font-size:13.5px;font-weight:600;}
+.flow-sep{align-self:center;color:var(--violet-d);font-size:18px;font-weight:800;margin:5px 0;}
+
+/* ── 비교표 ── */
+.table-wrap{overflow-x:auto;margin:18px 0 20px;}
+table.cmp{border-collapse:separate;border-spacing:0;width:100%;font-size:13.7px;background:var(--surface);min-width:480px;
+  border:1px solid var(--line);border-radius:var(--radius-sm);box-shadow:var(--shadow-soft);}
+table.cmp caption{caption-side:top;text-align:left;font-weight:800;color:var(--ink);font-size:15.5px;
+  letter-spacing:-0.2px;line-height:1.45;padding:0 2px 11px;}
+table.cmp caption::before{content:"";display:inline-block;width:6px;height:14px;border-radius:3px;
+  background:var(--teal);margin-right:9px;vertical-align:-1px;}
+table.cmp th{background:var(--teal-s);color:var(--teal-d);font-weight:800;padding:11px 15px;text-align:left;border-bottom:2px solid #cfe2ea;}
+table.cmp thead th:first-child{border-top-left-radius:var(--radius-sm);}
+table.cmp thead th:last-child{border-top-right-radius:var(--radius-sm);}
+table.cmp td{padding:10px 15px;border-bottom:1px solid var(--line);vertical-align:top;}
+table.cmp tbody tr:last-child td{border-bottom:none;}
+table.cmp tbody tr:nth-child(even){background:var(--surface-soft);}
+table.cmp td code{background:var(--bg-2);color:var(--coral-d);font-family:var(--code-font);font-size:12px;padding:1px 5px;border-radius:5px;}
+table.cmp a{color:var(--teal-d);font-weight:700;text-decoration:none;}
+table.cmp a:hover{text-decoration:underline;}
+
+/* ── 코드블록 ── */
+.code-role{margin:16px 0 0;font-size:13.3px;color:var(--ink-soft);font-weight:600;display:flex;gap:7px;align-items:flex-start;}
+.code-role::before{content:"📝";}
+.codecard{margin:9px 0 4px;border-radius:14px;overflow:hidden;border:1px solid #d9d0c2;box-shadow:var(--shadow-soft);}
+.code-title{display:flex;justify-content:space-between;align-items:center;background:#1f2733;color:#dde6f0;
+  padding:9px 15px;font-family:var(--code-font);font-size:13px;}
+.code-fname{font-weight:700;}
+.code-fname::before{content:"●  ";color:#ff8b80;}
+.code-lang{font-size:10.5px;background:rgba(255,255,255,.12);padding:2px 9px;border-radius:6px;letter-spacing:.4px;}
+.codecard pre{margin:0;background:#11161f;color:#e6edf3;padding:16px 18px;overflow-x:auto;}
+.codecard code{font-family:var(--code-font);font-size:13px;line-height:1.78;white-space:pre;}
+.code-keyword{color:#7cc4ff;font-weight:700;} .code-string{color:#9ae6a0;}
+.code-comment{color:#9aa7b3;font-style:italic;} .code-annotation{color:#d3b9ff;font-weight:700;}
+.code-class{color:#ffd66b;font-weight:600;} .code-method{color:#67e8f9;} .code-number{color:#ffaf9a;}
+.code-tag{color:#7cc4ff;font-weight:700;} .code-attr{color:#ffd66b;}
+.code-notes{margin:8px 0 4px;padding-left:0;list-style:none;}
+.code-notes li{position:relative;padding:5px 0 5px 24px;font-size:13.3px;color:var(--ink);border-bottom:1px dashed var(--line);}
+.code-notes li:last-child{border-bottom:none;}
+.code-notes li::before{content:"↳";position:absolute;left:4px;color:var(--teal-d);font-weight:800;}
+.code-notes li code{background:var(--teal-s);color:var(--teal-d);font-family:var(--code-font);font-size:12px;padding:1px 5px;border-radius:5px;}
+
+/* ── 마무리 카드 ── */
+.endcard{background:linear-gradient(135deg,#9a90cf,#7aa6c3);color:#fff;border-radius:var(--radius);
+  padding:26px 28px;margin-top:30px;box-shadow:var(--shadow);}
+.endcard h2{margin:0 0 12px;font-size:20px;}
+.endcard ul{margin:0;padding-left:20px;}
+.endcard li{margin:7px 0;font-size:14.3px;}
+.endcard strong{color:#fdf0d8;}
+.foot{text-align:center;color:var(--ink-soft);font-size:12.5px;margin-top:26px;}
+ul.checklist{list-style:none;padding-left:0;margin:6px 0;}
+ul.checklist li{position:relative;padding:7px 0 7px 30px;border-bottom:1px dashed rgba(0,0,0,.08);font-size:14px;}
+ul.checklist li:last-child{border-bottom:none;}
+ul.checklist li::before{content:"☐";position:absolute;left:4px;font-size:18px;color:var(--mint-d);}
+
+@media (max-width:720px){
+  body{font-size:15.5px;}
+  .toc-grid{grid-template-columns:1fr;}
+  .hero{padding:30px 22px;} .hero h1{font-size:24px;}
+  .sec{padding:24px 18px;} .sec-num{width:40px;height:40px;font-size:16px;} .sec-title{font-size:19px;}
+  .linkgrid{grid-template-columns:1fr;}
+}
+
+@page{size:A4;margin:14mm;}
+@media print{
+  html,body{background:#fff !important;color:#111 !important;}
+  #progress,#top-btn{display:none !important;}
+  .wrap{max-width:none;padding:0;}
+  .hero{background:#fff !important;color:#403a31 !important;border:1.5px solid #e7cf86;box-shadow:none !important;}
+  .hero::before{background:#fbf0c8 !important;border:1px solid #e7cf86;}
+  .hero::after{background:#fbf0c8 !important;}
+  .hb{background:#fbeee2 !important;color:var(--coral-d) !important;border:1px solid #efd7c2;}
+  .hero-meta span{background:#f6f1e6 !important;color:#5b5346 !important;border:1px solid #e7dcc8;}
+  .sec,.toc,.lcard,.callout,.flowbox,.endcard,table.cmp,.stat{box-shadow:none !important;break-inside:avoid;page-break-inside:avoid;}
+  .endcard{background:#fff !important;color:#111 !important;border:2px solid var(--violet);}
+  .endcard h2,.endcard strong{color:var(--violet-d) !important;}
+  .stat{color:#111 !important;background:#f7f3ea !important;border:1px solid #ddd;}
+  .stat-ic{background:#eee !important;}
+  .golink{background:#eef4f7 !important;color:#346e88 !important;border:1px solid #cfe2ea;}
+  .golink.sub{background:#f3f0fb !important;color:#62569b !important;}
+  .codecard{border:1px solid #d8cfbf !important;}
+  .code-title{background:#f1eadc !important;color:#403a31 !important;border-bottom:1px solid #d8cfbf;}
+  .code-fname::before{color:var(--coral-d) !important;}
+  .code-lang{background:#e7ddc9 !important;color:#5b5346 !important;}
+  .codecard pre{background:#faf7f0 !important;color:#241f17 !important;}
+  .codecard code{white-space:pre-wrap;word-break:break-word;}
+  .code-keyword,.code-tag{color:#1d4ed8 !important;} .code-string{color:#1c7a3a !important;}
+  .code-comment{color:#6b7280 !important;} .code-annotation{color:#7c3aed !important;}
+  .code-class,.code-attr{color:#b45309 !important;} .code-method{color:#0e7490 !important;} .code-number{color:#be3a2b !important;}
+  a{color:inherit !important;}
+}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="wrap">
+
+  <!-- ===== HERO ===== -->
+  <header class="hero">
+    <span class="hero-eyebrow">Game Dev · Reference Links</span>
+    <h1>게임 개발 참고 링크 <span class="accent">총정리</span></h1>
+    <p>여기저기서 긁어모은 링크들을 <strong>중복 제거 → 주제별 분류 → 이름·바로가는 링크·사용법</strong>까지 한 번에 정리한 자료예요.
+       지금 잡고 있는 뼈대(<b>Phaser 3 + TypeScript</b>로 만드는 2D 포켓몬류 게임)를 기준으로,
+       실제로 자주 쓰게 될 사이트를 앞쪽·크게 배치했어요.</p>
+    <div class="hero-badges">
+      <span class="hb">엔진/도구</span>
+      <span class="hb">에셋/이미지</span>
+      <span class="hb">포켓몬 자료</span>
+      <span class="hb">UI 참고</span>
+      <span class="hb">사운드</span>
+      <span class="hb">GitHub 예제</span>
+    </div>
+    <div class="hero-meta">
+      <span>📌 중복 제거 후 정리</span>
+      <span>🎯 내 스택(Phaser+TS) 우선</span>
+      <span>🖨️ 인쇄해도 깔끔</span>
+      <span>🔗 모든 링크 새 탭 열림</span>
+    </div>
+  </header>
+
+  <!-- ===== 목차 ===== -->
+  <nav class="toc">
+    <h2><span class="dot"></span>목차 — 어디부터 볼까</h2>
+    <div class="toc-grid">
+      <a class="toc-item" href="#s0"><span class="toc-n">0</span><span class="toc-t">이 자료 사용법 · 분류 기준</span></a>
+      <a class="toc-item" href="#s1"><span class="toc-n">1</span><span class="toc-t">⭐ 무조건 설치/가입해야 할 것</span></a>
+      <a class="toc-item" href="#s2"><span class="toc-n">2</span><span class="toc-t">게임 엔진 · 개발 시작</span></a>
+      <a class="toc-item" href="#s3"><span class="toc-n">3</span><span class="toc-t">맵 · 타일맵 · 도트 제작 도구</span></a>
+      <a class="toc-item" href="#s4"><span class="toc-n">4</span><span class="toc-t">무료 에셋 · 이미지 · 아이콘</span></a>
+      <a class="toc-item" href="#s5"><span class="toc-n">5</span><span class="toc-t">사운드 · BGM · 효과음</span></a>
+      <a class="toc-item" href="#s6"><span class="toc-n">6</span><span class="toc-t">폰트 · UI 디자인</span></a>
+      <a class="toc-item" href="#s7"><span class="toc-n">7</span><span class="toc-t">게임 UI · 화면 참고</span></a>
+      <a class="toc-item" href="#s8"><span class="toc-n">8</span><span class="toc-t">포켓몬 데이터 · 스프라이트</span></a>
+      <a class="toc-item" href="#s9"><span class="toc-n">9</span><span class="toc-t">포켓몬 배틀 로직 (GitHub)</span></a>
+      <a class="toc-item" href="#s10"><span class="toc-n">10</span><span class="toc-t">포켓몬 클론 예제 검색 (GitHub)</span></a>
+      <a class="toc-item" href="#s11"><span class="toc-n">11</span><span class="toc-t">젤다 · 롤 등 다른 게임 참고</span></a>
+      <a class="toc-item" href="#s12"><span class="toc-n">12</span><span class="toc-t">GitHub 자료 모음집</span></a>
+      <a class="toc-item" href="#s13"><span class="toc-n">13</span><span class="toc-t">아이디어 · 게임잼 · 기획</span></a>
+      <a class="toc-item" href="#s14"><span class="toc-n">14</span><span class="toc-t">⚠️ 저작권 주의 · 최종 체크리스트</span></a>
+    </div>
+  </nav>
+
+  <!-- ===== 0. 사용법 ===== -->
+  <section class="sec" id="s0">
+    <div class="sec-head">
+      <div class="sec-num">0</div>
+      <div><span class="sec-kicker">How to use</span><h2 class="sec-title">이 자료 사용법 · 분류 기준</h2></div>
+    </div>
+    <div class="sec-body">
+      <p>긁어온 링크가 너무 많아서 그대로 두면 막상 필요할 때 못 찾아요. 그래서 두 가지 기준으로 정리했어요.
+         하나는 <strong>"무엇에 쓰는가"(엔진·에셋·사운드·UI·포켓몬…)</strong>, 또 하나는 <strong>"어떤 형태인가"(실행 프로그램·웹사이트·GitHub 소스)</strong> 예요.</p>
+
+      <h3>카드에 붙는 태그 읽는 법</h3>
+      <p>각 링크 카드 위쪽에는 작은 태그가 붙어 있어요. 색만 보고도 "이게 깔아야 하는 프로그램인지, 그냥 보는 사이트인지"를 구분할 수 있게 한 거예요.</p>
+      <div class="tagrow" style="margin:10px 0 4px;">
+        <span class="tag tag-tool">설치/도구</span>
+        <span class="tag tag-git">GitHub 소스</span>
+        <span class="tag tag-doc">공식문서</span>
+        <span class="tag tag-ref">참고/구경</span>
+        <span class="tag tag-free">무료</span>
+        <span class="tag tag-paid">유료/혼합</span>
+        <span class="tag tag-cau">저작권 주의</span>
+      </div>
+      <div class="callout c-core">
+        <div class="callout-head"><span class="callout-ic">🧭</span><span class="callout-title">읽는 순서 추천</span></div>
+        <div class="callout-body">
+          <p><strong>1번 섹션(무조건 설치)</strong>부터 보세요. 지금 뼈대 잡는 단계에서 진짜 필요한 건 거기 5~6개가 전부예요.
+             나머지 섹션은 "맵 만들 차례", "소리 넣을 차례"처럼 <strong>그 작업을 할 때 꺼내 보는 사전</strong>처럼 쓰면 돼요.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 1. 무조건 설치 ===== -->
+  <section class="sec" id="s1">
+    <div class="sec-head">
+      <div class="sec-num">1</div>
+      <div><span class="sec-kicker">Must install</span><h2 class="sec-title">⭐ 무조건 설치/가입해야 할 것</h2></div>
+    </div>
+    <div class="sec-body">
+      <p>이 게임은 <strong>Phaser 3(2D 게임 도구 모음) + TypeScript(언어) + VS Code(편집기)</strong> 조합으로 만들기로 했죠.
+         이 조합을 돌리려면 아래 다섯 가지가 "있어야 시작이 되는" 필수품이에요. 나머지 100개 링크보다 이게 먼저예요.</p>
+
+      <div class="stat-row">
+        <div class="stat tone-coral"><div class="stat-ic">①</div><div class="stat-meta"><span class="stat-big">Node.js</span><span class="stat-small">엔진실 · 1순위</span></div></div>
+        <div class="stat tone-teal"><div class="stat-ic">②</div><div class="stat-meta"><span class="stat-big">VS Code</span><span class="stat-small">코드 편집기</span></div></div>
+        <div class="stat tone-violet"><div class="stat-ic">③</div><div class="stat-meta"><span class="stat-big">Phaser 3</span><span class="stat-small">게임 도구 모음</span></div></div>
+        <div class="stat tone-mint"><div class="stat-ic">④</div><div class="stat-meta"><span class="stat-big">Git + GitHub</span><span class="stat-small">세이브·백업</span></div></div>
+        <div class="stat tone-amber"><div class="stat-ic">⑤</div><div class="stat-meta"><span class="stat-big">Tiled</span><span class="stat-small">맵 그리기(곧 필요)</span></div></div>
+      </div>
+
+      <div class="callout c-warn">
+        <div class="callout-head"><span class="callout-ic">💡</span><span class="callout-title">Node.js · VS Code · GitHub 계정은 직접 검색해서 받으세요</span></div>
+        <div class="callout-body">
+          <p>이 세 개는 공식 다운로드 페이지에서 본인 OS(Windows/Mac)에 맞는 설치 파일을 받아야 해서, 안전하게 각 공식 사이트(<code>nodejs.org</code>, <code>code.visualstudio.com</code>, <code>github.com</code>)에서 직접 받는 걸 권해요. 아래 카드들은 <strong>당신이 긁어온 목록에 실제로 들어있던, 바로 연결되는 사이트</strong> 위주로 정리했어요.</p>
+        </div>
+      </div>
+
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-violet"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🎮</span><span class="lcard-name">Phaser 공식 사이트</span></div>
+          <div class="tagrow"><span class="tag tag-tool">설치/도구</span><span class="tag tag-doc">공식문서</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">우리가 쓰기로 한 2D 웹 게임 도구 모음. 다운로드·튜토리얼·문서가 여기 다 있어요. <b>지금 단계의 핵심 사이트.</b></div>
+          <div class="lcard-use"><b>이렇게 쓰기 →</b> 시작 가이드(Getting Started) 따라 npm으로 설치, 예제 보며 씬·캐릭터 이동 익히기.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://phaser.io/" target="_blank" rel="noopener">phaser.io</a>
+            <a class="golink sub" href="https://github.com/phaserjs/phaser" target="_blank" rel="noopener">공식 GitHub</a>
+            <a class="golink sub" href="https://github.com/phaserjs/examples" target="_blank" rel="noopener">예제 모음</a>
+          </div>
+        </div></div>
+
+        <div class="lcard"><div class="lcard-top lt-amber"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🗺️</span><span class="lcard-name">Tiled Map Editor</span></div>
+          <div class="tagrow"><span class="tag tag-tool">설치/도구</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">2D 타일맵(격자 맵) 만드는 무료 프로그램. 포켓몬·젤다식 맵 만들 때 사실상 표준이에요. Phaser가 Tiled 맵 파일을 바로 읽어요.</div>
+          <div class="lcard-use"><b>이렇게 쓰기 →</b> "① 맵 이동" 만들 차례가 되면 설치. 맵을 그려서 내보내면 Phaser에 불러옴.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://www.mapeditor.org/" target="_blank" rel="noopener">mapeditor.org</a>
+            <a class="golink sub" href="https://github.com/mapeditor/tiled" target="_blank" rel="noopener">GitHub</a>
+          </div>
+        </div></div>
+
+        <div class="lcard"><div class="lcard-top lt-coral"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🎨</span><span class="lcard-name">Aseprite</span></div>
+          <div class="tagrow"><span class="tag tag-tool">설치/도구</span><span class="tag tag-paid">유료</span></div>
+          <div class="lcard-desc">도트(픽셀) 그림을 직접 그리는 가장 유명한 프로그램. 캐릭터·가구·아이템 직접 그릴 때 편해요. 유료지만 도트 게임에서 많이 씀.</div>
+          <div class="lcard-use"><b>이렇게 쓰기 →</b> 처음엔 무료 에셋(4번 섹션)으로 시작하고, "내 그림"이 필요해지면 구매 고려.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://www.aseprite.org/" target="_blank" rel="noopener">aseprite.org</a>
+          </div>
+        </div></div>
+
+        <div class="lcard"><div class="lcard-top lt-mint"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">✏️</span><span class="lcard-name">Piskel</span></div>
+          <div class="tagrow"><span class="tag tag-tool">설치/도구</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">설치 없이 <strong>웹에서 바로</strong> 도트 스프라이트를 그릴 수 있는 무료 툴. Aseprite를 살지 고민될 때 먼저 써보기 좋아요.</div>
+          <div class="lcard-use"><b>이렇게 쓰기 →</b> 간단한 캐릭터/아이콘을 웹에서 그려 PNG로 저장 → Phaser에 넣기.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://www.piskelapp.com/" target="_blank" rel="noopener">piskelapp.com</a>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="callout c-tip">
+        <div class="callout-head"><span class="callout-ic">✅</span><span class="callout-title">설치 순서 한 줄 요약</span></div>
+        <div class="callout-body">
+          <p><strong>Node.js → VS Code → GitHub 가입 → Phaser 설치(npm)</strong> 순서면 충분해요. Tiled·Piskel은 맵/그림 작업 들어갈 때 추가하면 돼요.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 2. 게임 엔진 ===== -->
+  <section class="sec" id="s2">
+    <div class="sec-head">
+      <div class="sec-num">2</div>
+      <div><span class="sec-kicker">Engines</span><h2 class="sec-title">게임 엔진 · 개발 시작</h2></div>
+    </div>
+    <div class="sec-body">
+      <p>게임 엔진은 "게임을 만드는 큰 틀"이에요. 당신은 이미 <strong>Phaser</strong>로 정했지만, 나중에 비교하거나 다른 길이 궁금할 때를 위해 모아둔 다른 엔진들도 정리했어요. 지금은 <strong>Phaser만 집중</strong>하면 됩니다.</p>
+
+      <div class="table-wrap">
+        <table class="cmp">
+          <caption>엔진 비교 — 우리 프로젝트 기준</caption>
+          <thead><tr><th>엔진</th><th>언어</th><th>특징</th><th>우리에게</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Phaser 3</strong></td><td>TypeScript / JS</td><td>2D 웹 게임 최적, 링크로 바로 공유, 자료 풍부</td><td>★ 메인 (확정)</td></tr>
+            <tr><td>Godot</td><td>GDScript</td><td>게임 전용 엔진, 타일맵·씬 강력, 2D 우수</td><td>좋지만 새 언어 부담</td></tr>
+            <tr><td>Unity</td><td>C#</td><td>자료 최다, 2D/3D 둘 다, 모바일 강함</td><td>2D 웹엔 과함</td></tr>
+            <tr><td>Unreal</td><td>C++ / 블루프린트</td><td>고퀄 3D 특화</td><td>이번 목표와 안 맞음</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Phaser — 지금 쓰는 엔진</h3>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-violet"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🎮</span><span class="lcard-name">Phaser 공식</span></div>
+          <div class="tagrow"><span class="tag tag-doc">공식문서</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">다운로드·예제·API 문서가 모두 여기 있어요. 막히면 공식 예제부터 보는 게 제일 안전.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://phaser.io/" target="_blank" rel="noopener">phaser.io</a>
+            <a class="golink sub" href="https://github.com/phaserjs/phaser" target="_blank" rel="noopener">GitHub</a>
+            <a class="golink sub" href="https://github.com/phaserjs/examples" target="_blank" rel="noopener">예제</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-violet"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🔎</span><span class="lcard-name">GitHub Topics — Phaser</span></div>
+          <div class="tagrow"><span class="tag tag-git">GitHub 소스</span><span class="tag tag-ref">참고/구경</span></div>
+          <div class="lcard-desc">Phaser로 만든 실제 프로젝트를 별 많은 순으로 모아보기. 남의 코드 구조 참고용.</div>
+          <div class="lcard-links"><a class="golink" href="https://github.com/topics/phaser" target="_blank" rel="noopener">topics/phaser</a></div>
+        </div></div>
+      </div>
+
+      <h3>다른 엔진 (지금은 참고만)</h3>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-teal"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🟦</span><span class="lcard-name">Godot</span></div>
+          <div class="tagrow"><span class="tag tag-tool">설치/도구</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">무료 오픈소스 엔진. 2D 탑다운 RPG에 강해서 예전 정리본에서 추천됐던 후보예요.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://godotengine.org/" target="_blank" rel="noopener">godotengine.org</a>
+            <a class="golink sub" href="https://docs.godotengine.org/" target="_blank" rel="noopener">공식 문서</a>
+            <a class="golink sub" href="https://github.com/godotengine/godot-demo-projects" target="_blank" rel="noopener">예제 프로젝트</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-mint"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🟩</span><span class="lcard-name">Unity</span></div>
+          <div class="tagrow"><span class="tag tag-tool">설치/도구</span><span class="tag tag-doc">공식문서</span></div>
+          <div class="lcard-desc">자료가 가장 많은 엔진. C# 기반, 2D/3D 모두 가능. 초보 강의(Unity Learn)가 잘 돼 있음.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://unity.com/" target="_blank" rel="noopener">unity.com</a>
+            <a class="golink sub" href="https://learn.unity.com/" target="_blank" rel="noopener">Unity Learn</a>
+            <a class="golink sub" href="https://github.com/topics/unity" target="_blank" rel="noopener">topics/unity</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-coral"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🟥</span><span class="lcard-name">Unreal Engine</span></div>
+          <div class="tagrow"><span class="tag tag-tool">설치/도구</span><span class="tag tag-doc">공식문서</span></div>
+          <div class="lcard-desc">고퀄 3D에 많이 쓰는 엔진. 입문 난이도가 높아 이번 2D 프로젝트엔 안 맞아요.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://www.unrealengine.com/" target="_blank" rel="noopener">unrealengine.com</a>
+            <a class="golink sub" href="https://dev.epicgames.com/community/unreal-engine/learning" target="_blank" rel="noopener">학습 페이지</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-teal"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🔎</span><span class="lcard-name">GitHub Topics — Godot</span></div>
+          <div class="tagrow"><span class="tag tag-git">GitHub 소스</span><span class="tag tag-ref">참고/구경</span></div>
+          <div class="lcard-desc">Godot 프로젝트 모아보기. 엔진 비교하거나 구조 구경할 때.</div>
+          <div class="lcard-links"><a class="golink" href="https://github.com/topics/godot" target="_blank" rel="noopener">topics/godot</a></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 3. 맵/도트 도구 ===== -->
+  <section class="sec" id="s3">
+    <div class="sec-head">
+      <div class="sec-num">3</div>
+      <div><span class="sec-kicker">Map &amp; Pixel tools</span><h2 class="sec-title">맵 · 타일맵 · 도트 제작 도구</h2></div>
+    </div>
+    <div class="sec-body">
+      <p>"① 맵 이동"과 "도트 그림"을 만들 차례가 되면 쓰는 도구들이에요. 포켓몬식 게임은 결국 <strong>타일(격자) 맵 + 도트 캐릭터</strong>라서 이 두 종류 도구가 핵심이에요.</p>
+
+      <h3>맵(타일맵) 만들기</h3>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-amber"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🗺️</span><span class="lcard-name">Tiled</span></div>
+          <div class="tagrow"><span class="tag tag-tool">설치/도구</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">2D 타일맵 만드는 표준 무료 툴. Phaser와 궁합이 좋아 이번 프로젝트의 맵 담당 도구예요.</div>
+          <div class="lcard-use"><b>이렇게 쓰기 →</b> 격자에 타일을 깔아 맵 제작 → 파일로 내보내기 → Phaser에서 로드.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://www.mapeditor.org/" target="_blank" rel="noopener">mapeditor.org</a>
+            <a class="golink sub" href="https://github.com/mapeditor/tiled" target="_blank" rel="noopener">GitHub</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-teal"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🧱</span><span class="lcard-name">LDtk</span></div>
+          <div class="tagrow"><span class="tag tag-tool">설치/도구</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">현대적이고 예쁜 2D 레벨 에디터. Tiled 대안으로 써보면 좋음.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://ldtk.io/" target="_blank" rel="noopener">ldtk.io</a>
+            <a class="golink sub" href="https://github.com/deepnight/ldtk" target="_blank" rel="noopener">GitHub</a>
+          </div>
+        </div></div>
+      </div>
+
+      <h3>도트(픽셀아트) 그리기 · 참고</h3>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-coral"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🎨</span><span class="lcard-name">Aseprite</span></div>
+          <div class="tagrow"><span class="tag tag-tool">설치/도구</span><span class="tag tag-paid">유료</span></div>
+          <div class="lcard-desc">도트 제작 프로그램의 사실상 표준. 애니메이션 프레임 작업이 편함.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.aseprite.org/" target="_blank" rel="noopener">aseprite.org</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-mint"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">✏️</span><span class="lcard-name">Piskel</span></div>
+          <div class="tagrow"><span class="tag tag-tool">설치/도구</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">웹에서 바로 그리는 무료 도트 툴. 설치 없이 연습용으로 최고.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.piskelapp.com/" target="_blank" rel="noopener">piskelapp.com</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-violet"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🎨</span><span class="lcard-name">Lospec</span></div>
+          <div class="tagrow"><span class="tag tag-ref">참고/구경</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">픽셀아트 색상 팔레트·튜토리얼 모음. 도트 색감 고를 때 도움.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://lospec.com/" target="_blank" rel="noopener">lospec.com</a>
+            <a class="golink sub" href="https://lospec.com/palette-list" target="_blank" rel="noopener">팔레트 목록</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-pink"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🖼️</span><span class="lcard-name">Pixel Joint</span></div>
+          <div class="tagrow"><span class="tag tag-ref">참고/구경</span></div>
+          <div class="lcard-desc">픽셀아트 커뮤니티. 다른 사람 도트 스타일 구경하며 감 잡기.</div>
+          <div class="lcard-links"><a class="golink" href="https://pixeljoint.com/" target="_blank" rel="noopener">pixeljoint.com</a></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 4. 무료 에셋 ===== -->
+  <section class="sec" id="s4">
+    <div class="sec-head">
+      <div class="sec-num">4</div>
+      <div><span class="sec-kicker">Assets</span><h2 class="sec-title">무료 에셋 · 이미지 · 아이콘</h2></div>
+    </div>
+    <div class="sec-body">
+      <p>직접 그릴 시간이 없을 때 <strong>가져다 쓸 수 있는 그림(에셋)</strong> 사이트예요. 프로토타입 단계에선 직접 그리지 말고 여기서 받아 쓰는 게 훨씬 빨라요.
+         포켓몬 느낌을 내려면 <strong>"monster", "creature", "rpg", "pixel"</strong> 태그를 노려보세요.</p>
+
+      <div class="callout c-tip">
+        <div class="callout-head"><span class="callout-ic">🥇</span><span class="callout-title">초보 프로토타입엔 Kenney가 1순위</span></div>
+        <div class="callout-body"><p>Kenney는 무료 + 출처표기 부담도 적어서 "일단 돌아가는 화면"을 빨리 만들 때 제일 편해요.</p></div>
+      </div>
+
+      <h3>종합 에셋 사이트</h3>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-mint"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">⭐</span><span class="lcard-name">Kenney</span></div>
+          <div class="tagrow"><span class="tag tag-ref">에셋</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">2D·3D·UI·아이콘·타일맵·캐릭터 무료 에셋. 초보 프로토타입에 최고.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://kenney.nl/" target="_blank" rel="noopener">kenney.nl</a>
+            <a class="golink sub" href="https://kenney.nl/assets" target="_blank" rel="noopener">에셋 목록</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-coral"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🎒</span><span class="lcard-name">itch.io Game Assets</span></div>
+          <div class="tagrow"><span class="tag tag-ref">에셋</span><span class="tag tag-paid">무료/유료</span></div>
+          <div class="lcard-desc">인디 에셋의 보물창고. 픽셀아트·RPG 타일셋·몬스터·UI팩 많음.</div>
+          <div class="lcard-use"><b>포켓몬용 →</b> 아래 monster/pixel 태그 링크로 바로 가기.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://itch.io/game-assets" target="_blank" rel="noopener">전체</a>
+            <a class="golink sub" href="https://itch.io/game-assets/free" target="_blank" rel="noopener">무료만</a>
+            <a class="golink sub" href="https://itch.io/game-assets/free/tag-monsters" target="_blank" rel="noopener">무료 몬스터</a>
+            <a class="golink sub" href="https://itch.io/game-assets/free/tag-pixel-art" target="_blank" rel="noopener">무료 픽셀아트</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-teal"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🆓</span><span class="lcard-name">OpenGameArt</span></div>
+          <div class="tagrow"><span class="tag tag-ref">에셋</span><span class="tag tag-free">무료/오픈</span></div>
+          <div class="lcard-desc">무료/오픈 라이선스 에셋. 스프라이트·배경음악·효과음·타일셋. CC0면 출처 없이 사용 가능.</div>
+          <div class="lcard-use"><b>포켓몬용 →</b> monster / rpg 검색이 유용.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://opengameart.org/" target="_blank" rel="noopener">메인</a>
+            <a class="golink sub" href="https://opengameart.org/art-search?keys=monster" target="_blank" rel="noopener">monster</a>
+            <a class="golink sub" href="https://opengameart.org/art-search?keys=rpg" target="_blank" rel="noopener">rpg</a>
+            <a class="golink sub" href="https://opengameart.org/art-search-advanced?field_art_type_tid%5B%5D=9" target="_blank" rel="noopener">2D 아트</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-amber"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🧩</span><span class="lcard-name">CraftPix</span></div>
+          <div class="tagrow"><span class="tag tag-ref">에셋</span><span class="tag tag-paid">무료/유료</span></div>
+          <div class="lcard-desc">2D 게임 에셋(캐릭터·배경·UI·타일셋·게임 키트). 무료/유료 섞여 있음.</div>
+          <div class="lcard-links"><a class="golink" href="https://craftpix.net/" target="_blank" rel="noopener">craftpix.net</a></div>
+        </div></div>
+      </div>
+
+      <h3>아이콘 · 엔진별 마켓</h3>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-violet"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">⚔️</span><span class="lcard-name">Game-icons.net</span></div>
+          <div class="tagrow"><span class="tag tag-ref">아이콘</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">스킬·아이템·상태이상 아이콘. 배틀 UI 만들 때 딱.</div>
+          <div class="lcard-links"><a class="golink" href="https://game-icons.net/" target="_blank" rel="noopener">game-icons.net</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-mint"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🟩</span><span class="lcard-name">Unity Asset Store</span></div>
+          <div class="tagrow"><span class="tag tag-ref">에셋</span><span class="tag tag-cau">Unity 전용</span></div>
+          <div class="lcard-desc">Unity용 에셋 마켓. 무료도 많지만 Phaser엔 직접 못 씀(그림만 참고 가능).</div>
+          <div class="lcard-links"><a class="golink" href="https://assetstore.unity.com/" target="_blank" rel="noopener">assetstore</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-coral"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🟥</span><span class="lcard-name">Fab (Epic)</span></div>
+          <div class="tagrow"><span class="tag tag-ref">에셋</span><span class="tag tag-cau">3D 위주</span></div>
+          <div class="lcard-desc">Unreal/Epic 쪽 에셋 마켓. 3D 모델·환경·텍스처. 2D 프로젝트엔 우선순위 낮음.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.fab.com/" target="_blank" rel="noopener">fab.com</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-pink"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🎨</span><span class="lcard-name">ArtStation</span></div>
+          <div class="tagrow"><span class="tag tag-ref">참고/구경</span></div>
+          <div class="lcard-desc">캐릭터·배경·몬스터·컨셉아트 구경. 직접 쓰진 말고 분위기 참고용.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.artstation.com/" target="_blank" rel="noopener">artstation.com</a></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 5. 사운드 ===== -->
+  <section class="sec" id="s5">
+    <div class="sec-head">
+      <div class="sec-num">5</div>
+      <div><span class="sec-kicker">Sound</span><h2 class="sec-title">사운드 · BGM · 효과음</h2></div>
+    </div>
+    <div class="sec-body">
+      <p>게임에 소리를 넣는 단계에서 쓰는 사이트들. <strong>"받아 쓰는 곳"</strong>과 <strong>"직접 만드는 곳"</strong>으로 나뉘어요. 어느 쪽이든 <strong>라이선스(사용 조건) 확인</strong>은 필수예요.</p>
+
+      <h3>받아 쓰는 곳</h3>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-teal"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🔊</span><span class="lcard-name">Freesound</span></div>
+          <div class="tagrow"><span class="tag tag-ref">효과음</span><span class="tag tag-cau">라이선스 확인</span></div>
+          <div class="lcard-desc">효과음 검색 사이트. 양이 많지만 파일마다 사용 조건이 달라 꼭 확인.</div>
+          <div class="lcard-links"><a class="golink" href="https://freesound.org/" target="_blank" rel="noopener">freesound.org</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-mint"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🎵</span><span class="lcard-name">Pixabay</span></div>
+          <div class="tagrow"><span class="tag tag-ref">음악·효과음</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">무료 음악·효과음. 임시 BGM 깔기 좋음.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://pixabay.com/music/" target="_blank" rel="noopener">음악</a>
+            <a class="golink sub" href="https://pixabay.com/sound-effects/" target="_blank" rel="noopener">효과음</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-amber"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🎼</span><span class="lcard-name">OpenGameArt — Audio</span></div>
+          <div class="tagrow"><span class="tag tag-ref">음악·효과음</span><span class="tag tag-free">무료/오픈</span></div>
+          <div class="lcard-desc">게임용 배경음악·효과음. 오픈 라이선스라 게임에 넣기 편함.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://opengameart.org/art-search-advanced?field_art_type_tid%5B%5D=12" target="_blank" rel="noopener">음악</a>
+            <a class="golink sub" href="https://opengameart.org/art-search-advanced?field_art_type_tid%5B%5D=13" target="_blank" rel="noopener">효과음</a>
+          </div>
+        </div></div>
+      </div>
+
+      <h3>직접 만드는 곳</h3>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-violet"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">👾</span><span class="lcard-name">Bfxr</span></div>
+          <div class="tagrow"><span class="tag tag-tool">웹 툴</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">8비트·고전게임 효과음을 버튼 클릭으로 직접 생성. "삑/뿅" 소리 만들기 좋음.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.bfxr.net/" target="_blank" rel="noopener">bfxr.net</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-pink"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🎹</span><span class="lcard-name">ChipTone</span></div>
+          <div class="tagrow"><span class="tag tag-tool">웹 툴</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">귀여운 게임 효과음을 만드는 무료 툴. 메뉴 선택음·획득음 등에.</div>
+          <div class="lcard-links"><a class="golink" href="https://sfbgames.itch.io/chiptone" target="_blank" rel="noopener">chiptone</a></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 6. 폰트 ===== -->
+  <section class="sec" id="s6">
+    <div class="sec-head">
+      <div class="sec-num">6</div>
+      <div><span class="sec-kicker">Fonts &amp; UI</span><h2 class="sec-title">폰트 · UI 디자인</h2></div>
+    </div>
+    <div class="sec-body">
+      <p>게임 글씨에 쓸 폰트예요. 한국어 게임이라면 <strong>한글 폰트</strong>가 필수고, 포켓몬 느낌엔 <strong>픽셀/비트맵 폰트</strong>가 잘 어울려요.</p>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-teal"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🔤</span><span class="lcard-name">Google Fonts</span></div>
+          <div class="tagrow"><span class="tag tag-ref">폰트</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">무료 폰트의 기본. UI에 쓸 깔끔한 폰트 찾기 좋음.</div>
+          <div class="lcard-links"><a class="golink" href="https://fonts.google.com/" target="_blank" rel="noopener">fonts.google.com</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-coral"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🇰🇷</span><span class="lcard-name">눈누 (noonnu)</span></div>
+          <div class="tagrow"><span class="tag tag-ref">한글 폰트</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">한글 무료 폰트 모음. 상업용 가능 여부도 표시돼 있어 한국어 게임에 필수.</div>
+          <div class="lcard-links"><a class="golink" href="https://noonnu.cc/" target="_blank" rel="noopener">noonnu.cc</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-violet"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🕹️</span><span class="lcard-name">FontSpace — Pixel</span></div>
+          <div class="tagrow"><span class="tag tag-ref">픽셀 폰트</span></div>
+          <div class="lcard-desc">픽셀 게임용 영문 폰트 모음.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.fontspace.com/category/pixel" target="_blank" rel="noopener">fontspace</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-amber"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🔠</span><span class="lcard-name">DaFont — Bitmap</span></div>
+          <div class="tagrow"><span class="tag tag-ref">비트맵 폰트</span><span class="tag tag-cau">라이선스 확인</span></div>
+          <div class="lcard-desc">도트/비트맵 폰트 많음. 무료여도 상업용 조건은 따로 확인.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.dafont.com/bitmap.php" target="_blank" rel="noopener">dafont bitmap</a></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 7. UI 참고 ===== -->
+  <section class="sec" id="s7">
+    <div class="sec-head">
+      <div class="sec-num">7</div>
+      <div><span class="sec-kicker">UI reference</span><h2 class="sec-title">게임 UI · 화면 참고</h2></div>
+    </div>
+    <div class="sec-body">
+      <p>전투창·인벤토리·메뉴·도감 같은 <strong>화면 구성을 어떻게 짤지</strong> 막힐 때 구경하는 사이트들. 직접 베끼는 게 아니라 "이런 식으로 배치하는구나"를 배우는 용도예요.</p>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-teal"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🖥️</span><span class="lcard-name">Interface In Game</span></div>
+          <div class="tagrow"><span class="tag tag-ref">UI 참고</span></div>
+          <div class="lcard-desc">실제 게임 UI 스크린샷 모음. 인벤토리·전투·설정·지도 화면 참고에 최고.</div>
+          <div class="lcard-use"><b>포켓몬·젤다용 →</b> 사이트 내 "zelda" 검색 결과가 특히 유용.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://interfaceingame.com/" target="_blank" rel="noopener">메인</a>
+            <a class="golink sub" href="https://interfaceingame.com/?s=zelda" target="_blank" rel="noopener">zelda 검색</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-mint"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🗂️</span><span class="lcard-name">Game UI Database</span></div>
+          <div class="tagrow"><span class="tag tag-ref">UI 참고</span></div>
+          <div class="lcard-desc">HUD·메뉴·인벤토리·전투·캐릭터 선택창을 종류별로 모은 DB.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.gameuidatabase.com/" target="_blank" rel="noopener">gameuidatabase</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-pink"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🎨</span><span class="lcard-name">Dribbble — Game UI</span></div>
+          <div class="tagrow"><span class="tag tag-ref">컨셉 참고</span></div>
+          <div class="lcard-desc">예쁜 게임 UI 컨셉. 상점창·로그인·캐릭터 선택창 디자인 아이디어용.</div>
+          <div class="lcard-links"><a class="golink" href="https://dribbble.com/tags/game-ui" target="_blank" rel="noopener">dribbble</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-violet"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🖼️</span><span class="lcard-name">Behance — Game UI</span></div>
+          <div class="tagrow"><span class="tag tag-ref">컨셉 참고</span></div>
+          <div class="lcard-desc">퀄리티 높은 게임 UI 포트폴리오 작업물.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.behance.net/search/projects/game%20ui" target="_blank" rel="noopener">behance</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-amber"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">📌</span><span class="lcard-name">Pinterest — Game UI</span></div>
+          <div class="tagrow"><span class="tag tag-ref">컨셉 참고</span><span class="tag tag-cau">출처 확인</span></div>
+          <div class="lcard-desc">예쁜 UI 이미지 빠르게 찾기. 단, 출처·저작권은 따로 확인 필요.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.pinterest.com/search/pins/?q=game%20ui" target="_blank" rel="noopener">pinterest</a></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 8. 포켓몬 데이터/스프라이트 ===== -->
+  <section class="sec" id="s8">
+    <div class="sec-head">
+      <div class="sec-num">8</div>
+      <div><span class="sec-kicker">Pokémon data</span><h2 class="sec-title">포켓몬 데이터 · 스프라이트</h2></div>
+    </div>
+    <div class="sec-body">
+      <p>포켓몬류 게임의 핵심 자료예요. <strong>데이터(이름·타입·능력치)</strong>를 어떻게 구조화할지, <strong>이미지(스프라이트)</strong>를 어떻게 연결할지 배우는 데 씁니다.
+         단, <strong>진짜 포켓몬 이미지/데이터를 그대로 배포하면 저작권 문제</strong>가 생기니, "구조·연습용"으로 보는 게 안전해요.</p>
+
+      <div class="callout c-core">
+        <div class="callout-head"><span class="callout-ic">🧩</span><span class="callout-title">PokéAPI가 데이터 공부의 중심</span></div>
+        <div class="callout-body"><p>포켓몬 이름·타입·기술·능력치·이미지 URL을 API로 주기 때문에, "도감 데이터를 어떤 JSON 구조로 만들까"의 정답지가 돼요.</p></div>
+      </div>
+
+      <div class="code-role">PokéAPI가 주는 데이터를 단순화하면, 내 게임의 몬스터 데이터도 이런 모양으로 설계할 수 있어요.</div>
+      <div class="codecard">
+        <div class="code-title"><span class="code-fname">monster.json</span><span class="code-lang">JSON</span></div>
+<pre><code><span class="code-comment">// 내 게임용 몬스터 한 마리의 정보 카드 (PokéAPI 구조 참고)</span>
+{
+  <span class="code-attr">"name"</span>: <span class="code-string">"pikachu"</span>,        <span class="code-comment">// 이름</span>
+  <span class="code-attr">"types"</span>: [<span class="code-string">"electric"</span>],     <span class="code-comment">// 타입(상성 계산에 사용)</span>
+  <span class="code-attr">"hp"</span>: <span class="code-number">35</span>,                  <span class="code-comment">// 체력</span>
+  <span class="code-attr">"attack"</span>: <span class="code-number">55</span>,              <span class="code-comment">// 공격력</span>
+  <span class="code-attr">"speed"</span>: <span class="code-number">90</span>,               <span class="code-comment">// 누가 먼저 때릴지 결정</span>
+  <span class="code-attr">"sprite"</span>: <span class="code-string">"img/pikachu.png"</span> <span class="code-comment">// 화면에 띄울 그림 경로</span>
+}</code></pre>
+      </div>
+      <ul class="code-notes">
+        <li><code>types</code>는 배열이에요. 한 몬스터가 두 타입을 가질 수 있어서 <code>["fire","flying"]</code> 처럼 여러 개를 담을 수 있게 둡니다.</li>
+        <li><code>speed</code>는 배틀에서 <strong>"누가 먼저 공격하는가"</strong>를 정할 때 비교하는 값이에요. 이게 없으면 턴 순서를 못 정해요.</li>
+        <li><code>sprite</code>는 이미지 파일의 위치예요. 실제 포켓몬 이미지 대신 <strong>내가 만든/무료 에셋 그림</strong> 경로를 넣으면 저작권 문제를 피할 수 있어요.</li>
+      </ul>
+
+      <h3>데이터 · API</h3>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-teal"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🔌</span><span class="lcard-name">PokéAPI</span></div>
+          <div class="tagrow"><span class="tag tag-doc">API</span><span class="tag tag-git">GitHub 소스</span></div>
+          <div class="lcard-desc">포켓몬 데이터를 API로 제공. 데이터 구조 공부의 정답지.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://pokeapi.co/" target="_blank" rel="noopener">pokeapi.co</a>
+            <a class="golink sub" href="https://github.com/PokeAPI/pokeapi" target="_blank" rel="noopener">서버 소스</a>
+            <a class="golink sub" href="https://github.com/PokeAPI/sprites" target="_blank" rel="noopener">스프라이트</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-mint"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">📊</span><span class="lcard-name">Pokémon Database</span></div>
+          <div class="tagrow"><span class="tag tag-ref">참고/구경</span></div>
+          <div class="lcard-desc">능력치·타입·진화·기술을 표로 깔끔하게 정리. 도감 UI·능력치 표 디자인 참고.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://pokemondb.net/" target="_blank" rel="noopener">pokemondb.net</a>
+            <a class="golink sub" href="https://pokemondb.net/sprites" target="_blank" rel="noopener">스프라이트</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-amber"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">📖</span><span class="lcard-name">Bulbapedia</span></div>
+          <div class="tagrow"><span class="tag tag-ref">위키</span></div>
+          <div class="lcard-desc">포켓몬 위키. 타입 상성표·기술 설명·진화 조건 구조 참고에 방대.</div>
+          <div class="lcard-links"><a class="golink" href="https://bulbapedia.bulbagarden.net/" target="_blank" rel="noopener">bulbapedia</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-violet"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🗄️</span><span class="lcard-name">Veekun</span></div>
+          <div class="tagrow"><span class="tag tag-ref">데이터</span><span class="tag tag-git">GitHub 소스</span></div>
+          <div class="lcard-desc">예전 포켓몬 데이터 다운로드용. 요즘은 PokéAPI가 더 편하지만 DB 구조 공부엔 OK.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://veekun.com/" target="_blank" rel="noopener">veekun.com</a>
+            <a class="golink sub" href="https://github.com/veekun" target="_blank" rel="noopener">GitHub</a>
+          </div>
+        </div></div>
+      </div>
+
+      <h3>스프라이트(그림) 자료 — <span style="color:var(--danger-d)">⚠ 연습용</span></h3>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-coral"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🖼️</span><span class="lcard-name">PokéAPI Sprites — 공식 아트워크</span></div>
+          <div class="tagrow"><span class="tag tag-git">GitHub 소스</span><span class="tag tag-cau">저작권 주의</span></div>
+          <div class="lcard-desc">고화질 포켓몬 일러스트 PNG 경로. "API + 이미지 연결" 연습용. 그대로 배포는 금지.</div>
+          <div class="lcard-links"><a class="golink" href="https://github.com/PokeAPI/sprites/tree/master/sprites/pokemon/other/official-artwork" target="_blank" rel="noopener">official-artwork</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-teal"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">📦</span><span class="lcard-name">PokéSprite</span></div>
+          <div class="tagrow"><span class="tag tag-git">GitHub 소스</span><span class="tag tag-cau">저작권 주의</span></div>
+          <div class="lcard-desc">박스 아이콘·가방 아이템 같은 작은 스프라이트 정리. 도감 목록·인벤토리 아이콘 참고.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://msikma.github.io/pokesprite/index.html" target="_blank" rel="noopener">사이트</a>
+            <a class="golink sub" href="https://github.com/msikma/pokesprite" target="_blank" rel="noopener">GitHub</a>
+            <a class="golink sub" href="https://github.com/msikma/pokesprite-spritesheet" target="_blank" rel="noopener">시트</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-amber"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🗃️</span><span class="lcard-name">The Spriters Resource</span></div>
+          <div class="tagrow"><span class="tag tag-ref">스프라이트</span><span class="tag tag-cau">저작권 주의</span></div>
+          <div class="lcard-desc">게임 스프라이트 아카이브. 포켓몬 걷기 애니·배틀 화면 구조 참고. 하트골드/파이어레드 등 시리즈별 페이지.</div>
+          <div class="lcard-use"><b>당신 프로젝트(하트골드 느낌) →</b> HeartGold/SoulSilver 페이지가 직접 참고됨.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://www.spriters-resource.com/" target="_blank" rel="noopener">메인</a>
+            <a class="golink sub" href="https://www.spriters-resource.com/ds_dsi/pokemonheartgoldsoulsilver/" target="_blank" rel="noopener">HeartGold/SoulSilver</a>
+            <a class="golink sub" href="https://www.spriters-resource.com/game_boy_advance/pokemonfireredleafgreen/" target="_blank" rel="noopener">FireRed/LeafGreen</a>
+            <a class="golink sub" href="https://www.spriters-resource.com/game_boy_gbc/pokemonredblue/" target="_blank" rel="noopener">Red/Blue</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-pink"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">👥</span><span class="lcard-name">PokeCommunity</span></div>
+          <div class="tagrow"><span class="tag tag-ref">커뮤니티</span><span class="tag tag-cau">라이선스 불명확</span></div>
+          <div class="lcard-desc">포켓몬 팬게임·ROM 해킹 커뮤니티. 맵·스프라이트·툴 자료 많음. 배포용엔 라이선스 조심.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.pokecommunity.com/" target="_blank" rel="noopener">pokecommunity</a></div>
+        </div></div>
+      </div>
+
+      <h3>공식 사이트 (분위기·세계관 참고)</h3>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-pink"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🌐</span><span class="lcard-name">Pokémon 공식</span></div>
+          <div class="tagrow"><span class="tag tag-ref">참고/구경</span></div>
+          <div class="lcard-desc">캐릭터·도감·세계관 분위기 참고. 공식 도감 페이지의 데이터 표시 방식도 참고할 만함.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://www.pokemon.com/" target="_blank" rel="noopener">pokemon.com</a>
+            <a class="golink sub" href="https://www.pokemon.com/us/pokedex" target="_blank" rel="noopener">공식 도감</a>
+          </div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 9. 배틀 로직 GitHub ===== -->
+  <section class="sec" id="s9">
+    <div class="sec-head">
+      <div class="sec-num">9</div>
+      <div><span class="sec-kicker">Battle logic · source</span><h2 class="sec-title">포켓몬 배틀 로직 (GitHub)</h2></div>
+    </div>
+    <div class="sec-body">
+      <p>"③ 턴제 배틀"을 만들 때 참고하는 <strong>실제 소스코드</strong>들이에요. 타입 상성·기술 처리·데미지 계산 같은 복잡한 부분의 정답을 볼 수 있어요.
+         단, <strong>코드가 어려워서 처음엔 "흐름만" 보고, 뜯어보는 건 나중</strong>으로 미루는 걸 권해요.</p>
+
+      <div class="callout c-flow">
+        <div class="callout-head"><span class="callout-ic">🔁</span><span class="callout-title">먼저 "턴제 배틀 흐름"부터 머리에 넣기</span></div>
+        <div class="callout-body"><p>코드를 보기 전에 아래 흐름을 알고 보면 훨씬 쉽게 읽혀요.</p></div>
+      </div>
+
+      <div class="flowbox">
+        <div class="flow-step"><span class="flow-badge">1단계</span><span class="flow-label">속도(speed) 비교 → 누가 먼저 공격할지 결정</span></div>
+        <div class="flow-sep">▼</div>
+        <div class="flow-step"><span class="flow-badge">2단계</span><span class="flow-label">공격 측 기술 선택 → 타입 상성 계산(2배/0.5배 등)</span></div>
+        <div class="flow-sep">▼</div>
+        <div class="flow-step"><span class="flow-badge">3단계</span><span class="flow-label">데미지 계산 → 상대 HP 감소 → HP 바 갱신</span></div>
+        <div class="flow-sep">▼</div>
+        <div class="flow-step"><span class="flow-badge">4단계</span><span class="flow-label">쓰러졌는지 확인 → 아니면 반대로 상대 턴 반복</span></div>
+      </div>
+
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-violet"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">⚔️</span><span class="lcard-name">Pokémon Showdown</span></div>
+          <div class="tagrow"><span class="tag tag-git">GitHub 소스</span><span class="tag tag-ref">참고/구경</span></div>
+          <div class="lcard-desc">온라인 포켓몬 배틀 시뮬레이터. 턴제·타입 상성·상태이상·랭크업 로직의 끝판왕 예시. 코드는 어려움.</div>
+          <div class="lcard-use"><b>이렇게 쓰기 →</b> 사이트에서 실제 배틀을 해보며 "흐름"을 눈에 익힌 뒤, 나중에 서버 코드 참고.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://pokemonshowdown.com/" target="_blank" rel="noopener">사이트</a>
+            <a class="golink sub" href="https://github.com/smogon/pokemon-showdown" target="_blank" rel="noopener">서버 소스</a>
+            <a class="golink sub" href="https://github.com/smogon/pokemon-showdown-client" target="_blank" rel="noopener">클라이언트</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-teal"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🧮</span><span class="lcard-name">Smogon (조직 GitHub)</span></div>
+          <div class="tagrow"><span class="tag tag-git">GitHub 소스</span></div>
+          <div class="lcard-desc">Showdown 만든 팀. 배틀 시뮬·데미지 계산기 등 관련 프로젝트가 한곳에.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://github.com/smogon" target="_blank" rel="noopener">smogon</a>
+            <a class="golink sub" href="https://github.com/smogon/damage-calc" target="_blank" rel="noopener">데미지 계산기</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-coral"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🔎</span><span class="lcard-name">battle system 검색</span></div>
+          <div class="tagrow"><span class="tag tag-git">GitHub 검색</span></div>
+          <div class="lcard-desc">포켓몬식 전투 시스템 예제 검색. HP 바·턴제·기술 선택창·상태이상 구현 참고.</div>
+          <div class="lcard-use"><b>추천 검색어 →</b> pokemon battle system, turn based battle, monster battle system</div>
+          <div class="lcard-links"><a class="golink" href="https://github.com/search?q=pokemon+battle+system&type=repositories" target="_blank" rel="noopener">검색 결과</a></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 10. 클론 예제 검색 ===== -->
+  <section class="sec" id="s10">
+    <div class="sec-head">
+      <div class="sec-num">10</div>
+      <div><span class="sec-kicker">Clone examples</span><h2 class="sec-title">포켓몬 클론 예제 검색 (GitHub)</h2></div>
+    </div>
+    <div class="sec-body">
+      <p>"전체 게임이 어떻게 굴러가는지" 통째로 보고 싶을 때 쓰는 GitHub 검색 모음이에요. 검색 결과는 <strong>별 많은 순 / 최근 업데이트 순</strong>으로 정렬해서 보면 살아있는 프로젝트를 찾기 쉬워요.</p>
+
+      <div class="callout c-warn">
+        <div class="callout-head"><span class="callout-ic">⚠️</span><span class="callout-title">"바로 실행"보다 "구조 참고"로</span></div>
+        <div class="callout-body"><p>오래되거나 관리가 멈춘 프로젝트가 많아서, 그대로 돌리려다 막히기 쉬워요. <strong>씬 구조·데이터 관리·맵+전투 연결 방식</strong>을 보는 용도로 쓰세요.</p></div>
+      </div>
+
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-mint"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🔎</span><span class="lcard-name">godot + pokemon 검색</span></div>
+          <div class="tagrow"><span class="tag tag-git">GitHub 검색</span></div>
+          <div class="lcard-desc">Godot로 만든 포켓몬 스타일 예제. (엔진은 다르지만) 2D 탑다운 이동·전투창 구조 참고.</div>
+          <div class="lcard-use"><b>검색어 →</b> godot pokemon, godot monster taming, godot top down rpg</div>
+          <div class="lcard-links"><a class="golink" href="https://github.com/search?q=godot+pokemon&type=repositories" target="_blank" rel="noopener">검색 결과</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-amber"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🔎</span><span class="lcard-name">pokemon clone 검색</span></div>
+          <div class="tagrow"><span class="tag tag-git">GitHub 검색</span></div>
+          <div class="lcard-desc">포켓몬 클론·팬게임·연습용 프로젝트. 맵 이동 + 전투 연결, 데이터 파일 구성 참고.</div>
+          <div class="lcard-links"><a class="golink" href="https://github.com/search?q=pokemon+clone&type=repositories" target="_blank" rel="noopener">검색 결과</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-violet"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🔎</span><span class="lcard-name">OpMon 검색</span></div>
+          <div class="tagrow"><span class="tag tag-git">GitHub 검색</span><span class="tag tag-cau">관리 멈춤 多</span></div>
+          <div class="lcard-desc">포켓몬 스타일 오픈소스로 자주 언급되는 이름. 필드 이동·몬스터 데이터 구조 참고.</div>
+          <div class="lcard-links"><a class="golink" href="https://github.com/search?q=OpMon&type=repositories" target="_blank" rel="noopener">검색 결과</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-coral"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🧊</span><span class="lcard-name">PokemonDP_DX11</span></div>
+          <div class="tagrow"><span class="tag tag-git">GitHub 소스</span><span class="tag tag-cau">엔진 다름</span></div>
+          <div class="lcard-desc">긁어온 목록에 있던 개인 포켓몬 클론 레포(DirectX11). 우리 스택과는 다르지만 구현 구경용.</div>
+          <div class="lcard-links"><a class="golink" href="https://github.com/jiwonchoidd/PokemonDP_DX11" target="_blank" rel="noopener">레포 보기</a></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 11. 다른 게임 참고 ===== -->
+  <section class="sec" id="s11">
+    <div class="sec-head">
+      <div class="sec-num">11</div>
+      <div><span class="sec-kicker">Other games</span><h2 class="sec-title">젤다 · 롤 등 다른 게임 참고</h2></div>
+    </div>
+    <div class="sec-body">
+      <p>당신 프로젝트가 "하트골드 같은 2D + 집 꾸미기"라 <strong>젤다</strong>는 맵·던전·메뉴 구조 참고로 잘 맞아요. <strong>롤(MOBA)</strong>은 데이터를 화면에 보여주는 방식(통계·빌드 UI) 참고용으로만 보면 됩니다.</p>
+
+      <h3>젤다 참고 (맵·메뉴·세계관)</h3>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-mint"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🗡️</span><span class="lcard-name">Zelda Wiki</span></div>
+          <div class="tagrow"><span class="tag tag-ref">위키</span></div>
+          <div class="lcard-desc">아이템·지역·몬스터·시스템 정보. 2D 어드벤처 시스템 설계 참고.</div>
+          <div class="lcard-links"><a class="golink" href="https://zeldawiki.wiki/" target="_blank" rel="noopener">zeldawiki.wiki</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-teal"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🏰</span><span class="lcard-name">Zelda Dungeon</span></div>
+          <div class="tagrow"><span class="tag tag-ref">공략/정보</span></div>
+          <div class="lcard-desc">던전 구조·퍼즐·아이템 흐름 참고. 맵 설계 아이디어용.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.zeldadungeon.net/" target="_blank" rel="noopener">zeldadungeon</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-pink"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🌐</span><span class="lcard-name">Zelda 공식 · Nintendo</span></div>
+          <div class="tagrow"><span class="tag tag-ref">참고/구경</span></div>
+          <div class="lcard-desc">분위기·세계관·캐릭터 느낌 참고용 공식 페이지.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://www.zelda.com/" target="_blank" rel="noopener">zelda.com</a>
+            <a class="golink sub" href="https://www.nintendo.com/us/search/#q=zelda&p=1&cat=gme&sort=df" target="_blank" rel="noopener">Nintendo</a>
+          </div>
+        </div></div>
+      </div>
+
+      <h3>롤 / MOBA 참고 (데이터·통계 UI)</h3>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-violet"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🐉</span><span class="lcard-name">Riot Developer · Data Dragon</span></div>
+          <div class="tagrow"><span class="tag tag-doc">API/데이터</span><span class="tag tag-cau">에셋 저작권</span></div>
+          <div class="lcard-desc">챔피언·아이템·룬 데이터 구조 참고. 롤 에셋 직접 사용은 저작권 주의.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://developer.riotgames.com/" target="_blank" rel="noopener">개발자 포털</a>
+            <a class="golink sub" href="https://developer.riotgames.com/docs/lol#data-dragon" target="_blank" rel="noopener">Data Dragon</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-teal"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🐲</span><span class="lcard-name">Community Dragon</span></div>
+          <div class="tagrow"><span class="tag tag-ref">데이터</span><span class="tag tag-cau">공부용</span></div>
+          <div class="lcard-desc">롤 데이터/에셋 구조를 정리한 커뮤니티 사이트. 공부용으로만.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.communitydragon.org/" target="_blank" rel="noopener">communitydragon</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-amber"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">📈</span><span class="lcard-name">OP.GG · 통계 사이트</span></div>
+          <div class="tagrow"><span class="tag tag-ref">UI 참고</span></div>
+          <div class="lcard-desc">챔피언 통계·빌드·승률을 화면에 어떻게 보여주는지(대시보드 UI) 참고.</div>
+          <div class="lcard-links">
+            <a class="golink" href="https://www.op.gg/" target="_blank" rel="noopener">OP.GG</a>
+            <a class="golink sub" href="https://www.leagueofgraphs.com/" target="_blank" rel="noopener">LeagueOfGraphs</a>
+            <a class="golink sub" href="https://mobalytics.gg/lol" target="_blank" rel="noopener">Mobalytics</a>
+          </div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-pink"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🌐</span><span class="lcard-name">LoL 공식</span></div>
+          <div class="tagrow"><span class="tag tag-ref">참고/구경</span></div>
+          <div class="lcard-desc">챔피언·스킬·게임 분위기 참고.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.leagueoflegends.com/" target="_blank" rel="noopener">leagueoflegends.com</a></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 12. GitHub 모음집 ===== -->
+  <section class="sec" id="s12">
+    <div class="sec-head">
+      <div class="sec-num">12</div>
+      <div><span class="sec-kicker">Awesome lists</span><h2 class="sec-title">GitHub 자료 모음집</h2></div>
+    </div>
+    <div class="sec-body">
+      <p>"링크의 링크" 모음이에요. 막막할 때 여기서 또 다른 자료를 캐낼 수 있어요. 특히 <strong>오픈소스 게임 리메이크</strong>는 코드 구조 공부에 좋아요.</p>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-violet"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">⭐</span><span class="lcard-name">Awesome Gamedev</span></div>
+          <div class="tagrow"><span class="tag tag-git">모음집</span></div>
+          <div class="lcard-desc">엔진·에셋·튜토리얼·디자인 자료 링크가 정리된 종합 모음.</div>
+          <div class="lcard-links"><a class="golink" href="https://github.com/Calinou/awesome-gamedev" target="_blank" rel="noopener">awesome-gamedev</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-mint"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🔁</span><span class="lcard-name">Awesome Game Remakes</span></div>
+          <div class="tagrow"><span class="tag tag-git">모음집</span></div>
+          <div class="lcard-desc">오픈소스 게임 리메이크 모음. "이 게임은 코드로 이렇게 짜는구나" 구조 공부.</div>
+          <div class="lcard-links"><a class="golink" href="https://github.com/radek-sprta/awesome-game-remakes" target="_blank" rel="noopener">remakes</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-teal"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">📂</span><span class="lcard-name">Open Source Games</span></div>
+          <div class="tagrow"><span class="tag tag-git">모음집</span></div>
+          <div class="lcard-desc">오픈소스 게임 목록. 남의 게임 코드 구조 참고.</div>
+          <div class="lcard-links"><a class="golink" href="https://github.com/bobeff/open-source-games" target="_blank" rel="noopener">open-source-games</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-coral"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">📰</span><span class="lcard-name">freeCodeCamp — Game Dev</span></div>
+          <div class="tagrow"><span class="tag tag-doc">튜토리얼</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">게임 개발 튜토리얼 글 모음. 입문 개념 설명이 친절함.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.freecodecamp.org/news/tag/game-development/" target="_blank" rel="noopener">freeCodeCamp</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-amber"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🔎</span><span class="lcard-name">GitHub Topics — Game Dev</span></div>
+          <div class="tagrow"><span class="tag tag-git">GitHub 검색</span></div>
+          <div class="lcard-desc">게임 개발 관련 프로젝트 전반을 별 많은 순으로 모아보기.</div>
+          <div class="lcard-links"><a class="golink" href="https://github.com/topics/game-development" target="_blank" rel="noopener">topics/game-development</a></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 13. 아이디어/게임잼 ===== -->
+  <section class="sec" id="s13">
+    <div class="sec-head">
+      <div class="sec-num">13</div>
+      <div><span class="sec-kicker">Ideas &amp; jams</span><h2 class="sec-title">아이디어 · 게임잼 · 기획</h2></div>
+    </div>
+    <div class="sec-body">
+      <p>"무엇을 작게 만들지" 막힐 때, 그리고 기획·레벨디자인 같은 고급 주제를 배우고 싶을 때 보는 곳이에요.</p>
+      <div class="linkgrid">
+        <div class="lcard"><div class="lcard-top lt-coral"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🎪</span><span class="lcard-name">itch.io Game Jams</span></div>
+          <div class="tagrow"><span class="tag tag-ref">아이디어</span></div>
+          <div class="lcard-desc">게임잼 목록. 짧게 만드는 게임 아이디어 참고.</div>
+          <div class="lcard-links"><a class="golink" href="https://itch.io/jams" target="_blank" rel="noopener">itch.io/jams</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-violet"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">🏆</span><span class="lcard-name">Ludum Dare</span></div>
+          <div class="tagrow"><span class="tag tag-ref">아이디어</span></div>
+          <div class="lcard-desc">유명 게임잼. 작은 게임 아이디어의 보고.</div>
+          <div class="lcard-links"><a class="golink" href="https://ldjam.com/" target="_blank" rel="noopener">ldjam.com</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-teal"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">📺</span><span class="lcard-name">GDC (YouTube)</span></div>
+          <div class="tagrow"><span class="tag tag-ref">강연</span><span class="tag tag-free">무료</span></div>
+          <div class="lcard-desc">게임 개발자 컨퍼런스 영상. 기획·UI·레벨디자인·사운드 고급 자료.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.youtube.com/@Gdconf" target="_blank" rel="noopener">GDC 채널</a></div>
+        </div></div>
+        <div class="lcard"><div class="lcard-top lt-amber"></div><div class="lcard-in">
+          <div class="lcard-head"><span class="lcard-ic">📝</span><span class="lcard-name">Game Developer</span></div>
+          <div class="tagrow"><span class="tag tag-ref">아티클</span></div>
+          <div class="lcard-desc">게임 개발 글·업계 분석·디자인 글.</div>
+          <div class="lcard-links"><a class="golink" href="https://www.gamedeveloper.com/" target="_blank" rel="noopener">gamedeveloper.com</a></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 14. 저작권 주의 + 체크리스트 ===== -->
+  <section class="sec" id="s14">
+    <div class="sec-head">
+      <div class="sec-num">14</div>
+      <div><span class="sec-kicker">License &amp; checklist</span><h2 class="sec-title">⚠️ 저작권 주의 · 최종 체크리스트</h2></div>
+    </div>
+    <div class="sec-body">
+      <p>이 부분이 어쩌면 가장 중요해요. 포트폴리오로 공개할 게임이라면 <strong>"남의 그림·소리·데이터를 그대로 넣어서 배포"하면 문제</strong>가 될 수 있거든요. 라이선스(사용 조건) 개념만 짧게 잡고 가요.</p>
+
+      <div class="table-wrap">
+        <table class="cmp">
+          <caption>라이선스 한눈에 — 뭘 조심해야 하나</caption>
+          <thead><tr><th>구분</th><th>예시</th><th>배포 게임에 써도?</th></tr></thead>
+          <tbody>
+            <tr><td><strong>CC0</strong> (퍼블릭 도메인)</td><td>OpenGameArt 일부, Kenney</td><td>✅ 출처 없이도 자유</td></tr>
+            <tr><td><strong>CC-BY</strong></td><td>OpenGameArt 일부</td><td>✅ 단, <strong>출처 표기 필수</strong></td></tr>
+            <tr><td>유료 에셋</td><td>Aseprite로 산 팩, CraftPix 유료</td><td>✅ 구매 조건 안에서</td></tr>
+            <tr><td><strong>실제 포켓몬/롤 IP</strong></td><td>공식 스프라이트, Data Dragon 에셋</td><td>❌ <strong>연습용만</strong>, 배포 금지</td></tr>
+            <tr><td>커뮤니티 자료</td><td>PokeCommunity 등</td><td>⚠️ 라이선스 불명확 → 조심</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout c-mistake">
+        <div class="callout-head"><span class="callout-ic">🚫</span><span class="callout-title">가장 흔한 실수</span></div>
+        <div class="callout-body">
+          <p>"PokéAPI에서 진짜 포켓몬 이미지를 받아 내 게임에 넣고 itch.io에 공개" → 이게 위험해요.
+             <strong>데이터 구조와 코드 방식은 마음껏 참고</strong>하되, 실제 포켓몬 그림·이름·음악은 <strong>내가 만든 것이나 무료 에셋(4번 섹션)으로 교체</strong>해서 배포하세요.</p>
+        </div>
+      </div>
+
+      <div class="callout c-core">
+        <div class="callout-head"><span class="callout-ic">📋</span><span class="callout-title">지금 단계 체크리스트</span></div>
+        <div class="callout-body">
+          <ul class="checklist">
+            <li>Node.js 설치 (1순위)</li>
+            <li>VS Code 설치</li>
+            <li>GitHub 계정 만들기 + Git 설치</li>
+            <li>Phaser 프로젝트 만들고 첫 화면 띄워보기</li>
+            <li>Kenney/itch.io에서 프로토타입용 무료 에셋 1세트 받기</li>
+            <li>PokéAPI 구조 보고 내 <code>monster.json</code> 설계해보기</li>
+            <li>맵 만들 차례 되면 Tiled 설치</li>
+            <li>에셋 받을 때마다 라이선스(CC0/CC-BY/유료) 메모해두기</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 마무리 ===== -->
+  <section class="endcard">
+    <h2>🎯 한 장 요약 — 이것만 기억하면 돼요</h2>
+    <ul>
+      <li><strong>지금 필요한 건 5개뿐:</strong> Node.js · VS Code · Git/GitHub · Phaser · (곧) Tiled. 나머지는 사전처럼 필요할 때 꺼내 보기.</li>
+      <li><strong>그림이 막히면</strong> Kenney → itch.io(무료 monster/pixel 태그) → OpenGameArt 순으로.</li>
+      <li><strong>포켓몬 데이터 설계</strong>는 PokéAPI 구조를 정답지로, 배틀 로직은 Pokémon Showdown "흐름"부터.</li>
+      <li><strong>화면 구성 막히면</strong> Interface In Game · Game UI Database에서 실제 게임 UI 구경.</li>
+      <li><strong>저작권:</strong> 코드·구조는 참고 OK, 실제 포켓몬 그림·이름·소리는 배포 게임에서 무료 에셋으로 교체.</li>
+    </ul>
+  </section>
+
+  <p class="foot">게임 개발 참고 링크 총정리 · Phaser 2D 포켓몬류 프로젝트용 · 중복 제거 후 주제별 정리</p>
+
+</div>
+
+<button id="top-btn" aria-label="맨 위로">↑</button>
+
+<script>
+  // 스크롤 진행바
+  var prog = document.getElementById('progress');
+  var topBtn = document.getElementById('top-btn');
+  function onScroll(){
+    var h = document.documentElement;
+    var scrolled = h.scrollTop / (h.scrollHeight - h.clientHeight);
+    prog.style.width = (scrolled * 100) + '%';
+    if (h.scrollTop > 400){ topBtn.classList.add('show'); } else { topBtn.classList.remove('show'); }
+  }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  topBtn.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+  onScroll();
+</script>
+</body>
+</html>

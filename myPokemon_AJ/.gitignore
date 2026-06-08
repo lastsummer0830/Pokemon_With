@@ -1,0 +1,14 @@
+# 받아온 부품들 (npm install 하면 다시 생김)
+node_modules/
+
+# 빌드 결과물 (npm run build 하면 다시 생김)
+dist/
+
+# 로그·캐시
+*.log
+.DS_Store
+.vite/
+
+# TypeScript가 no outDir 설정에서 src 옆에 만든 산출물
+src/**/*.js
+src/**/*.js.map
