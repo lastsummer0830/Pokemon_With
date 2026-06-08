@@ -1,0 +1,318 @@
+/* 기본 */
+body {
+  line-height: 1.6;
+}
+a {
+  text-decoration: none;
+}
+#wrap {
+  /* border: 1px solid red; */
+  margin: 0 auto;
+  width: 100%;
+  /* max-width: 1200px; */
+}
+/* main{ 
+    border: 1px solid saddlebrown;
+}*/
+.sec-tit {
+  background-color: lightblue;
+  font-size: 42px;
+  font-weight: 600;
+  margin-bottom: 30px;
+}
+/************** HEADER **********/
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 60px;
+  background-color: #222222;
+  display: flex;
+  justify-content: space-between;
+  z-index: 100;
+}
+/* 수정 숙제 */
+/* PC용 네비게이션은 모바일에서 숨김 */
+
+/* .gnb {
+    display: none;
+}  */
+
+.logo a {
+  color: #fff;
+  font-size: 1.2rem;
+  line-height: 60px;
+  margin-left: 1rem;
+}
+
+/* 메뉴 기본 숨김  */
+
+nav {
+  display: none; /* 🌸 */
+  position: absolute; /* 헤더를 기준으로 위치 잡기 */
+  top: 60px; /* 헤더 높이(60px)만큼 아래에서 시작 */
+  left: 0;
+  width: 100%; /* 화면 꽉 차게 */
+  background-color: #333; /* 배경색 (스크린샷과 같은 어두운 회색) */
+  padding: 20px 0; /* 위아래 여백을 줘서 답답하지 않게 */
+  z-index: 99;
+  text-align: center; /* 다른 콘텐츠보다 위에 뜨게 설정 */
+}
+
+/* JS 토글 이후 추가 내용 */
+nav.is-open {
+  display: block;
+}
+/* 모바일 메뉴 내부 리스트 스타일 */
+nav ul {
+  /* 리스트 스타일 초기화는 reset.css에 있지만 확실히 하기 위해 */
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+nav li {
+  /* 각 메뉴 사이의 간격 */
+  margin-bottom: 20px;
+}
+
+/* 모바일 메뉴 글자 스타일 */
+nav a {
+  display: block; /* 글자 주변을 클릭해도 되게 영역 확장 */
+  color: #fff; /* 흰색 글씨 */
+  font-size: 1.2rem; /* 글자 크기 조금 키움 */
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.3s; /* 마우스 올렸을 때 부드럽게 */
+}
+
+nav a:hover {
+  color: lightblue; /* 마우스 올리면 색상 변경 (포인트) */
+}
+/* 햄버거 버튼 */
+/* 🫧 2) 이렇게 해도 됨 */
+/* .menu-toggle-btn{
+    color: #fff; 
+    font-size: 25px;
+    background-color: transparent;
+    border: none; 
+} */
+.menu-toggle-btn {
+  width: 2rem;
+  position: absolute;
+  top: 1.3rem;
+  right: 1rem;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+}
+.menu-toggle-btn span {
+  display: block;
+  height: 3px;
+  background-color: #fff;
+  margin-bottom: 5px;
+}
+
+/* SLIDER */
+.slider {
+  margin-top: 60px;
+  /* border: 1px solid red; */
+}
+.slider img {
+  width: 100%;
+  height: auto;
+}
+
+/* common */
+.container {
+  /* border: 1px solid red; */
+  width: 100%;
+}
+
+.sec-tit {
+  text-align: center;
+  font-size: 1.8rem; /* 원래 1.8rem이였음 */
+  margin-bottom: 1rem;
+}
+.desc {
+  text-align: center;
+  font-size: 1rem;
+  /* 🎀px이 아닌 rem은 창 크기에 따라 가변하는 단위 */
+}
+
+/* promotion*/
+.promo-list li {
+  margin-bottom: 1.5rem;
+}
+
+.promo-list a {
+  /* border: 5px solid green; */
+  display: block; /* 🎀한 번에 선택 */
+  text-align: center;
+  background-color: #f2f2f2;
+}
+.promo-list a h3 {
+  color: #777;
+  font-weight: 600;
+}
+.promo-list a p {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+/* work */
+.work-list li {
+  margin-bottom: 1.5rem;
+}
+.work-list a {
+  display: block;
+  background-color: #eaeaea;
+  text-align: center;
+  padding: 2rem;
+}
+.work-list li h3 {
+  color: #777;
+  font-weight: 600;
+}
+.work-list li span {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+/* blog */
+.blog-list li {
+  margin-bottom: 1.5rem;
+}
+.blog-list li h3 {
+  font-size: 1rem;
+  color: #777;
+  font-weight: 600;
+}
+
+/* contact */
+textarea {
+  width: 100%;
+  height: 120px;
+  font-size: 2rem;
+  padding: 1rem;
+}
+
+/* footer */
+footer {
+  font-size: 0.8rem;
+  /* 🎀16px=1rem */
+  color: #888;
+}
+
+/* 태블릿 최소 768px 이상일 때 적용 */
+@media (min-width: 768px) {
+  .promo-list {
+    display: flex;
+    /* 🌸자식 요소가 부모 컨테이너의
+        너비를 초과할 때, 자동으로 
+        다음 줄로 넘어가게 설정
+        ✨no-wrap 한 줄에 강제로 배치 */
+    flex-wrap: wrap;
+    gap: 1.5rem;
+  }
+  .promo-list li {
+    width: 48%;
+  }
+}
+@media (min-width: 768px) {
+  .work-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+  }
+  .work-list li {
+    width: 48%;
+  }
+  .blog-list {
+    display: flex; /* 가로 배치 시작 */
+    flex-wrap: wrap; /* 줄바꿈 허용 */
+    gap: 1.5rem; /* 사이 간격 */
+    justify-content: center;
+  }
+
+  .blog-list li {
+    width: 30%; /* 3개씩 배치 (100% / 3 ≒ 30%) */
+    /* 필요 시 아래 스타일 포함 */
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    padding: 1rem;
+  }
+
+  .blog-list li h3 {
+    font-size: 1.1rem;
+    margin-top: 0.5rem;
+  }
+}
+/* 📖1. work blog 2열로 배치
+       📖2. 제목만 살짝 키움
+       📖3. 1024 이상일 때는 
+       햄버거 메뉴가 사라지고 
+       nav가 생긴다
+       promotion, work 4열
+       blog 3열
+       */
+
+/* PC 1024px 이상일 때 */
+@media (min-width: 1024px) {
+  /* 1. header */
+  .menu-toggle-btn {
+    display: none;
+  }
+  nav {
+    display: block;
+    background: none;
+  }
+  nav ul {
+    display: flex;
+    position: absolute;
+    top: 0rem;
+    right: 2rem;
+    height: 60px;
+    align-items: center;
+  }
+  nav li {
+    margin-left: 2rem;
+  }
+  nav a {
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 500;
+  }
+  /* promotion 4열 */
+
+  /* work 4열 */
+
+  /* blog 3열 */
+
+  .sec-tit {
+    font-size: 3rem;
+    margin-bottom: 2rem;
+  }
+  /* 3. promotion 4열 (한 줄에 4개 = 너비 약 25%) */
+  /* WE ARE 섹션이 1줄(1열)로 보이게 됨 */
+  .promo-list li {
+    /* (전체 100% - 간격 1.5rem * 3개) 나누기 4 */
+    width: calc((100% - (1.5rem * 3)) / 4);
+  }
+
+  /* 4. work 4열 (한 줄에 4개 = 너비 약 25%) */
+  /* 아이템이 8개이므로 자동으로 2줄(2열)로 보이게 됨 */
+  .work-list li {
+    width: calc((100% - (1.5rem * 3)) / 4);
+  }
+
+  /* WORK 내부 텍스트 크기 등 미세 조정 */
+  .work-list a {
+    padding: 3rem 1rem;
+  }
+
+  .blog-list li {
+    width: calc((100% - (1.5rem * 2)) / 3);
+  }
+}

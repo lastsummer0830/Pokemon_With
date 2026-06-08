@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Portfolio</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;700&family=Noto+Sans+KR:wght@300;400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+
+    <style>
+      /* ================================================================
+           [1. 색상 및 기본 설정] 
+           보내주신 사진들의 색감을 추출하여 변수로 만들었습니다.
+           ================================================================
+        */
+      :root {
+        /* 배경: 맑은 하늘색 -> 연분홍 -> 보라빛 그라데이션 */
+        --bg-gradient: linear-gradient(
+          180deg,
+          #dceefb 0%,
+          #f4e1e9 50%,
+          #e8dff5 100%
+        );
+
+        /* 텍스트 색상: 너무 검지 않은 부드러운 먹색 */
+        --text-main: #4a4a4a;
+        --text-sub: #7a7a7a;
+
+        /* 포인트 컬러: 데이지 꽃술 같은 따뜻한 노랑 & 맑은 파랑 */
+        --accent-color: #7bb3ff;
+        --accent-warm: #ffca28;
+
+        /* 카드 배경: 유리처럼 투명한 흰색 */
+        --glass-bg: rgba(255, 255, 255, 0.6);
+        --glass-border: rgba(255, 255, 255, 0.8);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Montserrat", "Noto Sans KR", sans-serif;
+        background: var(--bg-gradient);
+        color: var(--text-main);
+        overflow-x: hidden; /* 가로 스크롤 방지 */
+        line-height: 1.6;
+      }
+
+      /* 부드러운 스크롤 이동을 위한 설정 (끊기는 느낌 제거!) */
+      html {
+        scroll-behavior: smooth;
+      }
+
+      /* ================================================================
+           [2. 네비게이션 바]
+           상단에 고정되지만 배경을 흐리게 처리해 답답하지 않게 했습니다.
+           ================================================================
+        */
+      nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        padding: 1.2rem 5%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 1000;
+        background: rgba(255, 255, 255, 0.4); /* 반투명 */
+        backdrop-filter: blur(10px); /* 유리 효과 */
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      }
+
+      .logo {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--accent-color);
+        text-decoration: none;
+        letter-spacing: -0.5px;
+      }
+
+      .nav-links {
+        list-style: none;
+        display: flex;
+        gap: 2rem;
+      }
+
+      .nav-links a {
+        text-decoration: none;
+        color: var(--text-main);
+        font-weight: 500;
+        font-size: 0.95rem;
+        transition: color 0.3s;
+      }
+
+      .nav-links a:hover {
+        color: var(--accent-color);
+      }
+
+      /* 모바일 메뉴 숨김 처리 (단순화를 위해 PC 기준, 모바일은 자동 줄바꿈) */
+      @media (max-width: 768px) {
+        .nav-links {
+          gap: 1rem;
+          font-size: 0.85rem;
+        }
+        nav {
+          padding: 1rem 1.5rem;
+        }
+      }
+
+      /* ================================================================
+           [3. 공통 섹션 스타일]
+           화면을 가득 채우되(min-height: 100vh), 
+           내용이 많으면 자연스럽게 늘어나도록 설정했습니다.
+           ================================================================
+        */
+      section {
+        min-height: 100vh;
+        width: 100%;
+        padding: 6rem 1.5rem; /* 상하 여백 넉넉히 */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+      }
+
+      .section-title {
+        font-size: 2.5rem;
+        margin-bottom: 3rem;
+        color: var(--text-main);
+        position: relative;
+        display: inline-block;
+      }
+
+      /* 제목 밑에 살짝 들어가는 형광펜 효과 */
+      .section-title::after {
+        content: "";
+        position: absolute;
+        bottom: 5px;
+        left: 0;
+        width: 100%;
+        height: 8px;
+        background: rgba(123, 179, 255, 0.3); /* 연한 파랑 */
+        z-index: -1;
+        border-radius: 4px;
+      }
+
+      /* ================================================================
+           [4. HOME 섹션: 레코드판 & 타이핑]
+           ================================================================
+        */
+      #home {
+        text-align: center;
+        overflow: hidden; /* 삐져나가는 것 방지 */
+      }
+
+      /* 레코드 전체를 감싸는 영역 */
+      .record-wrapper {
+        position: relative;
+        /* 중요: 화면 너비(vw)의 70%를 쓰되, 최대 450px는 넘지 마라 */
+        width: 70vw;
+        max-width: 450px;
+        /* 중요: 가로세로 비율을 1:1로 고정 (절대 안 찌그러짐) */
+        aspect-ratio: 1 / 1;
+        margin: 0 auto 3rem auto; /* 중앙 정렬 */
+        perspective: 1200px; /* 3D 효과 원근감 */
+        cursor: pointer;
+      }
+
+      /* 실제 회전하고 뒤집히는 판 */
+      .record-card {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* 통통 튀는 느낌의 부드러움 */
+        transform-style: preserve-3d;
+        border-radius: 50%;
+      }
+
+      /* 클릭했을 때 붙는 클래스 (자바스크립트로 제어) */
+      .record-card.flipped {
+        transform: rotateY(180deg);
+      }
+
+      /* 앞면/뒷면 공통 설정 */
+      .record-face {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%; /* 원형 */
+        backface-visibility: hidden; /* 뒷면 숨김 */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        /* 레코드판 테두리 느낌 */
+        border: 8px solid rgba(255, 255, 255, 0.8);
+        box-shadow: 0 20px 50px rgba(0, 70, 150, 0.15); /* 부드러운 푸른 그림자 */
+        background: #fff;
+        overflow: hidden; /* 이미지가 원 밖으로 안 나가게 */
+      }
+
+      /* 빙글빙글 도는 애니메이션 (이미지에 직접 적용) */
+      .spinning-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover; /* 비율 유지하며 꽉 채움 */
+        animation: spin 15s linear infinite;
+      }
+
+      /* 뒷면은 이미 180도 돌려둠 */
+      .record-back {
+        transform: rotateY(180deg);
+      }
+
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      
+      /* .record-card.flipped .spinning-img { animation-play-state: paused; } */
+
+      /* 재생바 (Progress Bar) */
+      .player-bar {
+        width: 80%;
+        max-width: 500px;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 10px;
+        margin: 0 auto 1.5rem auto;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .player-fill {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        background: var(--accent-color);
+        width: 0%;
+        animation: playProgress 15s linear infinite; /* 레코드 속도와 맞춤 */
+      }
+
+      @keyframes playProgress {
+        0% {
+          width: 0%;
+        }
+        100% {
+          width: 100%;
+        }
+      }
+
+      /* 움직이는 텍스트 (Marquee) */
+      .scrolling-text-container {
+        width: 100%;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+
+      .scrolling-text {
+        display: inline-block;
+        font-size: 1.5rem;
+        color: var(--text-sub);
+        animation: scrollText 20s linear infinite;
+      }
+
+      @keyframes scrollText {
+        0% {
+          transform: translateX(100%);
+        }
+        100% {
+          transform: translateX(-100%);
+        }
+      }
+
+      /* ================================================================
+           [5. ABOUT & SKILLS & PROJECT & CONTACT]
+           카드 형태의 깔끔한 디자인
+           ================================================================
+        */
+
+      /* 공통 카드 스타일 */
+      .glass-card {
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 20px;
+        padding: 2rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+        max-width: 1000px;
+        width: 90%;
+        transition: transform 0.3s ease;
+      }
+
+      .glass-card:hover {
+        transform: translateY(-5px);
+      }
+
+      /* About 내부 레이아웃 */
+      .about-inner {
+        display: flex;
+        gap: 3rem;
+        align-items: center;
+      }
+      .about-img {
+        width: 250px;
+        height: 300px;
+        border-radius: 15px;
+        object-fit: cover;
+        box-shadow: 10px 10px 0px var(--accent-color); /* 그림자 효과 */
+      }
+      .about-text h3 {
+        font-size: 1.8rem;
+        margin-bottom: 1rem;
+        color: var(--accent-color);
+      }
+      .about-text p {
+        margin-bottom: 1rem;
+        color: var(--text-main);
+      }
+
+      @media (max-width: 768px) {
+        .about-inner {
+          flex-direction: column;
+          text-align: center;
+        }
+        .about-img {
+          width: 200px;
+          height: 250px;
+          margin-bottom: 1rem;
+        }
+      }
+
+      /* Skills 레이아웃 */
+      .skills-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 2rem;
+        width: 100%;
+        text-align: center;
+      }
+      .skill-item i {
+        font-size: 3rem;
+        color: var(--accent-color);
+        margin-bottom: 10px;
+        background: #fff;
+        width: 80px;
+        height: 80px;
+        line-height: 80px;
+        border-radius: 50%;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s;
+      }
+      .skill-item:hover i {
+        transform: scale(1.1) rotate(10deg);
+        color: var(--accent-warm);
+      }
+
+      /* Projects 레이아웃 */
+      .project-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+        width: 100%;
+      }
+      .project-item {
+        background: #fff;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+      }
+      .project-thumb {
+        width: 100%;
+        height: 200px;
+        background: #eee;
+        object-fit: cover;
+      }
+      .project-info {
+        padding: 1.5rem;
+      }
+      .project-info h4 {
+        font-size: 1.2rem;
+        margin-bottom: 0.5rem;
+      }
+      .btn-small {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        background: var(--accent-color);
+        color: #fff;
+        text-decoration: none;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        margin-top: 1rem;
+        transition: background 0.3s;
+      }
+      .btn-small:hover {
+        background: var(--accent-warm);
+      }
+
+      /* Contact 레이아웃 */
+      .contact-box {
+        text-align: center;
+      }
+      .social-icons {
+        margin-top: 2rem;
+      }
+      .social-icons a {
+        font-size: 2rem;
+        color: var(--text-sub);
+        margin: 0 1rem;
+        transition: color 0.3s;
+      }
+      .social-icons a:hover {
+        color: var(--accent-color);
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="#home" class="logo">A Jin's Page</a>
+      <ul class="nav-links">
+        <li><a href="#about">ABOUT</a></li>
+        <li><a href="#skills">SKILLS</a></li>
+        <li><a href="#projects">PROJECT</a></li>
+        <li><a href="#contact">CONTACT</a></li>
+      </ul>
+    </nav>
+
+    <section id="home">
+      <div class="record-wrapper" onclick="toggleRecord()">
+        <div class="record-card" id="myRecord">
+          <div class="record-face record-front">
+            <img
+              src="images/담꽃.jpg"
+              alt="Record Front"
+              class="spinning-img"
+            />
+          </div>
+
+          <div class="record-face record-back">
+            <img
+              src="images/zeldasword.jpg"
+              alt="Record Back"
+              class="spinning-img"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="player-bar">
+        <div class="player-fill"></div>
+      </div>
+
+      <div class="scrolling-text-container">
+        <p class="scrolling-text">
+          Welcome to A Jin's Universe ✿ Healing, Coding, and Dreaming ✿ Click
+          the Record to play B-Side ✿
+        </p>
+      </div>
+    </section>
+
+    <section id="about">
+      <h2 class="section-title">ABOUT ME</h2>
+      <div class="glass-card">
+        <div class="about-inner">
+          <img
+            src="images/조나우바다.jpg"
+            alt="Profile"
+            class="about-img"
+          />
+
+          <div class="about-text">
+            <h3>
+              안녕하세요, <br />개발자
+              <span style="color: var(--accent-color)">조아진</span> 입니다.
+            </h3>
+            <p>
+              따뜻한 시선으로 세상을 코드로 담아내는 개발자입니다.<br />
+              특유의 미적 감각으로 센스있고 독특한 작업에 자신있습니다. <br />
+              좋은 작업물로 저를 보여드리겠습니다. 
+            </p>
+            <p>#Frontend #WebDesign #MultiPlayer</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="skills">
+      <h2 class="section-title">SKILLS</h2>
+      <div class="glass-card">
+        <div class="skills-grid">
+          <div class="skill-item">
+            <i class="fab fa-html5"></i>
+            <p>HTML5</p>
+          </div>
+          <div class="skill-item">
+            <i class="fab fa-css3-alt"></i>
+            <p>CSS3</p>
+          </div>
+          <div class="skill-item">
+            <i class="fab fa-js"></i>
+            <p>JavaScript</p>
+          </div>
+          <div class="skill-item">
+            <i class="fa-solid fa-database"></i>
+            <p>MySQL</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="projects">
+      <h2 class="section-title">PROJECTS</h2>
+      <div class="project-list">
+        <div class="project-item">
+          <img
+            src="images/samplezelda.png"
+            alt="Project 1"
+            class="project-thumb"
+          />
+          <div class="project-info">
+            <h4>젤다의 전설 Tears Of Kingdom INFO 사이트</h4>
+            <p>젤다의 전설 TOF의 관련된 정보를 한 눈에 볼 수 있는 사이트입니다</p>
+            <a href="#" class="btn-small">자세히 보기</a>
+          </div>
+        </div>
+
+        <div class="project-item">
+          <img
+            src="images/sample_switch.png"
+            alt="Project 2"
+            class="project-thumb"
+          />
+          <div class="project-info">
+            <h4>닌텐도 스위치 컨셉의 포트폴리오</h4>
+            <p>닌텐도 스위치를 컨셉으로 한 독특한 포트폴리오입니다.</p>
+            <a href="#" class="btn-small">자세히 보기</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact">
+      <h2 class="section-title">CONTACT</h2>
+      <div class="glass-card contact-box">
+        <p style="font-size: 1.2rem; margin-bottom: 2rem">
+          읽어주셔서 감사합니다🙏 <br>
+          저에 대해 더 궁금하신 사항이있으신 분들의 연락을 기다리겠습니다!<br>
+          새로운 프로젝트나 협업 제안은 언제든 환영합니다.<br />
+          아래 메일로 편하게 연락주세요!
+        </p>
+        <a
+          href="https://mail.google.com/mail/?view=cm&fs=1&to=ajin@example.com"
+          class="btn-small"
+          style="font-size: 1.2rem; padding: 1rem 2rem"
+        >
+          lastsummer0830@gmail.com
+        </a>
+
+        <div class="social-icons">
+          <a href="https://github.com/lastsummer0830"><i class="fab fa-github"></i></a>
+          <a href="https://instagram.com/0ajinova"><i class="fab fa-instagram"></i></a>
+          <a href="https://blog.naver.com/lastsummer0830"><i class="fa-solid fa-blog"></i></i></a>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      // 1. 레코드판 뒤집기 기능
+      function toggleRecord() {
+        const record = document.getElementById("myRecord");
+        // 'flipped' 클래스를 뺐다 꼈다(toggle) 
+        // 클래스가 붙으면 CSS에서 rotateY(180deg)가 작동
+        record.classList.toggle("flipped");
+      }
+
+      // 2. 스크롤 시 섹션들이 부드럽게 떠오르는 효과 (Fade-In)
+      
+      const observerOptions = {
+        threshold: 0.2, // 화면에 20% 정도 보이면 작동
+      };
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.style.opacity = "1";
+            entry.target.style.transform = "translateY(0)";
+          }
+        });
+      }, observerOptions);
+
+      
+      document.querySelectorAll("section").forEach((sec) => {
+        sec.style.opacity = "0";
+        sec.style.transform = "translateY(30px)"; // 아래로 살짝 내려가 있음
+        sec.style.transition = "all 1s ease-out"; // 1초 동안 부드럽게 올라옴
+        observer.observe(sec);
+      });
+    </script>
+  </body>
+</html>
+

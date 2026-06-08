@@ -1,0 +1,111 @@
+/* ================================== Login ================================== */
+.login_main {
+  max-width: 50%;
+  margin: 0 auto;
+  align-items: center;
+}
+
+.login_wrap {
+  border: 1px solid #e5e5e5;
+  padding: 28px 22px;
+  background: #fff;
+}
+
+.login_title {
+  margin: 0 0 6px;
+  font-size: 26px;
+  font-weight: bold;
+}
+
+.login_desc {
+  margin: 0 0 18px;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.login_table {
+  width: 100%;
+  border-collapse: collapse;
+}
+/* 분류 */
+.login_table th {
+  text-align: left;
+  width: 120px;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 12px 10px 12px 0;
+  vertical-align: middle;
+}
+/* 값 */
+.login_table td {
+  padding: 10px 0;
+}
+
+.login_table input {
+  /* 안넘치게 */
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  border: 1px solid #d9d9d9;
+  padding: 0 12px;
+  outline: none;
+  font-size: 14px;
+}
+
+.login_table input:focus {
+  border-color: #111;
+}
+
+/* 비밀번호 */
+.pw_field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pw_field input {
+  padding-right: 44px; /* 눈 버튼 공간 */
+}
+
+.pw_toggle {
+  position: absolute;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #111;
+  opacity: 0.7;
+}
+
+.pw_toggle:hover {
+  opacity: 1;
+}
+
+.login_actions {
+  margin-top: 18px;
+}
+
+.login_btn {
+  width: 100%;
+  height: 46px;
+  background: #111;
+  color: #fff;
+  border: 0;
+  cursor: pointer;
+  font-weight: bold;
+  letter-spacing: 0.4px;
+}
+
+.login_btn:hover {
+  opacity: 0.9;
+}
+/* 미입력 시 출력되는 글자 */
+.login_error {
+  margin: 12px 0 0;
+  color: #d00000;
+  font-size: 12px;
+  min-height: 16px;
+}

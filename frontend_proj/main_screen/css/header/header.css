@@ -1,0 +1,533 @@
+body {
+  padding-top: 130px;
+}
+/* ================================== header ================================== */
+.header {
+  margin: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  /* background: #fff; */
+  background: transparent;
+  border: 1px solid #cfcfcf;
+  z-index: 9999; /* 드롭다운보다 위에 오게 크게 */
+}
+/* ul 기본 padding/marker 제거(헤더 안에서만) */
+.header ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* a 기본 밑줄 제거(헤더 안에서만) */
+.header a {
+  color: inherit;
+  text-decoration: none;
+}
+/* button 기본 스타일 제거(헤더 안에서만) */
+.header button {
+  font: inherit;
+  color: inherit;
+  /* background: transparent; */
+  border: 0;
+  padding: 0;
+}
+/* ================================== nav ================================== */
+.main_nav {
+  /* max-width: 1200px; */
+  margin: 0 auto;
+  padding: 10px;
+  /* border: 1px solid red; */
+}
+
+/* ================================== div1(top_mini) ================================== */
+.top_mini {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  /* border: 1px solid red; */
+}
+
+.logo {
+  /* text-decoration: none; */
+  color: #111;
+  font-weight: 900;
+  letter-spacing: 1px;
+  font-size: 14px;
+  /* border: 1px solid red; */
+}
+
+.mini_menu {
+  /* list-style: none; */
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  /* border: 1px solid red; */
+}
+
+.mini_menu a {
+  /* text-decoration: none; */
+  color: #111;
+  opacity: 0.85;
+}
+
+.mini_menu a:hover {
+  opacity: 0.6;
+}
+/* ================================== div1(top_mini icon.ver) ================================== */
+/* 아이콘 기준으로 수직정렬 */
+.icon_link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  vertical-align: middle;
+  margin-right: 10px;
+}
+
+/* 아이콘 고정 */
+.icon_link svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+  flex: 0 0 20px;
+}
+
+.icon_text {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* ================================== div2(nav_top) ================================== */
+.nav_top {
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  /* border: 1px solid red; */
+}
+
+.menu_top {
+  /* list-style: none; */
+  display: flex;
+  gap: 18px;
+  align-items: baseline;
+}
+
+.nav_link {
+  position: relative;
+  display: inline-block;
+  /* text-decoration: none; */
+  color: black;
+  /* border: 1px solid red; */
+}
+
+/* 메인메뉴 */
+.nav_link.big {
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  line-height: 1.05;
+  padding: 4px 0;
+}
+
+/* 메인메뉴 밑줄 */
+.nav_link.big::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -8px;
+  width: 100%;
+  height: 3px;
+  background: #111;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 160ms ease;
+}
+
+.nav_link.big:hover::after {
+  transform: scaleX(1);
+}
+
+/* ================================== div3(nav_bottom) ================================== */
+.nav_bottom {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  /* margin-top: 8px; */
+  position: relative;
+  /* border: 1px solid red; */
+}
+
+/* category row */
+.menu_bottom {
+  /* list-style: none; */
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.menu_bottom li {
+  display: flex;
+  align-items: center;
+}
+
+.nav_link.small {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  opacity: 0.85;
+}
+
+/* 서브메뉴 밑줄 */
+.nav_link.small::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  width: 100%;
+  height: 2px;
+  background: #111;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 160ms ease;
+}
+
+.nav_link.small:hover {
+  opacity: 1;
+}
+
+.nav_link.small:hover::after {
+  transform: scaleX(1);
+}
+
+/* ================================== 호버시 나오는 화면 ================================== */
+
+.has_drop {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* 메인 패널 */
+.drop {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 14px);
+
+  /* 가로 화면 전체 채우게 */
+  width: 100vw;
+  background: #fff;
+
+  border-top: 1px solid #fff;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    visibility 160ms;
+  z-index: 50;
+}
+
+/* hover 시 표시 */
+.has_drop:hover .drop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* mega 내부를 nav 폭에 맞추기 */
+.drop_inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 22px 20px 28px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  gap: 28px;
+}
+
+/* 컬럼 스타일 */
+.drop_col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drop_title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #111;
+  margin-bottom: 6px;
+}
+
+.drop a {
+  /* text-decoration: none; */
+  color: #111;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.drop a:hover {
+  opacity: 1;
+  /* text-decoration: underline; */
+}
+
+.has_drop::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 100%;
+  width: 100%;
+  height: 16px;
+}
+
+/* 추가메뉴 구분 */
+.divider {
+  width: 1px;
+  height: 15px;
+  background: #cfcfcf;
+}
+
+/* 추가메뉴2개 */
+.extra_menu {
+  list-style: none;
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  font-style: italic;
+  /* border: 1px solid red; */
+}
+
+.extra_menu a {
+  /* text-decoration: none; */
+  color: #111;
+  opacity: 0.7;
+}
+
+.extra_menu a:hover {
+  opacity: 0.95;
+}
+
+/* search icon */
+.search_btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* border: 1px solid red; */
+}
+
+.search_btn svg {
+  width: 22px;
+  height: 22px;
+  fill: #111;
+  opacity: 0.9;
+}
+
+.search_btn:hover svg {
+  opacity: 0.6;
+}
+/* ================================== Search Overlay ================================== */
+.search_overlay {
+  position: fixed;
+  inset: 0;
+  /* header보다 높게 해서 덮기 */
+  z-index: 20000;
+  display: none;
+}
+
+/* 처음엔 안보이다 보이게 */
+.search_overlay.is_open {
+  display: block;
+}
+.search_overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* 패널 */
+.search_panel {
+  position: relative;
+  max-width: 640px;
+  margin: 70px auto 0;
+  padding: 18px 18px 22px;
+  background: transparent;
+}
+
+/* 닫기 버튼 */
+.search_close {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  font-size: 28px;
+  line-height: 44px;
+  cursor: pointer;
+}
+
+/* 검색 바 */
+.search_box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 2px solid #111;
+  padding: 8px 0;
+}
+
+.search_input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 18px;
+  padding: 10px 0;
+}
+
+.search_submit {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 22px;
+}
+
+/* 인기 키워드 */
+.search_keywords {
+  margin-top: 18px;
+}
+
+.search_keywords h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.search_keywords ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.search_keywords a {
+  color: #111;
+  text-decoration: none;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.search_keywords a:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+/* 스크롤 잠금 */
+body.is_search_open {
+  overflow: hidden;
+}
+
+/* ================================== header 스크롤 시 압축 ================================== */
+.header {
+  background: #fff;
+  transition:
+    padding 180ms ease,
+    box-shadow 180ms ease;
+}
+
+/* 헤더 압축 */
+.header.is_compact .main_nav {
+  padding: 10px 16px;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto; /* logo | TOP | mini | search */
+  grid-template-rows: auto auto;
+  /* 영역 할당 */
+  grid-template-areas:
+    "logo menu mini search"
+    "logo bottom bottom bottom";
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 8px;
+}
+
+/* 기존 래퍼(div) grid에 직접 배치 */
+.header.is_compact .top_mini,
+.header.is_compact .nav_top {
+  display: contents;
+}
+
+/* grid 배치 */
+/* logo를 가장 왼쪽 배치 */
+.header.is_compact .logo {
+  grid-area: logo;
+}
+/* nav_top 왼쪽에 오게 */
+.header.is_compact .menu_top {
+  grid-area: menu;
+  margin: 0;
+}
+.header.is_compact .search_btn {
+  grid-area: search;
+  /* mini 오른쪽 */
+  justify-self: end;
+}
+/* nav_top 사이즈 조절 */
+.header.is_compact .nav_link.big {
+  font-size: 20px;
+  line-height: 1.1;
+}
+/* mini_menu 조정인데 했다가 애매해서 뺌 */
+/* .header.is_compact .mini_menu {
+  font-size: 10px;
+  gap: 10px;
+} */
+
+/* nav_bottom 간격 조정 */
+.header.is_compact .nav_bottom .menu_bottom {
+  gap: 12px;
+}
+
+/* 압축시 드롭다운의 기준이 nav_link로 그대로면 화면이 뚫리기 때문에 수정 */
+.header.is_compact .has_drop .drop {
+  /* 기준을 viewport로 */
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: auto;
+  top: calc(100% + 14px);
+}
+
+/* fixed로 바뀌면 top:100% 기준이 깨짐 따라서 헤더 아래로 정확히 내림 */
+.header.is_compact .has_drop .drop {
+  top: calc(var(--header-h, 70px) + 14px);
+}
+
+/* 압축 시 mini menu 아이콘만 보이게 */
+.header.is_compact .icon_text {
+  display: none;
+}
+
+/* 기본: 아이콘 + 텍스트 둘 다 보임 */
+.icon_text {
+  display: inline-flex;
+}
+
+/* 화면이 좁아지면 아이콘만 보이게 */
+@media (max-width: 1100px) {
+  .icon_text {
+    display: none;
+  }
+}

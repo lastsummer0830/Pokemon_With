@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title> 사진 grid 핀터st</title>
+  <style>
+    body {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      display: grid;
+
+      /* 가로 3칸 (비율 동일) */
+      grid-template-columns: 1fr 1fr 1fr;
+
+      /* 세로 5줄 (화면 높이를 5등분) */
+      grid-template-rows: repeat(5, 1fr);
+
+      /* 배치도 수정 (7개 박스 배치) */
+      grid-template-areas:
+        "img1 img1 img4"
+        "img2 img3 img4"
+        "img2 img3 img4"
+        "img5 img3 img6"
+        "img5 img7 img7";
+      gap: 10px;
+      /* 사이 간격 */
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    /* 이미지 공통 스타일 */
+    div {
+      background-size: cover;
+      background-position: center;
+      border-radius: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* 각 위치별 사진 및 구역 이름 지정 */
+    .box1 {
+      grid-area: img1;
+      background-image: url(images/zeldasword.jpg);
+      background-position: center 10%;
+    }
+
+    .box2 {
+      grid-area: img2;
+      background-image: url(images/pinter_바다.jpg);
+    }
+
+    .box3 {
+      grid-area: img3;
+      background-image: url(images/pinter_보라히아신스밭.jpg);
+      background-position: center 70%;
+    }
+
+    .box4 {
+      grid-area: img4;
+      background-image: url(images/pinter_센과치히로.jpg);
+      background-position: left;
+    }
+
+    .box5 {
+      grid-area: img5;
+      background-image: url(images/pinter_분홍연꽃.jpg);
+      background-position: center 50%;
+    }
+
+    .box6 {
+      grid-area: img6;
+      background-image: url(images/조나우바다.jpg);
+    }
+
+    .box7 {
+      grid-area: img7;
+      background-image: url(images/가디언꽃.jpg);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="box1"></div>
+  <div class="box2"></div>
+  <div class="box3"></div>
+  <div class="box4"></div>
+  <div class="box5"></div>
+  <div class="box6"></div>
+  <div class="box7"></div>
+</body>
+
+
+</html>

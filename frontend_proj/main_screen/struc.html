@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Structure View - Spaced</title>
+    <script
+      src="https://kit.fontawesome.com/4ec79785b5.js"
+      crossorigin="anonymous"
+    ></script>
+    <script defer src="./js/search.js"></script>
+    <script defer src="./js/header.js"></script>
+    <script defer src="./js/more_button.js"></script>
+    <link rel="stylesheet" href="./css/style.css" />
+    <link rel="stylesheet" href="./css/header.css" />
+    <link rel="stylesheet" href="./css/left_screen.css" />
+
+    <style>
+      * {
+        box-sizing: border-box !important;
+      }
+
+      /* 기본 뼈대 스타일 */
+      header, nav, div, section, ul, li, footer, p, h2, h3, h4, a {
+        border: 1px solid rgba(255, 0, 0, 0.7) !important;
+        background-color: rgba(255, 0, 0, 0.03) !important;
+        padding: 6px !important;
+        margin: 4px !important;
+        border-radius: 3px !important;
+        min-height: 20px;
+      }
+
+      ul { list-style: none !important; }
+      
+      a {
+        display: block !important;
+        text-decoration: none !important;
+        color: #333 !important;
+        text-align: center;
+        font-size: 12px;
+      }
+
+      img {
+        display: block;
+        background-color: #e0e0e0 !important;
+        min-height: 60px;
+        min-width: 60px;
+        content: url("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
+        border: 2px dashed blue !important;
+        margin: 0 auto !important;
+      }
+
+      /* =========================================
+         [추가/수정된 부분] 헤더 고정 및 반투명 처리 
+         ========================================= */
+      
+      /* 1. 헤더가 본문을 가리지 않도록 바디 상단에 여백 줌 */
+      body {
+        padding-top: 180px !important; /* 헤더의 대략적인 높이만큼 밀어내기 */
+        margin: 0 !important;
+      }
+
+      /* 2. 헤더 고정 및 디자인 */
+      header.header {
+        position: fixed !important;  /* 상단에 고정 */
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;      /* 가로 전체 차지 */
+        z-index: 9999 !important;    /* 가장 위에 보이도록 설정 */
+        margin: 0 !important;        /* 헤더 바깥 여백 제거 */
+        
+        /* 반투명 효과의 핵심 */
+        background-color: rgba(255, 255, 255, 0.85) !important; /* 흰색 배경을 85% 불투명하게 */
+        backdrop-filter: blur(8px) !important; /* 아래 지나가는 요소들을 흐리게(유리창 효과) */
+        
+        border-bottom: 3px solid red !important; /* 헤더와 본문의 경계를 확실히 구분 */
+      }
+      /* ========================================= */
+
+    </style>
+  </head>
+
+  <body>
+    <header class="header">
+      <nav class="main_nav">
+        <div class="top_mini">
+          <a class="logo" href="index.html">LOGO</a>
+          <ul class="mini_menu">
+            <li>Menu 1</li>
+            <li>Menu 2</li>
+            <li>Menu 3</li>
+            <li>Menu 4</li>
+          </ul>
+        </div>
+
+        <div class="nav_top">
+          <ul class="menu_top">
+            <li><a class="nav_link big" href="#">BIG MENU 1</a></li>
+            <li><a class="nav_link big" href="#">BIG MENU 2</a></li>
+            <li><a class="nav_link big" href="#">BIG MENU 3</a></li>
+            <li><a class="nav_link big" href="#">BIG MENU 4</a></li>
+          </ul>
+
+          <button class="search_btn" type="button" data-open-search>
+            [Search Btn]
+          </button>
+
+          <div class="search_overlay" data-search-overlay aria-hidden="true">
+            <div class="search_panel">
+              <div class="search_box">
+                [Search Input Area]
+              </div>
+              <div class="search_keywords">
+                <h3>Keywords Area</h3>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav_bottom">
+          <ul class="menu_bottom">
+            <li><a class="nav_link small" href="#">Small 1</a></li>
+            
+            <li class="has_drop">
+              <a class="nav_link small" href="#">Small 2 (Drop)</a>
+              <div class="drop">
+                <div class="drop_inner">
+                  <div class="drop_col">Drop Column 1</div>
+                  <div class="drop_col">Drop Column 2</div>
+                </div>
+              </div>
+            </li>
+            
+            <li class="has_drop"><a class="nav_link small" href="#">Small 3</a></li>
+            <li class="has_drop"><a class="nav_link small" href="#">Small 4</a></li>
+            <li class="has_drop"><a class="nav_link small" href="#">Small 5</a></li>
+            <li class="has_drop"><a class="nav_link small" href="#">Small 6</a></li>
+          </ul>
+          <span class="divider"></span>
+          <ul class="extra_menu">
+            <li>Extra 1</li>
+            <li>Extra 2</li>
+          </ul>
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <div id="container">
+        <section class="left_screen">
+          <ul class="left_list">
+            <li>
+              <a class="left_card" href="#">
+                <div class="left_thumb"><img alt="thumb"></div>
+                <h2>Title</h2>
+                <p>desc</p>
+              </a>
+            </li>
+            <li><a class="left_card" href="#"><div class="left_thumb"><img alt="thumb"></div><h2>Title</h2><p>desc</p></a></li>
+            <li><a class="left_card" href="#"><div class="left_thumb"><img alt="thumb"></div><h2>Title</h2><p>desc</p></a></li>
+          </ul>
+        </section>
+
+        <section class="product">
+          
+          <section class="product_left">
+            <img alt="Brand Logo" class="product_left_logo">
+            
+            <div class="content left_content">
+              <div class="product_picture">
+                <img alt="Main Product Img">
+              </div>
+              <div class="product_explain">
+                <h2>Main Title</h2>
+                <p>Description text area...</p>
+              </div>
+              <div class="product_list">
+                <div class="product_list1">
+                  <a href="#" class="product_list_wrap">
+                    <img alt="Small Thumb">
+                    <div class="product_list_explain">
+                      <h4>Brand</h4>
+                      <p>Item Name</p>
+                      <p class="price">Price</p>
+                    </div>
+                  </a>
+                </div>
+                <div class="product_list2">
+                    <a href="#" class="product_list_wrap">
+                        <img alt="Small Thumb">
+                        <div class="product_list_explain">
+                          <h4>Brand</h4>
+                          <p>Item Name</p>
+                          <p class="price">Price</p>
+                        </div>
+                      </a>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="product_right">
+            <img alt="Brand Logo" class="product_right_logo">
+            
+            <div class="content right_content">
+              <div class="product_picture">
+                <img alt="Main Product Img">
+              </div>
+              <div class="product_explain">
+                <h2>Main Title</h2>
+                <p>Description text area...</p>
+              </div>
+              <div class="product_list">
+                <div class="product_list1">
+                    <a href="#" class="product_list_wrap">
+                        <img alt="Small Thumb">
+                        <div class="product_list_explain">
+                          <h4>Brand</h4>
+                          <p>Item Name</p>
+                        </div>
+                      </a>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+      </div>
+
+      <button id="more" type="button">
+        [More Button]
+      </button>
+    </main>
+
+    <footer>
+      <div class="call">
+        <div class="call_info">
+          <h4>Customer Center Info</h4>
+          <p>Time Info</p>
+          <div class="call_link">
+            <a href="#">Link 1</a>
+            <a href="#">Link 2</a>
+          </div>
+        </div>
+        <div class="call_icon">
+          [SNS Icons Area]
+        </div>
+      </div>
+      <div class="notice">
+        <div class="notice_list">
+          <h4>NOTICE Title</h4>
+          <a href="#">Notice Item 1</a>
+        </div>
+        <div class="notice_menu">
+          <div class="about_us"><h4>ABOUT</h4><a href="#">Link</a></div>
+          <div class="my_order"><h4>ORDER</h4><a href="#">Link</a></div>
+          <div class="my_account"><h4>ACCOUNT</h4><a href="#">Link</a></div>
+          <div class="help"><h4>HELP</h4><a href="#">Link</a></div>
+        </div>
+      </div>
+      <div class="info">
+        <div class="info_link">
+          <a href="#">Policy Link</a> | <a href="#">Terms Link</a>
+        </div>
+        <div class="info_list">
+          <div class="info_list1"><p>Company Info</p></div>
+          <div class="info_list2"><p>Contact Info</p></div>
+        </div>
+      </div>
+    </footer>
+    
+    <script>
+      const moreBtn = document.getElementById("more");
+      const container = document.getElementById("container");
+      let cnt = 0;
+      let moreDisplay = ["2000px", "3000px", "4000px", "5000px"];
+
+      moreBtn.addEventListener("click", function () {
+        if(cnt < moreDisplay.length) {
+            container.style.height = moreDisplay[cnt];
+            cnt++;
+        }
+      });
+    </script>
+  </body>
+</html>

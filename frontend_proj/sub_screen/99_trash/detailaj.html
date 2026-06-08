@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+
+    <link rel="stylesheet" href="../css/detailaj.css" />
+    <script src="../js/product.js"></script>
+  </head>
+  <body>
+  <main class="product-main">
+  <div class="split-layout">
+    
+    <section class="product-gallery">
+      
+      <div class="gallery-top">
+        <div class="galleryimg-list">
+          <button class="detailimg active" onclick="changeImage(0)"><img src="" alt="상세1"></button>
+          <button class="detailimg" onclick="changeImage(1)"><img src="" alt="상세2"></button>
+          <button class="detailimg" onclick="changeImage(2)"><img src="" alt="상세3"></button>
+          <button class="detailimg" onclick="changeImage(3)"><img src="" alt="상세4"></button>
+          <button class="detailimg" onclick="changeImage(4)"><img src="" alt="상세5"></button>
+          <button class="detailimg" onclick="changeImage(5)"><img src="" alt="상세6"></button>
+        </div>
+
+        <div class="main-display">
+          <div class="slider-track" id="sliderTrack">
+            <img src="" alt="메인1">
+            <img src="" alt="메인2">
+            <img src="" alt="메인3">
+            <img src="" alt="메인4">
+            <img src="" alt="메인5">
+            <img src="" alt="메인6">
+          </div>
+          <button class="nav-btn prev" onclick="moveSlide(-1)"><span>&#10094;</span></button>
+          <button class="nav-btn next" onclick="moveSlide(1)"><span>&#10095;</span></button>
+        </div>
+      </div>
+
+      <div class="product-description-box">
+        <p class="content" id="productContent"></p>
+        
+        <div class="product-info-id">
+          <span class="id-label">제품 번호</span>
+          <span class="id-number" id="productId"></span>
+        </div>
+      </div>
+
+    </section>
+
+    <section class="product-info-right">
+      </section>
+    
+  </div>
+</main>
+  </body>
+</html>

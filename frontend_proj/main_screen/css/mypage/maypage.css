@@ -1,0 +1,123 @@
+/* ================================== mypage ================================== */
+.mypage_main {
+  max-width: 50%;
+  margin: 0 auto;
+  align-items: center;
+}
+
+.mypage_wrap {
+  max-width: 720px;
+  margin: 0 auto;
+}
+/* 위에 제목 및 설명 */
+.mypage_head {
+  margin-bottom: 18px;
+}
+
+.mypage_title {
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  margin: 0 0 6px;
+}
+
+.mypage_desc {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.7;
+}
+/* 각 카드 */
+.mypage_card {
+  border: 1px solid #e6e6e6;
+  border-radius: 14px;
+  padding: 18px;
+  background: #fff;
+}
+
+.mypage_profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+/* 이모티콘임 */
+.mypage_avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #f2f2f2;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+}
+
+.mypage_userid {
+  margin: 0;
+  font-weight: 900;
+  font-size: 16px;
+}
+
+.mypage_email {
+  margin: 2px 0 0;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.mypage_actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+}
+/* 로그아웃 버튼 */
+.mypage_btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+  border-radius: 10px;
+  background: #111;
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  text-decoration: none;
+  border: 1px solid #111;
+  cursor: pointer;
+}
+
+.mypage_btn.outline {
+  background: #fff;
+  color: #111;
+}
+
+.mypage_grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+/* 각 내용(박스) */
+.mypage_box {
+  border: 1px solid #e6e6e6;
+  border-radius: 14px;
+  padding: 16px;
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 120ms ease;
+}
+
+.mypage_box:hover {
+  transform: translateY(-2px);
+}
+
+.mypage_box h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.mypage_box p {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.7;
+}

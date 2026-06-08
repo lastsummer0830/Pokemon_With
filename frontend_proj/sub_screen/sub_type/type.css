@@ -1,0 +1,200 @@
+/* main */
+.best_wrap{
+    width: 80%;
+    margin: 100px auto 0;
+}
+.best_wrap hr{
+    background:rgb(214, 214, 214);
+    height:1px;
+    border:0;
+}
+/* button */
+.type_container{
+    display: flex;
+    flex-wrap: wrap;
+}
+.type_container button{
+    margin: 5px;
+    background-color: transparent;
+    border: none;
+    font-weight: bold;
+}
+.type_container button:hover{
+    cursor: pointer;
+}
+.type_container .divide{
+    margin: 5px;
+}
+.sort_container button{
+    background-color: rgb(214, 214, 214);
+    color: rgb(46, 46, 46);
+    border-radius: 20px;
+    border: none;
+    padding: 5px;
+}
+.sort_container button:hover{
+    cursor: pointer;
+}
+/* product */
+.card-group{
+    display: flex;
+    flex-wrap: wrap;
+}
+.card{
+    margin: 10px;
+    width: 250px;
+    height: 360px;
+}
+.card_link{
+    text-decoration: none;
+    color: black;
+}
+.card h5, p, b{
+    margin: 0;
+}
+.card img{
+    width: 250px;
+}
+.card .benefit{
+    display: inline-block;
+    background-color: rgb(226, 225, 225);
+    margin-right: 5px;
+    border-radius: 3px;
+    font-size: 14px;
+    padding: 2px;
+}
+
+
+
+
+
+/* footer */
+footer{
+    background-color: #ffffff;
+    font-size: 0.7rem;
+}
+/* footer call */
+.call{
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+}
+.call_link{
+    margin-bottom: 10px;
+    margin-top: 10px;
+}
+.call_link a{
+    background-color: black;
+    color: white;
+    margin-right: 5px;
+    padding: 5px;
+    text-decoration: none;
+    border-radius: 5px;
+}
+.call_icon a{
+    color: black;
+    text-decoration: none;
+    font-size: 20px;
+}
+/* footer notice */
+.notice{
+    display: flex;
+    justify-content: space-between;
+}
+.notice_list{
+    display: flex;
+    flex-direction: column;
+}
+.notice_list a{
+    color: black;
+    text-decoration: none;
+    margin-bottom: 5px;
+}
+.notice_menu{
+    display: flex;
+}
+.about_us{
+    display: flex;
+    flex-direction: column;
+    margin-right: 30px;
+}
+.about_us a{
+    text-decoration: none;
+    color: black;
+    margin-bottom: 5px;
+}
+.my_order{
+    display: flex;
+    flex-direction: column;
+    margin-right: 30px;
+}
+.my_order a{
+    text-decoration: none;
+    color: black;
+    margin-bottom: 5px;
+}
+.my_account{
+    display: flex;
+    flex-direction: column;
+    margin-right: 30px;
+}
+.my_account a{
+    text-decoration: none;
+    color: black;
+    margin-bottom: 5px;
+}
+.help{
+    display: flex;
+    flex-direction: column;
+    margin-right: 30px;
+}
+.help a{
+    text-decoration: none;
+    color: black;
+    margin-bottom: 5px;
+}
+/* footer info */
+.info_link{
+    display: flex;
+}
+.info_link a{
+    text-decoration: none;
+    color: black;
+    font-weight: bold;
+}
+.info_link div{
+    margin-right: 5px;
+    margin-left: 5px;
+    color: gray;
+}
+.info_list p{
+    margin-right: 10px;
+}
+.info_list1{
+    display: flex;
+    color: gray;
+}
+.info_list1 a{
+    background-color: gray;
+    color: white;
+    text-decoration: none;
+    height: 20px;
+    line-height: 20px;
+    padding: 3px;
+}
+.info_list2{
+    display: flex;
+    color: gray;
+}
+.info_list3{
+    display: flex;
+    color: gray;
+}
+.info_list4{
+    display: flex;
+    color: gray;
+}
+.info_list4 a{
+    color: gray;
+    font-weight: bold;
+}
