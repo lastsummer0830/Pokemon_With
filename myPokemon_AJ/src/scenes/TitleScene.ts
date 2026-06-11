@@ -1,74 +1,82 @@
 import Phaser from "phaser";
-import { artworkUrl, JOHTO_STARTERS } from "../api/pokeapi";
 
 // 게임 메인(타이틀) 화면 — 가장 먼저 뜨는 화면.
-// PokeAPI에서 하트골드 스타팅 3마리 공식 일러스트를 실시간으로 불러와 보여준다.
+// 노을 마을 배경 + "Pokémon With" 로고 + 아래에 PRESS START! 안내.
 export default class TitleScene extends Phaser.Scene {
   constructor() {
     super("TitleScene");
   }
 
   preload(): void {
-    // 외부(깃허브) 이미지를 불러오려면 CORS 설정이 필요하다
-    this.load.crossOrigin = "anonymous";
-    JOHTO_STARTERS.forEach((id, i) => {
-      this.load.image(`starter${i}`, artworkUrl(id));
-    });
+    // 타이틀 배경(노을 마을 수채화)과 로고. 둘 다 public/assets/title/ 에 있음.
+    this.load.image("title_bg", "assets/title/title_bg.png");
+    this.load.image("title_logo", "assets/title/logo.png");
   }
 
   create(): void {
     const { width, height } = this.scale;
 
-    // 배경: 위→아래 그라데이션 (하트골드 느낌의 금빛)
-    const bg = this.add.graphics();
-    bg.fillGradientStyle(0xf7da7f, 0xf7da7f, 0xe89986, 0xe89986, 1);
-    bg.fillRect(0, 0, width, height);
+    // 1) 배경 — 화면을 꽉 채우되 비율 유지(가장자리는 살짝 잘림 = cover 방식)
+    const bg = this.add.image(width / 2, height / 2, "title_bg").setOrigin(0.5);
+    const bgSrc = this.textures.get("title_bg").getSourceImage();
+    const bgScale = Math.max(width / bgSrc.width, height / bgSrc.height);
+    bg.setScale(bgScale);
 
-    // 스타팅 3마리 일러스트 (그림이 안 받아지면 색깔 원으로 대체)
-    const artH = height * 0.32;        // 일러스트 높이 = 화면 높이의 32%
-    const spacing = width * 0.24;      // 좌우 간격
-    JOHTO_STARTERS.forEach((_, i) => {
-      const x = width / 2 + (i - 1) * spacing;
-      const y = height * 0.56;
-      const key = `starter${i}`;
-      if (this.textures.exists(key)) {
-        const img = this.add.image(x, y, key).setOrigin(0.5);
-        img.setScale(artH / img.height); // 화면 크기에 맞춰 비율로 확대
-        // 둥실둥실 떠다니는 효과
-        this.tweens.add({
-          targets: img, y: y - 12, duration: 1100 + i * 150,
-          yoyo: true, repeat: -1, ease: "Sine.inOut",
-        });
-      } else {
-        this.add.circle(x, y, artH * 0.4, 0xffffff, 0.6);
-      }
-    });
-
-    // 제목
-    this.add.text(width / 2, height * 0.18, "myPokemon", {
-      fontFamily: "sans-serif", fontSize: `${Math.round(height * 0.13)}px`,
-      fontStyle: "bold", color: "#4a3d1c",
-    }).setOrigin(0.5).setShadow(0, 4, "#ffffff", 2);
-
-    this.add.text(width / 2, height * 0.30, "집을 꾸미면 포켓몬이 강해진다", {
-      fontFamily: "sans-serif", fontSize: `${Math.round(height * 0.04)}px`,
-      color: "#7a4e2e",
-    }).setOrigin(0.5);
-
-    // 시작 안내 (깜빡임)
-    const prompt = this.add.text(width / 2, height * 0.88,
-      "▶  SPACE 또는 클릭으로 시작", {
-        fontFamily: "sans-serif", fontSize: `${Math.round(height * 0.045)}px`,
-        fontStyle: "bold", color: "#ffffff",
-        backgroundColor: "#cf6f57", padding: { x: 20, y: 10 },
-      }).setOrigin(0.5);
+    // 2) 로고 — 화면 위쪽 가운데. 폭의 약 46%에 맞추되 너무 커지지 않게 제한.
+    const logo = this.add.image(width / 2, height * 0.40, "title_logo").setOrigin(0.5);
+    const logoSrc = this.textures.get("title_logo").getSourceImage();
+    const targetW = Math.min(width * 0.46, 560);          // 로고 목표 폭
+    logo.setScale(targetW / logoSrc.width);
+    // 둥실둥실 떠다니는 효과
     this.tweens.add({
-      targets: prompt, alpha: 0.3, duration: 700, yoyo: true, repeat: -1,
+      targets: logo, y: logo.y - 10, duration: 1600,
+      yoyo: true, repeat: -1, ease: "Sine.inOut",
     });
 
-    // 입력: 스페이스 또는 클릭 → 맵 화면으로
+    // 3) PRESS START! — 로고 "With"처럼 둥글고 무광인 글씨 + 주변이 은은하게 빛나는 느낌.
+    const pressSize = Math.round(height * 0.045);   // 아까보다 더 작게
+    const press = this.add.text(width / 2, height * 0.82, "PRESS START!", {
+      fontFamily: '"Baloo 2", sans-serif',  // 통통하고 둥근 폰트(내장)
+      fontSize: `${pressSize}px`,
+      fontStyle: "700",
+      color: "#ff7e9d",        // 부드러운 코랄핑크 (무광 단색)
+      stroke: "#ffffff",       // 얇은 흰 외곽선
+      strokeThickness: Math.max(3, Math.round(height * 0.005)),
+    })
+      .setOrigin(0.5)
+      .setShadow(0, 3, "rgba(150,90,60,0.25)", 5, true, true); // 아주 옅은 그림자
+
+    // 주변이 은은하게 빛나는 느낌 (WebGL일 때만 — 글로우 후처리). 따뜻한 흰빛.
+    let glow: Phaser.FX.Glow | undefined;
+    if (press.postFX) {
+      glow = press.postFX.addGlow(0xffe7b3, 4, 0, false, 0.1, 16);
+    }
+
+    // 빛이 살짝 숨쉬듯 강해졌다 약해졌다 (깜빡임 대신 부드러운 반짝임)
+    if (glow) {
+      this.tweens.add({
+        targets: glow, outerStrength: 1.5, duration: 900,
+        yoyo: true, repeat: -1, ease: "Sine.inOut",
+      });
+    }
+    // 글자 자체도 아주 살짝 깜빡 (시작하라는 신호)
+    this.tweens.add({
+      targets: press, alpha: 0.55, duration: 900,
+      yoyo: true, repeat: -1, ease: "Sine.inOut",
+    });
+
+    // 내장 폰트가 늦게 준비되면 기본 글씨로 먼저 그려질 수 있어, 준비되면 다시 적용.
+    if (document.fonts && document.fonts.load) {
+      document.fonts
+        .load(`700 ${pressSize}px "Baloo 2"`)
+        .then(() => press.setFontFamily('"Baloo 2", sans-serif'))
+        .catch(() => {});
+    }
+
+    // 입력: 스페이스/엔터 또는 클릭 → 맵 화면으로
     const start = () => this.scene.start("WorldScene");
     this.input.keyboard!.once("keydown-SPACE", start);
+    this.input.keyboard!.once("keydown-ENTER", start);
     this.input.once("pointerdown", start);
   }
 }
