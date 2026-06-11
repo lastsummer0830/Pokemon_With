@@ -33,45 +33,56 @@ export default class TitleScene extends Phaser.Scene {
       yoyo: true, repeat: -1, ease: "Sine.inOut",
     });
 
-    // 3) PRESS START! — 로고 "With"처럼 둥글고 무광인 글씨 + 주변이 은은하게 빛나는 느낌.
-    const pressSize = Math.round(height * 0.045);   // 아까보다 더 작게
-    const press = this.add.text(width / 2, height * 0.82, "PRESS START!", {
-      fontFamily: '"Baloo 2", sans-serif',  // 통통하고 둥근 폰트(내장)
+    // 3) PRESS START — 로고 "With"처럼: 둥근 무광 파스텔 글씨 + 연한 체크그리드 색감 + 흰빛 후광(클릭 유도)
+    const pressSize = Math.round(height * 0.034);   // 더 작게
+    const py = height * 0.83;
+    const fam = '"Baloo 2", sans-serif';            // 통통하고 둥근 폰트(내장)
+    const strokeW = Math.max(4, Math.round(height * 0.006));
+
+    // (a) 연한 파스텔 "체크 그리드" 텍스처 한 번만 생성 (연분홍/연민트 번갈아)
+    const checkKey = "pastel_check";
+    if (!this.textures.exists(checkKey)) {
+      const s = 12;                                  // 한 칸 크기
+      const g = this.make.graphics({ x: 0, y: 0 });
+      g.fillStyle(0xffe3ef, 1); g.fillRect(0, 0, s, s); g.fillRect(s, s, s, s); // 연분홍
+      g.fillStyle(0xdaf4ec, 1); g.fillRect(s, 0, s, s); g.fillRect(0, s, s, s); // 연민트
+      g.generateTexture(checkKey, s * 2, s * 2);
+      g.destroy();
+    }
+
+    // (b) 글자 본체 — 무광 파스텔 핑크 + 흰 외곽선 + 흰빛 후광(offset 0 그림자 = glow, 캔버스에서도 보임)
+    const press = this.add.text(width / 2, py, "PRESS START", {
+      fontFamily: fam,
       fontSize: `${pressSize}px`,
       fontStyle: "700",
-      color: "#ff7e9d",        // 부드러운 코랄핑크 (무광 단색)
-      stroke: "#ffffff",       // 얇은 흰 외곽선
-      strokeThickness: Math.max(3, Math.round(height * 0.005)),
+      color: "#ff9fb8",                 // 무광 파스텔 핑크
+      stroke: "#ffffff",
+      strokeThickness: strokeW,
     })
       .setOrigin(0.5)
-      .setShadow(0, 3, "rgba(150,90,60,0.25)", 5, true, true); // 아주 옅은 그림자
+      .setShadow(0, 0, "#ffffff", 14, true, true);  // 하얀 후광
 
-    // 주변이 은은하게 빛나는 느낌 (WebGL일 때만 — 글로우 후처리). 따뜻한 흰빛.
-    let glow: Phaser.FX.Glow | undefined;
-    if (press.postFX) {
-      glow = press.postFX.addGlow(0xffe7b3, 4, 0, false, 0.1, 16);
+    // (c) 체크그리드를 글자 "안쪽에만" 은은하게 (비트맵 마스크는 WebGL 전용이라 가드)
+    const isWebGL = this.renderer.type === Phaser.WEBGL;
+    let check: Phaser.GameObjects.TileSprite | undefined;
+    if (isWebGL) {
+      const maskText = this.add.text(width / 2, py, "PRESS START", {
+        fontFamily: fam, fontSize: `${pressSize}px`, fontStyle: "700", color: "#ffffff",
+      }).setOrigin(0.5).setVisible(false);
+      check = this.add.tileSprite(width / 2, py, press.width, press.height, checkKey)
+        .setOrigin(0.5)
+        .setAlpha(0.5);
+      check.setMask(maskText.createBitmapMask());
+      // 진짜 글로우도 추가 (더 또렷한 후광)
+      if (press.postFX) press.postFX.addGlow(0xffffff, 4, 0, false, 0.1, 16);
     }
 
-    // 빛이 살짝 숨쉬듯 강해졌다 약해졌다 (깜빡임 대신 부드러운 반짝임)
-    if (glow) {
-      this.tweens.add({
-        targets: glow, outerStrength: 1.5, duration: 900,
-        yoyo: true, repeat: -1, ease: "Sine.inOut",
-      });
-    }
-    // 글자 자체도 아주 살짝 깜빡 (시작하라는 신호)
+    // (e) 클릭 유도 — 글자(+체크)가 같이 부드럽게 숨쉬듯 깜빡
+    const blink = { v: 1 };
     this.tweens.add({
-      targets: press, alpha: 0.55, duration: 900,
-      yoyo: true, repeat: -1, ease: "Sine.inOut",
+      targets: blink, v: 0.55, duration: 950, yoyo: true, repeat: -1, ease: "Sine.inOut",
+      onUpdate: () => { press.setAlpha(blink.v); check?.setAlpha(0.5 * blink.v); },
     });
-
-    // 내장 폰트가 늦게 준비되면 기본 글씨로 먼저 그려질 수 있어, 준비되면 다시 적용.
-    if (document.fonts && document.fonts.load) {
-      document.fonts
-        .load(`700 ${pressSize}px "Baloo 2"`)
-        .then(() => press.setFontFamily('"Baloo 2", sans-serif'))
-        .catch(() => {});
-    }
 
     // 입력: 스페이스/엔터 또는 클릭 → 맵 화면으로
     const start = () => this.scene.start("WorldScene");
