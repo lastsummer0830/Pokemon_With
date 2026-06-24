@@ -6,7 +6,30 @@
 
 ---
 
-## 0. 이게 뭔가 (한 줄 요약)
+## 🤖 0. AI에게 — 이대로 실행 (사용자가 이 폴더를 주며 "환경 복원해줘"라고 하면)
+
+> 아래는 **네(AI)가 직접 수행**한다. 사용자에게 일일이 시키지 말고, 네 도구로 파일을 올바른 경로에 만들어라.
+> 단, 표시된 **"사용자 필요"** 항목은 네가 물리적으로 못 하니 사용자에게 명확히 요청한다.
+
+**네가 직접 하는 일:**
+1. **세션 루트 확인** — 반드시 프로젝트 **루트**(`AGENTS.md`가 있는 `myPokemon_AJ/`의 상위, 즉 `vcPortfolio_AJ`)에서 작업 중인지 확인. 아니면 사용자에게 "루트에서 다시 열어달라"고 요청(스킬·메모리가 이 폴더 기준으로 로드됨).
+2. **스킬 배치** — `복사본/claude_skills/`의 내용을 `<루트>/.claude/skills/`로 복사. 각 `SKILL.md`의 frontmatter(`name`/`description`) 존재 확인.
+3. **메모리 배치** — `복사본/claude_memory/*.md`(`MEMORY.md` 포함)를 **너의 실제 메모리 폴더**(`~/.claude/projects/<이 프로젝트 슬러그>/memory/`)에 복사. 슬러그는 네 컨텍스트에 이미 주어져 있으니 그 경로를 그대로 써라. 경로 추측하지 말 것.
+4. **settings 배치(선택)** — `복사본/claude_settings/settings.local.json`을 `<루트>/.claude/settings.local.json`로 복사(없으면 권한만 매번 물음).
+5. **AR맵 스크립트 경로 수정** — `myPokemon_AJ/tools/ar-map/extract.py`·`rxrender.py` 안의 `AR=`/`PUB=` 절대경로를 **이 PC 경로**로 고쳐라.
+6. **의존성 설치 & 검증** — `cd myPokemon_AJ && npm install` (Electron 504 시 `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm install`) → `npm run dev`로 http://localhost:5180 확인.
+7. 끝나면 각 단계 결과를 보고하고, 못 한 "사용자 필요" 항목을 짚어준다.
+
+**사용자가 해줘야 하는 일(네가 못 함 — 명확히 요청):**
+- 🧑 **프로젝트 본체**가 이 PC에 있어야 함(git clone 또는 폴더 동기화). URL/위치 모르면 사용자에게 물어라.
+- 🧑 **어나더레드 원본** `Pokemon Another Red_PWT_250829`를 D드라이브에 배치(수백MB, USB/클라우드로 옮김).
+- 🧑 **모델 = Opus** 선택 확인(`/model`).
+
+**검증(이거 되면 복원 성공):** 새 세션에서 "주인공 남녀가 누구고 실행 본체가 뭐냐"고 물었을 때 *"남=1세대 RED, 여=4세대 DAWN, 본체=Pokemon With.exe"*가 바로 나오면 메모리가 제대로 로드된 것.
+
+---
+
+## 0-1. 이게 뭔가 (한 줄 요약)
 
 `myPokemon_AJ` = Phaser 3 + TypeScript + Vite + Electron으로 만드는 **2D 탑다운 포켓몬 팬게임**(목표 퀄리티 = 팬게임 "어나더 레드" 수준). 차별점 = **집 꾸미기 → 포켓몬 컨디션 → 배틀 보너스**.
 
