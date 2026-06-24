@@ -72,3 +72,8 @@ myPokemon_AJ/src/**/*.js.map
 # Reference images not needed for project sync
 # =========================
 01_Resources/Pokemon/
+
+# =========================
+# 로컬 실행 바로가기 (각자 빌드한 exe를 가리킴 — git엔 안 올림)
+# =========================
+*.lnk

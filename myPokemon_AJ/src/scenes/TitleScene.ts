@@ -8,8 +8,8 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   preload(): void {
-    // 타이틀 배경(노을 마을 수채화)과 로고. 둘 다 public/assets/title/ 에 있음.
-    this.load.image("title_bg", "assets/title/title_bg.png");
+    // 타이틀 배경(새 시작화면)과 로고. 둘 다 public/assets/title/ 에 있음.
+    this.load.image("title_bg", "assets/title/title_bg_new.png");
     this.load.image("title_logo", "assets/title/logo.png");
   }
 
@@ -84,10 +84,17 @@ export default class TitleScene extends Phaser.Scene {
       onUpdate: () => { press.setAlpha(blink.v); check?.setAlpha(0.5 * blink.v); },
     });
 
-    // 입력: 스페이스/엔터 또는 클릭 → 맵 화면으로
-    const start = () => this.scene.start("WorldScene");
+    // 입력: 스페이스/엔터 또는 클릭 → 게임 인트로(이름·성별)로
+    const start = () => this.scene.start("IntroScene");
     this.input.keyboard!.once("keydown-SPACE", start);
     this.input.keyboard!.once("keydown-ENTER", start);
     this.input.once("pointerdown", start);
+
+    // 개발용 — D 키로 씬 바로가기 메뉴(매번 처음부터 안 거치고 특정 화면 확인)
+    this.input.keyboard!.once("keydown-D", () => this.scene.start("DebugMenuScene"));
+    this.add.text(width - 12, height - 10, "[D] 디버그", {
+      fontFamily: '"Galmuri11", sans-serif', fontSize: `${Math.round(height * 0.022)}px`,
+      color: "#ffffff",
+    }).setOrigin(1, 1).setAlpha(0.6);
   }
 }

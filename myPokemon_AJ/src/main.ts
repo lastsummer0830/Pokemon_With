@@ -1,5 +1,8 @@
 import Phaser from "phaser";          // Phaser 도구 모음을 통째로 가져온다
 import TitleScene from "./scenes/TitleScene";
+import IntroScene from "./scenes/IntroScene";
+import BedroomScene from "./scenes/BedroomScene";
+import DebugMenuScene from "./scenes/DebugMenuScene";
 import WorldScene from "./scenes/WorldScene";
 import BattleScene from "./scenes/BattleScene";
 import HouseScene from "./scenes/HouseScene";
@@ -14,24 +17,28 @@ const config: Phaser.Types.Core.GameConfig = {
     width: "100%",
     height: "100%",
   },
-  scene: [TitleScene, WorldScene, BattleScene, HouseScene], // 맨 앞 씬이 가장 먼저 실행됨
+  // 맨 앞 씬이 가장 먼저 실행됨. Title → Intro(성별·이름) → Bedroom(시작 방) → World 순서.
+  scene: [TitleScene, IntroScene, BedroomScene, DebugMenuScene, WorldScene, BattleScene, HouseScene],
 };
 
-// ★ 둥근 폰트(Baloo 2)를 게임이 시작되기 전에 확실히 로드한다.
-//   (이렇게 안 하면 글자가 기본 폰트로 먼저 그려져서 "안 둥글게" 보임 — 오프라인 exe에서 특히)
+// ★ 게임 시작 전에 폰트를 확실히 로드한다.
+//   (이렇게 안 하면 글자가 기본 폰트로 먼저 그려졌다가 바뀜 — 오프라인 exe에서 특히)
+//   - Baloo 2: 타이틀의 둥근 영문 로고용
+//   - Galmuri11: 옛날 픽셀 포켓몬 게임 감성의 한글 도트 폰트(인트로 대사용)
 function boot() {
   new Phaser.Game(config);
 }
-try {
-  const baloo = new FontFace("Baloo 2", "url(assets/fonts/Baloo2-700.ttf)", {
-    weight: "700",
-    style: "normal",
-  });
-  baloo
-    .load()
-    .then((f) => document.fonts.add(f))
-    .catch(() => {})        // 못 받아도 게임은 켠다
-    .finally(boot);
-} catch {
-  boot();                   // FontFace 미지원 등 예외 시에도 게임은 켠다
+function loadFont(family: string, url: string, weight = "400") {
+  // FontFace 로 폰트 하나를 받아서 document에 등록(실패해도 무시)
+  try {
+    const f = new FontFace(family, `url(${url})`, { weight, style: "normal" });
+    return f.load().then((face) => { document.fonts.add(face); }).catch(() => {});
+  } catch {
+    return Promise.resolve();
+  }
 }
+Promise.all([
+  loadFont("Baloo 2", "assets/fonts/Baloo2-700.ttf", "700"),
+  loadFont("Galmuri11", "assets/fonts/Galmuri11.ttf", "400"),
+  loadFont("Galmuri11", "assets/fonts/Galmuri11-Bold.ttf", "700"),
+]).finally(boot);   // 폰트를 다 받았든 못 받았든 게임은 켠다
