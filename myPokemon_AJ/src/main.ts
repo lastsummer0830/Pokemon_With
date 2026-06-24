@@ -2,6 +2,7 @@ import Phaser from "phaser";          // Phaser 도구 모음을 통째로 가�
 import TitleScene from "./scenes/TitleScene";
 import IntroScene from "./scenes/IntroScene";
 import BedroomScene from "./scenes/BedroomScene";
+import InteriorScene from "./scenes/InteriorScene";
 import DebugMenuScene from "./scenes/DebugMenuScene";
 import WorldScene from "./scenes/WorldScene";
 import BattleScene from "./scenes/BattleScene";
@@ -17,8 +18,8 @@ const config: Phaser.Types.Core.GameConfig = {
     width: "100%",
     height: "100%",
   },
-  // 맨 앞 씬이 가장 먼저 실행됨. Title → Intro(성별·이름) → Bedroom(시작 방) → World 순서.
-  scene: [TitleScene, IntroScene, BedroomScene, DebugMenuScene, WorldScene, BattleScene, HouseScene],
+  // 맨 앞 씬이 가장 먼저 실행됨. Title → Intro(성별·이름) → Interior(시작 집: 방2층↔거실1층) → World 순서.
+  scene: [TitleScene, IntroScene, InteriorScene, BedroomScene, DebugMenuScene, WorldScene, BattleScene, HouseScene],
 };
 
 // ★ 게임 시작 전에 폰트를 확실히 로드한다.

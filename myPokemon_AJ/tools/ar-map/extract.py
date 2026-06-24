@@ -1,8 +1,8 @@
 import struct, os, glob, json
 from rubymarshal.reader import loads
 from PIL import Image
-AR="/mnt/d/Pokemon Another Red_PWT_250829"
-PUB="/mnt/d/dev/AJ_Proj/vcPortfolio_AJ/myPokemon_AJ/public/assets/house"
+AR="/mnt/c/Users/ONE/Desktop/Pokemon Another Red_PWT_250829"
+PUB="/mnt/c/Users/ONE/Documents/GitHub/AJ_Proj/vcPortfolio_AJ/myPokemon_AJ/public/assets/house"
 os.makedirs(PUB, exist_ok=True)
 def b2s(x): return x.decode('utf-8','replace') if isinstance(x,(bytes,bytearray)) else str(x)
 def parse_table(ud):

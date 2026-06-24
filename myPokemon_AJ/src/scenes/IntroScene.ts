@@ -196,7 +196,7 @@ export default class IntroScene extends Phaser.Scene {
     try { localStorage.setItem("myPokemon.intro", JSON.stringify({ name, gender })); } catch { /* 무시 */ }
 
     this.cameras.main.fadeOut(700, 0, 0, 0);
-    this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("BedroomScene"));
+    this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("InteriorScene"));
   }
 
   // ─────────────────────────── 공용 헬퍼 ───────────────────────────

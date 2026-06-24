@@ -8,6 +8,7 @@ dist/
 # git엔 안 올림. 더블클릭 실행파일은 각자 로컬에서 빌드해서 씀.
 release/
 build_win/
+build_new/
 dist_electron/
 
 # 로그·캐시

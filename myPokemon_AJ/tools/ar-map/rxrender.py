@@ -2,7 +2,7 @@ import struct, os, glob
 from rubymarshal.reader import loads
 from PIL import Image
 
-AR="/mnt/d/Pokemon Another Red_PWT_250829"
+AR="/mnt/c/Users/ONE/Desktop/Pokemon Another Red_PWT_250829"
 def b2s(x):
     return x.decode('utf-8','replace') if isinstance(x,(bytes,bytearray)) else str(x)
 
@@ -68,7 +68,7 @@ render_map(f'{AR}/Data/Map067.rxdata', f'{SCR}/map067.png')
 if __name__=="__main__" and os.environ.get("BATCH"):
     info=loads(open(f'{AR}/Data/MapInfos.rxdata','rb').read())
     names={int(str(k)):b2s(v.attributes.get('@name')) for k,v in info.items()}
-    OUT="/mnt/d/dev/AJ_Proj/vcPortfolio_AJ/01_Resources/Pick/07_집/AR집후보"
+    OUT="/mnt/c/Users/ONE/Documents/GitHub/AJ_Proj/vcPortfolio_AJ/01_Resources/Pick/07_집/AR집후보"
     os.makedirs(OUT, exist_ok=True)
     # 집/방 관련 맵 id 모으기(너무 큰 야외맵 제외)
     cand=[i for i,n in names.items() if n.strip() in ('House',) or any(k in n for k in ('Room','집','방','House'))]

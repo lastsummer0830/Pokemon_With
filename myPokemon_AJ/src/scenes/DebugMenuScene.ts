@@ -36,7 +36,7 @@ export default class DebugMenuScene extends Phaser.Scene {
     const scenes: [string, string][] = [
       ["1. 타이틀", "TitleScene"],
       ["2. 인트로(성별·이름)", "IntroScene"],
-      ["3. 침실(시작 방)", "BedroomScene"],
+      ["3. 시작 집(방2층↔거실1층)", "InteriorScene"],
       ["4. 마을(World)", "WorldScene"],
       ["5. 배틀(Battle)", "BattleScene"],
       ["6. 집 꾸미기(House)", "HouseScene"],
