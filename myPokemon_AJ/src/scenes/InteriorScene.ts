@@ -1,7 +1,8 @@
 import Phaser from "phaser";
 import { Gender } from "../data/Player";
 
-// 시작 집 내부 — 어나더레드 맵을 추출한 2층 방(red_room_2f) + 1층 거실(red_living_1f).
+// 시작 집 내부 — 어나더레드 맵을 추출한 2층 방(red_room_2f) + 1층 거실(red_living_1f_stairs:
+//   1f 거실에 154 계단을 좌우반전해 좌측 상단에 구워넣고 빨간 카펫을 얹은 이미지).
 // 핵심 규칙(사용자 요청):
 //  - 칸(격자) 단위로만 움직이고, 방 그래픽(바닥) 밖으로는 절대 못 나간다. (rooms.json의 blocked 사용)
 //  - 2층 방 계단 → 1층 거실, 1층 거실 계단 → 2층 방 으로 장면이 바뀐다(계단 전환).
@@ -55,15 +56,25 @@ export default class InteriorScene extends Phaser.Scene {
   private speaker: string | null = null;
   private boxRect = { x: 0, y: 0, w: 0, h: 0, pad: 0, font: 18 };
 
+  // 시작 방/인트로 스킵 (디버그에서 거실로 바로 진입할 때 사용)
+  private startRoom = "bedroom";
+  private skipIntro = false;
+
   constructor() {
     super("InteriorScene");
+  }
+
+  // scene.start("InteriorScene", { room: "living", skipIntro: true }) 로 특정 방부터 시작 가능
+  init(data: { room?: string; skipIntro?: boolean }): void {
+    this.startRoom = data?.room ?? "bedroom";
+    this.skipIntro = !!data?.skipIntro || this.startRoom !== "bedroom";
   }
 
   preload(): void {
     this.gender = (this.registry.get("playerGender") as Gender) ?? "boy";
     this.load.json("rooms", "assets/house/rooms.json");
     this.load.image("room_bedroom", "assets/house/red_room_2f.png");
-    this.load.image("room_living", "assets/house/red_living_1f.png");
+    this.load.image("room_living", "assets/house/red_living_1f_stairs.png");
     this.load.image("stairs_living", "assets/house/stairs_living.png");
     this.load.audio("sfx_door", "assets/audio/door.ogg");
     const file = this.gender === "girl"
@@ -102,15 +113,16 @@ export default class InteriorScene extends Phaser.Scene {
 
     this.buildDialogUi();
 
-    // 첫 방 진입
-    this.enterRoom("bedroom", ...this.rooms.bedroom.start);
+    // 첫 방 진입(기본 침실, 디버그면 지정한 방)
+    const sr = this.rooms[this.startRoom] ? this.startRoom : "bedroom";
+    this.enterRoom(sr, ...this.rooms[sr].start);
 
     this.scale.on("resize", this.layout, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off("resize", this.layout, this));
     this.cameras.main.fadeIn(450, 0, 0, 0);
 
-    // 처음 한 번만 인트로 컷신
-    if (!this.registry.get("houseIntroDone")) {
+    // 인트로 컷신은 침실에서 처음 시작할 때만(거실 바로가기 등은 스킵)
+    if (sr === "bedroom" && !this.skipIntro && !this.registry.get("houseIntroDone")) {
       this.busy = true;
       this.runHouseIntro();
     }
@@ -156,15 +168,10 @@ export default class InteriorScene extends Phaser.Scene {
     this.layoutDialog();
   }
 
-  // 1층 거실(red_living_1f)엔 계단 그림이 없어서 stairs_living 오버레이를 얹는다.
-  // 154 거실과 같은 우측 상단(11~12열, 3~5행)에 배치. origin(0,1)=좌하단 기준이라
-  // 그림 밑변을 5행 바닥(=6행 시작선)에, 왼쪽을 11열에 맞춘다.
+  // 거실 계단은 154 원본 타일을 좌우반전해 red_living_1f_stairs.png에 직접 구워넣었다.
+  // (좌측 상단 cols3-4, rows2-4 + 빨간 카펫 col5) → 별도 오버레이 불필요, 항상 숨김.
   private updateStairsDeco(): void {
-    if (this.roomKey !== "living") { this.stairsDeco.setVisible(false); return; }
-    this.stairsDeco
-      .setPosition(this.origin.x + 11 * this.tile, this.origin.y + 6 * this.tile)
-      .setScale(this.zoom)
-      .setVisible(true);
+    this.stairsDeco.setVisible(false);
   }
 
   // 칸 좌표 → 화면 픽셀(발 밑 기준)

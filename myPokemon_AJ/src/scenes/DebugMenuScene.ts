@@ -32,32 +32,34 @@ export default class DebugMenuScene extends Phaser.Scene {
     refreshGender();
     genderTxt.on("pointerdown", () => { this.gender = this.gender === "boy" ? "girl" : "boy"; refreshGender(); });
 
-    // 씬 버튼들
-    const scenes: [string, string][] = [
+    // 씬 버튼들. 세 번째 값(data)이 있으면 scene.start에 함께 넘긴다(거실 바로가기 등).
+    const scenes: [string, string, object?][] = [
       ["1. 타이틀", "TitleScene"],
       ["2. 인트로(성별·이름)", "IntroScene"],
-      ["3. 시작 집(방2층↔거실1층)", "InteriorScene"],
-      ["4. 마을(World)", "WorldScene"],
-      ["5. 배틀(Battle)", "BattleScene"],
-      ["6. 집 꾸미기(House)", "HouseScene"],
+      ["3. 시작 집 - 침실(인트로부터)", "InteriorScene"],
+      ["4. 시작 집 - 거실 바로가기", "InteriorScene", { room: "living", skipIntro: true }],
+      ["5. 마을(World)", "WorldScene"],
+      ["6. 배틀(Battle)", "BattleScene"],
+      ["7. 집 꾸미기(House)", "HouseScene"],
     ];
-    const go = (key: string) => {
+    const go = (key: string, data?: object) => {
       // 테스트용 기본값 — 인트로를 건너뛰어도 씬이 동작하도록
       if (!this.registry.get("playerName")) this.registry.set("playerName", "테스트");
       this.registry.set("playerGender", this.gender);
-      this.scene.start(key);
+      this.scene.start(key, data);
     };
 
-    const startY = height * 0.34, gap = height * 0.085;
-    scenes.forEach(([label, key], i) => {
+    const keyNames = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN"];
+    const startY = height * 0.32, gap = height * 0.075;
+    scenes.forEach(([label, key, data], i) => {
       const t = this.add.text(width / 2, startY + i * gap, label, {
         fontFamily: FONT, fontSize: "22px", color: "#ffffff",
         backgroundColor: "#21314f", padding: { x: 20, y: 10 },
       }).setOrigin(0.5).setInteractive({ useHandCursor: true });
       t.on("pointerover", () => t.setColor("#ffe27a"));
       t.on("pointerout", () => t.setColor("#ffffff"));
-      t.on("pointerdown", () => go(key));
-      this.input.keyboard!.on(`keydown-${["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX"][i]}`, () => go(key));
+      t.on("pointerdown", () => go(key, data));
+      if (keyNames[i]) this.input.keyboard!.on(`keydown-${keyNames[i]}`, () => go(key, data));
     });
 
     this.input.keyboard!.once("keydown-ESC", () => this.scene.start("TitleScene"));
