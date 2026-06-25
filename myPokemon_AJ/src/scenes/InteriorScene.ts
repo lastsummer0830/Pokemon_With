@@ -63,7 +63,7 @@ export default class InteriorScene extends Phaser.Scene {
     this.gender = (this.registry.get("playerGender") as Gender) ?? "boy";
     this.load.json("rooms", "assets/house/rooms.json");
     this.load.image("room_bedroom", "assets/house/red_room_2f.png");
-    this.load.image("room_living", "assets/house/red_living_154.png");
+    this.load.image("room_living", "assets/house/red_living_1f.png");
     this.load.image("stairs_living", "assets/house/stairs_living.png");
     this.load.audio("sfx_door", "assets/audio/door.ogg");
     const file = this.gender === "girl"
@@ -156,9 +156,15 @@ export default class InteriorScene extends Phaser.Scene {
     this.layoutDialog();
   }
 
-  // Map154 거실은 계단이 맵 그림에 이미 들어있어 별도 오버레이가 필요 없다(항상 숨김).
+  // 1층 거실(red_living_1f)엔 계단 그림이 없어서 stairs_living 오버레이를 얹는다.
+  // 154 거실과 같은 우측 상단(11~12열, 3~5행)에 배치. origin(0,1)=좌하단 기준이라
+  // 그림 밑변을 5행 바닥(=6행 시작선)에, 왼쪽을 11열에 맞춘다.
   private updateStairsDeco(): void {
-    this.stairsDeco.setVisible(false);
+    if (this.roomKey !== "living") { this.stairsDeco.setVisible(false); return; }
+    this.stairsDeco
+      .setPosition(this.origin.x + 11 * this.tile, this.origin.y + 6 * this.tile)
+      .setScale(this.zoom)
+      .setVisible(true);
   }
 
   // 칸 좌표 → 화면 픽셀(발 밑 기준)
