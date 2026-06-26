@@ -14,7 +14,9 @@ import { Gender } from "../data/Player";
 // 이름창 규칙: 본인이 이름을 밝히기 전엔 "???", 밝힌 뒤부터 실제 이름.
 //  배틀 안 하는 NPC(엄마 등)는 처음부터 이름 그대로.
 
-interface Warp { x: number; y: number; to: string; ax?: number; ay?: number; kind?: string }
+// dir = 그 방향으로 "들어설 때만" 워프 발동(계단 옆을 가로질러 지나가도 안 켜짐).
+// face = 워프 후 도착해서 바라보는 방향.
+interface Warp { x: number; y: number; to: string; ax?: number; ay?: number; kind?: string; dir?: Dir; face?: Dir }
 interface RoomDef { img: string; cols: number; rows: number; blocked: number[][]; start: [number, number]; warps: Warp[] }
 type Rooms = Record<string, RoomDef>;
 type Dir = "down" | "left" | "right" | "up";
@@ -141,11 +143,14 @@ export default class InteriorScene extends Phaser.Scene {
   }
 
   // 방을 바꾸거나 처음 들어갈 때: 텍스처/데이터 교체 후 위치 배치
-  private enterRoom(key: string, tx: number, ty: number): void {
+  private enterRoom(key: string, tx: number, ty: number, face: Dir = "down"): void {
     this.roomKey = key;
     this.def = this.rooms[key];
     this.roomImg.setTexture(key === "bedroom" ? "room_bedroom" : "room_living");
     this.tx = tx; this.ty = ty;
+    this.facing = face;
+    this.player.stop();
+    this.player.setFrame(this.idleFrame[face]);
     this.moving = false;
     this.layout();
   }
@@ -180,10 +185,12 @@ export default class InteriorScene extends Phaser.Scene {
 
   private snapPlayer(): void { this.player.setPosition(this.cx(this.tx), this.cy(this.ty)); }
 
-  // 해당 칸이 걸을 수 있는 곳인지 — 격자 밖/blocked는 불가, 단 워프 칸은 통과 허용
-  private walkable(tx: number, ty: number): boolean {
+  // 해당 칸이 dir 방향으로 들어갈 수 있는지 — 격자 밖/blocked는 불가.
+  // 방향 지정 워프(계단/문)는 "그 방향으로 들어설 때만" 진입 가능 → 계단을 옆/아래에서 밟고 서 있는 일이 없다.
+  private walkable(tx: number, ty: number, dir: Dir): boolean {
     if (tx < 0 || ty < 0 || tx >= this.def.cols || ty >= this.def.rows) return false;
-    if (this.warpAt(tx, ty)) return true;
+    const w = this.warpAt(tx, ty);
+    if (w) return w.dir ? w.dir === dir : true;
     return this.def.blocked[ty][tx] === 0;
   }
 
@@ -202,7 +209,7 @@ export default class InteriorScene extends Phaser.Scene {
     else { this.player.stop(); this.player.setFrame(this.idleFrame[this.facing]); return; }
 
     const ntx = this.tx + dx, nty = this.ty + dy;
-    if (!this.walkable(ntx, nty)) {
+    if (!this.walkable(ntx, nty, this.facing)) {
       this.player.stop(); this.player.setFrame(this.idleFrame[this.facing]); return;
     }
 
@@ -218,13 +225,15 @@ export default class InteriorScene extends Phaser.Scene {
   private handleWarp(): void {
     const w = this.warpAt(this.tx, this.ty);
     if (!w) return;
+    // 방향 지정 워프(계단/문)는 그 방향으로 "들어설 때"만 발동 → 옆으로 지나가다 발동하는 버그 방지.
+    if (w.dir && this.facing !== w.dir) return;
     this.busy = true;
     this.player.stop();
     this.sound.play("sfx_door", { volume: 0.6 });
     this.cameras.main.fadeOut(380, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", () => {
       if (w.to === "world") { this.scene.start("WorldScene"); return; }
-      this.enterRoom(w.to, w.ax ?? this.rooms[w.to].start[0], w.ay ?? this.rooms[w.to].start[1]);
+      this.enterRoom(w.to, w.ax ?? this.rooms[w.to].start[0], w.ay ?? this.rooms[w.to].start[1], w.face ?? "down");
       this.busy = false;
       this.cameras.main.fadeIn(380, 0, 0, 0);
     });

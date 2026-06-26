@@ -8,13 +8,17 @@ import { Gender } from "../data/Player";
 // - 말하는 사람이 있으면 대화박스 위에 "이름창"이 붙고, 나레이션(상황 설명)은 이름창이 없다.
 export default class IntroScene extends Phaser.Scene {
   // 화면 내내 유지되는 요소들
-  private bg!: Phaser.GameObjects.Image;
+  private bg!: Phaser.GameObjects.Graphics;   // 오박사/선택 단계 그라데 배경
+  private darkBg!: Phaser.GameObjects.Image;  // 도입부 스포트라이트 배경(공식 에셋)
   private boxG!: Phaser.GameObjects.Graphics;       // 대화 박스(직접 그림)
   private boxText!: Phaser.GameObjects.Text;        // 대화 글자
   private namePlate!: Phaser.GameObjects.Graphics;  // 이름창(작은 박스)
   private nameTag!: Phaser.GameObjects.Text;        // 이름창 안 글자
   private arrow!: Phaser.GameObjects.Text;          // 다음 안내 ▼
   private oak?: Phaser.GameObjects.Image;           // 오박사 스프라이트
+  private oakShadow?: Phaser.GameObjects.Image;     // 오박사 발밑 발판(p1에서 뜬 부드러운 타원 스프라이트)
+  // 배경 단계: open=도입부(어두운 깨어남) / oak=오박사(크림 p1) / select=성별·이름(핑크민트 p2·p3)
+  private bgPhase: "open" | "oak" | "select" = "open";
 
   private speaker: string | null = null;            // 현재 말하는 사람(없으면 나레이션)
   private dialogShown = true;                       // 대화 UI가 보이는 상태인가
@@ -29,8 +33,9 @@ export default class IntroScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.image("intro_bg", "assets/intro/intro_bg.png");   // 중앙 스포트라이트
     this.load.image("oak", "assets/intro/oak.png");             // 오박사(FRLG 도트)
+    this.load.image("intro_base", "assets/intro/intro_base.png"); // 공식 발판(AR Pictures/introbase)
+    this.load.image("intro_dark", "assets/intro/intro_dark.png"); // 시작 스포트라이트 배경
     this.load.image("boy_red", "assets/intro/boy_red.png");     // 남=1세대 RED
     this.load.image("girl_dawn", "assets/intro/girl_dawn.png"); // 여=4세대 DAWN
   }
@@ -38,8 +43,9 @@ export default class IntroScene extends Phaser.Scene {
   create(): void {
     const { width, height } = this.scale;
 
-    // 1) 배경 — 화면을 꽉 채우되 비율 유지(cover)
-    this.bg = this.add.image(width / 2, height / 2, "intro_bg").setOrigin(0.5);
+    // 1) 배경 — 단계별. 도입부는 공식 스포트라이트 이미지(intro_dark), 오박사/선택은 그라데(this.bg).
+    this.bg = this.add.graphics().setDepth(-10);
+    this.darkBg = this.add.image(0, 0, "intro_dark").setOrigin(0.5).setDepth(-9);
 
     // 도트 에셋은 또렷하게(픽셀 보존)
     ["oak", "boy_red", "girl_dawn"].forEach((k) =>
@@ -78,9 +84,9 @@ export default class IntroScene extends Phaser.Scene {
   private layout(): void {
     const { width, height } = this.scale;
 
-    const src = this.textures.get("intro_bg").getSourceImage();
-    const scale = Math.max(width / src.width, height / src.height);
-    this.bg.setPosition(width / 2, height / 2).setScale(scale);
+    const ds = this.textures.get("intro_dark").getSourceImage();
+    this.darkBg.setPosition(width / 2, height / 2).setScale(Math.max(width / ds.width, height / ds.height));
+    this.paintBg();
 
     const w = Math.min(width * 0.92, 1100);
     const h = Math.max(height * 0.24, 140);
@@ -98,6 +104,26 @@ export default class IntroScene extends Phaser.Scene {
 
     this.applySpeaker();              // 이름창 위치/표시 갱신
     if (this.oak) this.placeOak();
+  }
+
+  // 단계별 배경 — 미리보기(p1/p2/p3)에서 뽑은 실제 색 그대로.
+  private paintBg(): void {
+    const { width: W, height: H } = this.scale;
+    const g = this.bg; g.clear();
+    if (this.bgPhase === "oak") {
+      this.darkBg.setVisible(false);
+      // 오박사 = 따뜻한 크림(p1 정밀): 위 #fff5dc → 아래 #f6dab0
+      g.fillGradientStyle(0xfff5dc, 0xfff5dc, 0xf6dab0, 0xf6dab0, 1);
+      g.fillRect(0, 0, W, H);
+    } else if (this.bgPhase === "select") {
+      this.darkBg.setVisible(false);
+      // 성별·이름 = 핑크민트(p2/p3): TL #fde0eb, TR #e5e9e9, BL #e6e9e9, BR #cef3e8
+      g.fillGradientStyle(0xfde0eb, 0xe5e9e9, 0xe6e9e9, 0xcef3e8, 1);
+      g.fillRect(0, 0, W, H);
+    } else {
+      // 도입부 = 공식 스포트라이트 배경 이미지
+      this.darkBg.setVisible(true);
+    }
   }
 
   // HGSS 감성 대화 박스: 바깥 크림색 테두리 + 안쪽 남색 패널
@@ -148,6 +174,7 @@ export default class IntroScene extends Phaser.Scene {
     this.boxG.setVisible(v);
     this.boxText.setVisible(v);
     if (this.oak) this.oak.setVisible(v);
+    if (this.oakShadow) this.oakShadow.setVisible(v);
     if (v) this.applySpeaker();
     else { this.namePlate.setVisible(false); this.nameTag.setVisible(false); this.arrow.setVisible(false); }
   }
@@ -169,9 +196,11 @@ export default class IntroScene extends Phaser.Scene {
     await this.say("자, 먼저 너에 대해 한 가지 묻고 싶구나.", "오박사");
     await this.say("너는… 남자아이니, 여자아이니?", "오박사");
 
-    // 1) 성별(주인공) 선택 — 전용 화면
+    // 1) 성별(주인공) 선택 — 전용 화면(배경 핑크민트로)
     this.setDialogVisible(false);
+    this.bgPhase = "select"; this.paintBg();
     const gender = await this.askGender();
+    this.bgPhase = "oak"; this.paintBg();
     this.setDialogVisible(true);
     await this.say(gender === "boy" ? "오호, 씩씩한 남자 아이로구나!" : "오호, 야무진 여자 아이로구나!", "오박사");
 
@@ -180,7 +209,9 @@ export default class IntroScene extends Phaser.Scene {
     while (true) {
       await this.say("그럼, 너의 이름은 무엇이니?", "오박사");
       this.setDialogVisible(false);
+      this.bgPhase = "select"; this.paintBg();
       name = await this.askName(gender);
+      this.bgPhase = "oak"; this.paintBg();
       this.setDialogVisible(true);
       await this.say(`그래, ${name}(이)구나. 이 이름이 맞니?`, "오박사", false);
       const ok = await this.askYesNo();
@@ -218,6 +249,7 @@ export default class IntroScene extends Phaser.Scene {
       const cleanup = () => {
         this.input.keyboard!.off("keydown-SPACE", onAdvance);
         this.input.keyboard!.off("keydown-ENTER", onAdvance);
+        this.input.keyboard!.off("keydown-Z", onAdvance);
         this.input.off("pointerdown", onAdvance);
       };
       const finishTyping = () => {
@@ -238,12 +270,16 @@ export default class IntroScene extends Phaser.Scene {
       if (waitInput) {
         this.input.keyboard!.on("keydown-SPACE", onAdvance);
         this.input.keyboard!.on("keydown-ENTER", onAdvance);
+        this.input.keyboard!.on("keydown-Z", onAdvance);
         this.input.on("pointerdown", onAdvance);
       }
     });
   }
 
   private showOak(): Promise<void> {
+    this.bgPhase = "oak"; this.paintBg();   // 오박사 등장 = 세상이 크림빛으로 또렷해짐
+    // 공식 발판(introbase). 대화박스보다 뒤(depth -1)라 박스에 안 겹침.
+    this.oakShadow = this.add.image(0, 0, "intro_base").setOrigin(0.5, 0.5).setDepth(-1);
     this.oak = this.add.image(0, 0, "oak").setOrigin(0.5, 1).setAlpha(0);
     this.placeOak();
     return new Promise((resolve) => {
@@ -258,9 +294,18 @@ export default class IntroScene extends Phaser.Scene {
     if (!this.oak) return;
     const { width } = this.scale;
     const src = this.textures.get("oak").getSourceImage();
-    const targetH = Math.min(this.boxRect.y * 0.78, src.height * 5);
+    const targetH = Math.min(this.scale.height * 0.40, src.height * 5);  // p1 비율(화면 약 38%)
     this.oak.setScale(targetH / src.height);
-    this.oak.setPosition(width / 2, this.boxRect.y - 14);
+    // 공식 발판(introbase 176x48) 크기
+    const pw = this.oak.displayWidth * 1.45;
+    const ph = pw * (48 / 176);
+    // 오박사를 위로 올려 발판 전체가 대화박스 위에 보이게(p1처럼). 발은 발판 위쪽에 얹힘.
+    const feetY = this.boxRect.y - 10 - ph * 0.6;
+    this.oak.setPosition(width / 2, feetY);
+    if (this.oakShadow) {
+      this.oakShadow.setDisplaySize(pw, ph).setPosition(width / 2, feetY + ph * 0.12);
+      this.oakShadow.setVisible(this.oak.visible);
+    }
   }
 
   // 카드 한 장(크림 테두리 + 캐릭터 도트 + 라벨)을 만들어 컨테이너로 반환
@@ -271,12 +316,16 @@ export default class IntroScene extends Phaser.Scene {
     g.fillStyle(0xc98a3c, 1); g.fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 16);
     g.fillStyle(0xf3e4c8, 1); g.fillRoundedRect(-cardW / 2 + 8, -cardH / 2 + 8, cardW - 16, cardH - 16, 12);
     const src = this.textures.get(key).getSourceImage();
-    const isc = Math.min((cardW - 40) / src.width, (cardH - 70) / src.height);
-    const img = this.add.image(0, -cardH * 0.06, key).setOrigin(0.5).setScale(isc);
-    const cap = this.add.text(0, cardH / 2 - 28, label, {
-      fontFamily: this.FONT, fontSize: `${Math.max(18, Math.round(cardW * 0.1))}px`, color: "#3a2a14",
-    }).setOrigin(0.5);
-    c.add([g, img, cap]);
+    // 라벨 있으면 위쪽에 캐릭터+아래 캡션, 없으면(빈 문자열) 중앙 정렬
+    const isc = Math.min((cardW - 40) / src.width, (cardH - (label ? 70 : 40)) / src.height);
+    const img = this.add.image(0, label ? -cardH * 0.06 : 0, key).setOrigin(0.5).setScale(isc);
+    c.add([g, img]);
+    if (label) {
+      const cap = this.add.text(0, cardH / 2 - 28, label, {
+        fontFamily: this.FONT, fontSize: `${Math.max(18, Math.round(cardW * 0.1))}px`, color: "#3a2a14",
+      }).setOrigin(0.5);
+      c.add(cap);
+    }
     c.setSize(cardW, cardH);
     return c;
   }
@@ -287,29 +336,29 @@ export default class IntroScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const cx = width / 2;
 
-    const backdrop = this.add.graphics();
-    backdrop.fillStyle(0x0a0e18, 0.97); backdrop.fillRect(0, 0, width, height);
-    backdrop.fillStyle(0x1a2740, 0.55); backdrop.fillEllipse(cx, height * 0.6, width * 0.95, height * 0.7);
+    // 파스텔 배경(this.bg) 그대로. 오박사·발판 숨기고, 대화박스에 "너는… 누구지?" 나레이션.
+    this.oak?.setVisible(false); this.oakShadow?.setVisible(false);
+    this.setSpeaker(null);
+    this.boxG.setVisible(true); this.boxText.setVisible(true); this.arrow.setVisible(true);
+    this.boxText.setText("너는… 누구지?");
 
-    const header = this.add.text(cx, height * 0.085, "너는… 누구지?", {
-      fontFamily: this.FONT, fontSize: `${Math.max(26, Math.round(height * 0.045))}px`, color: "#ffffff",
-    }).setOrigin(0.5);
-    const help = this.add.text(cx, height * 0.15, "마우스 / ← → 로 고르고  클릭·Enter", {
-      fontFamily: this.FONT, fontSize: `${Math.max(15, Math.round(height * 0.024))}px`, color: "#9fb3d8",
-    }).setOrigin(0.5);
-
-    // 카드는 화면 아래쪽으로 내려서 위 안내문을 절대 안 가리게
-    const cardW = Math.min(width * 0.22, 250);
-    const gap = cardW * 1.28;
-    const cyCard = height * 0.58;
-    const boy = this.buildCard(cx - gap / 2, cyCard, "boy_red", "남자아이", cardW);
-    const girl = this.buildCard(cx + gap / 2, cyCard, "girl_dawn", "여자아이", cardW);
+    // 카드 2장(라벨 없음) — 박스 위쪽에 배치
+    const cardW = Math.min(width * 0.2, 230);
+    const gap = cardW * 1.35;
+    const cyCard = height * 0.42;
+    const boy = this.buildCard(cx - gap / 2, cyCard, "boy_red", "", cardW);
+    const girl = this.buildCard(cx + gap / 2, cyCard, "girl_dawn", "", cardW);
     const cards = [boy, girl];
     [boy, girl].forEach((c) => {
       c.setInteractive(new Phaser.Geom.Rectangle(-cardW / 2, -(cardW * 1.34) / 2, cardW, cardW * 1.34), Phaser.Geom.Rectangle.Contains);
     });
+    // 카드 아래 안내문구 — 안 튀는 차분한 회청색, 제대로 된 화살표(◀ ▶)
+    const help = this.add.text(cx, cyCard + (cardW * 1.34) / 2 + Math.max(26, height * 0.04),
+      "⬅  ➡  로 선택", {
+        fontFamily: this.FONT, fontSize: `${Math.max(15, Math.round(height * 0.022))}px`, color: "#97a0b0",
+      }).setOrigin(0.5);
     const cursor = this.add.graphics();
-    let idx = -1;                 // -1 = 아직 아무것도 안 고름
+    let idx = 0;                  // 기본 = 남자(왼쪽) 선택됨
 
     const refresh = () => {
       cursor.clear();
@@ -320,10 +369,10 @@ export default class IntroScene extends Phaser.Scene {
       });
       if (idx >= 0) {
         const c = cards[idx];
-        const hw = (cardW * 1.04) / 2 + 8;
-        const hh = (cardW * 1.34 * 1.04) / 2 + 8;
-        cursor.lineStyle(5, 0xffe27a, 1);
-        cursor.strokeRoundedRect(c.x - hw, c.y - hh, hw * 2, hh * 2, 18);
+        // 선택 카드(스케일 1.04)의 외곽선에 딱 맞춰 노란 테두리(이중 테두리 X)
+        const sw = cardW * 1.04, sh = cardW * 1.34 * 1.04;
+        cursor.lineStyle(4, 0xffe27a, 1);
+        cursor.strokeRoundedRect(c.x - sw / 2 - 1, c.y - sh / 2 - 1, sw + 2, sh + 2, 16);
       }
     };
     refresh();
@@ -337,13 +386,14 @@ export default class IntroScene extends Phaser.Scene {
         this.input.keyboard!.off("keydown-LEFT", goLeft);
         this.input.keyboard!.off("keydown-RIGHT", goRight);
         this.input.keyboard!.off("keydown-ENTER", confirm);
-        backdrop.destroy(); header.destroy(); help.destroy();
-        boy.destroy(); girl.destroy(); cursor.destroy();
+        this.input.keyboard!.off("keydown-Z", confirm);
+        boy.destroy(); girl.destroy(); cursor.destroy(); help.destroy();
         resolve(g);
       };
       this.input.keyboard!.on("keydown-LEFT", goLeft);
       this.input.keyboard!.on("keydown-RIGHT", goRight);
       this.input.keyboard!.on("keydown-ENTER", confirm);
+      this.input.keyboard!.on("keydown-Z", confirm);
       cards.forEach((c, i) => {
         c.on("pointerover", () => { idx = i; refresh(); });
         c.on("pointerout", () => { idx = -1; refresh(); });
@@ -357,54 +407,44 @@ export default class IntroScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const cx = width / 2;
 
-    const backdrop = this.add.graphics();
-    backdrop.fillStyle(0x0a0e18, 0.97); backdrop.fillRect(0, 0, width, height);
-    backdrop.fillStyle(0x1a2740, 0.55); backdrop.fillEllipse(cx, height * 0.5, width * 0.9, height * 0.8);
+    // 파스텔 배경(this.bg) 그대로. 오박사·발판 숨기고, 대화박스에 "네 이름을 알려다오" 나레이션.
+    this.oak?.setVisible(false); this.oakShadow?.setVisible(false);
+    this.setSpeaker(null);
+    this.boxG.setVisible(true); this.boxText.setVisible(true); this.arrow.setVisible(true);
+    this.boxText.setText("네 이름을 알려다오");
 
-    const header = this.add.text(cx, height * 0.12, "네 이름을 알려다오", {
-      fontFamily: this.FONT, fontSize: `${Math.max(26, Math.round(height * 0.045))}px`, color: "#ffffff",
-    }).setOrigin(0.5);
-
-    // 선택한 성별 카드(작게)
-    const cardW = Math.min(width * 0.16, 190);
+    // 선택한 성별 카드(라벨 없음) — 성별 화면과 같은 크기
+    const cardW = Math.min(width * 0.2, 230);
     const key = gender === "boy" ? "boy_red" : "girl_dawn";
-    const card = this.buildCard(cx, height * 0.43, key, gender === "boy" ? "남자아이" : "여자아이", cardW);
+    const card = this.buildCard(cx, height * 0.37, key, "", cardW);
 
     // HTML 입력창 + 결정 버튼(카드 아래)
     const input = document.createElement("input");
     input.type = "text"; input.maxLength = 8; input.value = "";
     input.setAttribute("autocomplete", "off");
+    // 입력창 = 크림 바탕 + 황금 테두리(카드와 톤 맞춤). 카드 아래·대화박스 위에 배치.
     Object.assign(input.style, {
-      position: "fixed", left: "50%", top: "70%", transform: "translate(-50%,-50%)",
+      position: "fixed", left: "50%", top: "57%", transform: "translate(-50%,-50%)",
       width: "min(40vw, 320px)", padding: "10px 14px", textAlign: "center",
-      fontFamily: `"${this.FONT}", monospace`, fontSize: "26px", color: "#21314f",
-      background: "#f6efd8", border: "4px solid #4a6aa5", borderRadius: "10px",
-      outline: "none", zIndex: "9999", boxShadow: "0 6px 18px rgba(0,0,0,.45)",
+      fontFamily: `"${this.FONT}", monospace`, fontSize: "26px", color: "#3a2a14",
+      background: "#f3e4c8", border: "4px solid #c98a3c", borderRadius: "10px",
+      outline: "none", zIndex: "9999", boxShadow: "0 6px 18px rgba(0,0,0,.25)",
     } as CSSStyleDeclaration);
-    const btn = document.createElement("button");
-    btn.textContent = "결정";
-    Object.assign(btn.style, {
-      position: "fixed", left: "50%", top: "calc(70% + 48px)", transform: "translate(-50%,-50%)",
-      fontFamily: `"${this.FONT}", monospace`, fontSize: "20px", color: "#f6efd8",
-      background: "#4a6aa5", border: "none", borderRadius: "8px", padding: "6px 22px",
-      cursor: "pointer", zIndex: "9999",
-    } as CSSStyleDeclaration);
-    document.body.appendChild(input); document.body.appendChild(btn);
+    document.body.appendChild(input);
     input.focus();
     this.input.keyboard!.enabled = false;   // 입력 동안 Phaser 키 가로채기 끔
 
     return new Promise((resolve) => {
       const submit = () => {
         const v = input.value.trim() || (gender === "girl" ? "빛나" : "레드");
-        input.remove(); btn.remove();
+        input.remove();
         this.input.keyboard!.enabled = true;
-        backdrop.destroy(); header.destroy(); card.destroy();
+        card.destroy();
         resolve(v);
       };
       input.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); submit(); }
       });
-      btn.addEventListener("click", submit);
     });
   }
 
