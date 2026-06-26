@@ -1,6 +1,9 @@
 import Phaser from "phaser";
 import { Gender } from "../data/Player";
 
+// ⚠️ 검증용 임시 오버레이 — 충돌(빨강)·워프(초록) 칸을 화면에 그린다. 확인 끝나면 false로.
+const DEBUG_COLLISION = false;
+
 // 시작 집 내부 — 어나더레드 맵을 추출한 2층 방(red_room_2f) + 1층 거실(red_living_1f_stairs:
 //   1f 거실에 154 계단을 좌우반전해 좌측 상단에 구워넣고 빨간 카펫을 얹은 이미지).
 // 핵심 규칙(사용자 요청):
@@ -29,6 +32,7 @@ export default class InteriorScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
   private roomImg!: Phaser.GameObjects.Image;
   private stairsDeco!: Phaser.GameObjects.Image;   // 거실(1F)에 깔아주는 2층식 계단 그림
+  private dbg?: Phaser.GameObjects.Graphics;       // 검증용 충돌/워프 오버레이
   private nemona?: Phaser.GameObjects.Sprite;      // 컷신용 라이벌 네모
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
 
@@ -106,6 +110,12 @@ export default class InteriorScene extends Phaser.Scene {
     this.player = this.add.sprite(0, 0, this.texKey, this.idleFrame.down).setOrigin(0.5, 1);
     this.cursors = this.input.keyboard!.createCursorKeys();
 
+    if (DEBUG_COLLISION) {
+      this.dbg = this.add.graphics().setDepth(50);
+      this.add.text(12, 40, "", { fontFamily: "monospace", fontSize: "18px", color: "#00ff66", backgroundColor: "#000000aa", padding: { x: 6, y: 3 } })
+        .setName("dbgpos").setScrollFactor(0).setDepth(200);
+    }
+
     // 안내(컷신 동안엔 숨김)
     const name = this.playerName();
     this.add.text(12, 12, `${name ? name + "  |  " : ""}방향키: 이동  |  계단: 층 이동  |  거실 아래 문: 마을로`, {
@@ -170,7 +180,25 @@ export default class InteriorScene extends Phaser.Scene {
     this.snapPlayer();
     if (this.nemona) this.nemona.setScale(this.zoom * 0.92);
     this.updateStairsDeco();
+    this.drawDebug();
     this.layoutDialog();
+  }
+
+  // 검증용: 막힌 칸=빨강, 워프 칸=초록(+방향). 확인용일 뿐 게임 로직과 무관.
+  private drawDebug(): void {
+    if (!this.dbg) return;
+    const g = this.dbg;
+    g.clear();
+    for (let ty = 0; ty < this.def.rows; ty++) {
+      for (let tx = 0; tx < this.def.cols; tx++) {
+        const x = this.origin.x + tx * this.tile;
+        const y = this.origin.y + ty * this.tile;
+        const w = this.warpAt(tx, ty);
+        if (w) { g.fillStyle(0x00ff00, 0.45); g.fillRect(x, y, this.tile, this.tile); }
+        else if (this.def.blocked[ty][tx] === 1) { g.fillStyle(0xff0000, 0.4); g.fillRect(x, y, this.tile, this.tile); }
+        g.lineStyle(1, 0xffffff, 0.25); g.strokeRect(x, y, this.tile, this.tile);
+      }
+    }
   }
 
   // 거실 계단은 154 원본 타일을 좌우반전해 red_living_1f_stairs.png에 직접 구워넣었다.
@@ -199,6 +227,10 @@ export default class InteriorScene extends Phaser.Scene {
   }
 
   update(): void {
+    if (this.dbg) {
+      const t = this.children.getByName("dbgpos") as Phaser.GameObjects.Text | null;
+      t?.setText(`room=${this.roomKey} tile=(${this.tx},${this.ty}) face=${this.facing}`);
+    }
     if (this.busy || this.moving) return;
 
     let dx = 0, dy = 0;
@@ -280,6 +312,7 @@ export default class InteriorScene extends Phaser.Scene {
     await this.wait(200);
 
     await this.say("네모를 따라 오박사님이 계시는 연구소로 가자!");
+    this.setDialogVisible(false);   // 마지막 대사에서 엔터 → 대화상자 닫기(이동 화면과 통일)
 
     this.registry.set("houseIntroDone", true);
     hud?.setVisible(true);

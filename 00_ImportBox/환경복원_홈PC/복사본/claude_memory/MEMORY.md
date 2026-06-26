@@ -1,8 +1,0 @@
-- [myPokemon 프로젝트](mypokemon-project.md) — Phaser/TS 포켓몬 팬게임(어나더레드 수준), 에셋소스·/mnt/d vite polling 함정
-- [질문 작작하기](dont-over-ask.md) — 과한 확인질문 싫어함, 알아서 진행하고 결과로 보여주기
-- [풀스택 지향](user-fullstack.md) — 백엔드 아님, 풀스택(AGENTS.md "백엔드" 표기는 부정확)
-- [도트풍만](dot-style-only.md) — 매끈한 일러스트(PokeAPI HOME 512) 금지, AR 도트/픽셀 스프라이트만
-- [주인공 확정](protagonist-choice.md) — 남=1세대 RED, 여=4세대 DAWN, 픽셀 전용 (AGENTS.md §1.5에도 기록)
-- [실행 본체는 exe](launch-via-bat-only.md) — 본체=Pokemon With.exe(어나더레드 Game.exe격), 코드 고치면 매번 npm run app:build로 다시 구워줄 것
-- [후보는 Pick폴더](pick-folder-workflow.md) — "~후보 보여줘"면 01_Resources/Pick에 정리+몽타주, 고른 뒤 적용
-- [AR맵 rxdata 파이프라인](ar-map-rxdata-pipeline.md) — AR 맵 읽힘(tools/ar-map), 진행중: 시작 집(방155+거실067) InteriorScene 미완
