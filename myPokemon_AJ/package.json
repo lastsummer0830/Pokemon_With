@@ -12,7 +12,8 @@
     "fetch": "node tools/fetch-pokemon.mjs",
     "electron": "electron . --no-sandbox",
     "app": "concurrently -k -n vite,app \"vite\" \"wait-on tcp:127.0.0.1:5180 && electron . --no-sandbox\"",
-    "app:build": "npm run build && electron-builder"
+    "app:build": "npm run build && electron-builder",
+    "app:bake": "bash tools/bake-exe.sh"
   },
   "build": {
     "appId": "com.aj.pokemonwith",

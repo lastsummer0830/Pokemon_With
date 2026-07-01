@@ -28,7 +28,9 @@ const config: Phaser.Types.Core.GameConfig = {
 //   - Baloo 2: 타이틀의 둥근 영문 로고용
 //   - Galmuri11: 옛날 픽셀 포켓몬 게임 감성의 한글 도트 폰트(인트로 대사용)
 function boot() {
-  new Phaser.Game(config);
+  const game = new Phaser.Game(config);
+  // dev 전용: 자동 플레이테스트(playwright)에서 씬 상태를 읽기 위해 노출. 배포에 영향 없음.
+  (window as unknown as { __game: Phaser.Game }).__game = game;
 }
 function loadFont(family: string, url: string, weight = "400") {
   // FontFace 로 폰트 하나를 받아서 document에 등록(실패해도 무시)

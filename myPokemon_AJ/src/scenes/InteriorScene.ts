@@ -19,7 +19,8 @@ const DEBUG_COLLISION = false;
 
 // dir = 그 방향으로 "들어설 때만" 워프 발동(계단 옆을 가로질러 지나가도 안 켜짐).
 // face = 워프 후 도착해서 바라보는 방향.
-interface Warp { x: number; y: number; to: string; ax?: number; ay?: number; kind?: string; dir?: Dir; face?: Dir }
+// climb = 계단을 밟았을 때 전환 전 "올라서는" 이동칸 오프셋 [dx,dy]. (거실 계단은 오른쪽→왼쪽 위로 = [-1,-1] 식)
+interface Warp { x: number; y: number; to: string; ax?: number; ay?: number; kind?: string; dir?: Dir; face?: Dir; climb?: [number, number] }
 interface RoomDef { img: string; cols: number; rows: number; blocked: number[][]; start: [number, number]; warps: Warp[] }
 type Rooms = Record<string, RoomDef>;
 type Dir = "down" | "left" | "right" | "up";
@@ -189,14 +190,17 @@ export default class InteriorScene extends Phaser.Scene {
     if (!this.dbg) return;
     const g = this.dbg;
     g.clear();
+    // 막힌 칸=빨간 외곽선(그림 비침), 워프=초록 반투명, 걷는 칸=옅은 흰 격자.
     for (let ty = 0; ty < this.def.rows; ty++) {
       for (let tx = 0; tx < this.def.cols; tx++) {
         const x = this.origin.x + tx * this.tile;
         const y = this.origin.y + ty * this.tile;
         const w = this.warpAt(tx, ty);
         if (w) { g.fillStyle(0x00ff00, 0.45); g.fillRect(x, y, this.tile, this.tile); }
-        else if (this.def.blocked[ty][tx] === 1) { g.fillStyle(0xff0000, 0.4); g.fillRect(x, y, this.tile, this.tile); }
-        g.lineStyle(1, 0xffffff, 0.25); g.strokeRect(x, y, this.tile, this.tile);
+        else if (this.def.blocked[ty][tx] === 1) {
+          g.lineStyle(3, 0xff2222, 0.95); g.strokeRect(x + 1.5, y + 1.5, this.tile - 3, this.tile - 3);
+        }
+        g.lineStyle(1, 0xffffff, 0.28); g.strokeRect(x, y, this.tile, this.tile);
       }
     }
   }
@@ -260,14 +264,36 @@ export default class InteriorScene extends Phaser.Scene {
     // 방향 지정 워프(계단/문)는 그 방향으로 "들어설 때"만 발동 → 옆으로 지나가다 발동하는 버그 방지.
     if (w.dir && this.facing !== w.dir) return;
     this.busy = true;
-    this.player.stop();
     this.sound.play("sfx_door", { volume: 0.6 });
-    this.cameras.main.fadeOut(380, 0, 0, 0);
-    this.cameras.main.once("camerafadeoutcomplete", () => {
+    // 계단이면 곧장 순간이동하지 말고 한두 칸 "올라서는" 연출 후 전환(성급하게 넘어가는 느낌 제거).
+    if (w.kind === "stairs") {
+      const [dx, dy] = w.climb ?? this.dirVec(this.facing);
+      const nx = this.tx + dx, ny = this.ty + dy;
+      this.player.play(`walk-${this.facing}`, true);
+      this.tweens.add({
+        targets: this.player, x: this.cx(nx), y: this.cy(ny), duration: 260,
+        onComplete: () => this.doWarpTransition(w),
+      });
+    } else {
+      this.player.stop();
+      this.doWarpTransition(w);
+    }
+  }
+
+  private dirVec(d: Dir): [number, number] {
+    return d === "left" ? [-1, 0] : d === "right" ? [1, 0] : d === "up" ? [0, -1] : [0, 1];
+  }
+
+  // 실제 화면 전환. ⚠️ 예전엔 카메라 "camerafadeoutcomplete" 이벤트에만 의존했는데, 그 이벤트가
+  //    안 오면 busy=true로 영영 멈춰(입력잠금) "계단 밟았는데 안 넘어간다"가 된다 → 시간기반으로 확실하게.
+  private doWarpTransition(w: Warp): void {
+    this.player.stop();
+    this.cameras.main.fadeOut(300, 0, 0, 0);
+    this.time.delayedCall(320, () => {
       if (w.to === "world") { this.scene.start("WorldScene"); return; }
       this.enterRoom(w.to, w.ax ?? this.rooms[w.to].start[0], w.ay ?? this.rooms[w.to].start[1], w.face ?? "down");
+      this.cameras.main.fadeIn(300, 0, 0, 0);
       this.busy = false;
-      this.cameras.main.fadeIn(380, 0, 0, 0);
     });
   }
 
