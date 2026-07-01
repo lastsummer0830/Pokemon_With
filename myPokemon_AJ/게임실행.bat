@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-title myPokemon
+title PokemonWith
 
 REM 최초 1회: 패키지가 없으면 자동 설치
 if not exist node_modules (

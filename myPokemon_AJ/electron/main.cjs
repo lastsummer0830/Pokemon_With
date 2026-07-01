@@ -14,7 +14,7 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
     height: 720,
-    title: "myPokemon",
+    title: "PokemonWith",
     backgroundColor: "#1b1b1b",
     autoHideMenuBar: true,        // 상단 메뉴바 숨김 (게임답게)
     webPreferences: {
