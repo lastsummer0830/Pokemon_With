@@ -19,7 +19,8 @@ Thumbs.db
 # =========================
 # Local AI / agent workspace
 # =========================
-.claude/
+# .claude/skills 와 settings.json 은 PC 간 공유(추적). 기계별 settings.local.json 만 제외.
+.claude/settings.local.json
 .omo/
 .sisyphus/
 .playwright-mcp/
