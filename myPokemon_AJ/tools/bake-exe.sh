@@ -17,7 +17,23 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 ASAR="node_modules/.bin/asar"
-APP_ASAR="build_win/win-unpacked/resources/app.asar"
+
+# win-unpacked 위치는 PC마다 다르다: 집 PC는 OneDrive 락 우회로 build_new/, 학원 PC는 build_win/.
+# → 실제 exe가 든 폴더를 자동으로 찾는다(실행되는 그 asar를 갱신해야 "굽자"가 먹힘).
+APP_ASAR=""
+for d in build_new/win-unpacked build_win/win-unpacked; do
+  if [ -f "$d/resources/app.asar" ] && ls "$d"/*.exe >/dev/null 2>&1; then
+    APP_ASAR="$d/resources/app.asar"; break
+  fi
+done
+# exe가 아직 없어도 asar만 있으면 그거라도 쓴다(fallback).
+if [ -z "$APP_ASAR" ]; then
+  for d in build_new/win-unpacked build_win/win-unpacked; do
+    [ -f "$d/resources/app.asar" ] && { APP_ASAR="$d/resources/app.asar"; break; }
+  done
+fi
+[ -n "$APP_ASAR" ] || { echo "✗ win-unpacked/resources/app.asar 를 build_new·build_win 어디서도 못 찾음. 먼저 윈도우 빌드 필요."; exit 1; }
+echo "  대상 exe 폴더: $(dirname "$(dirname "$APP_ASAR")")"
 # 추출/재패킹은 cwd에 파일 흘리지 않도록 scratch 임시폴더에서.
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT

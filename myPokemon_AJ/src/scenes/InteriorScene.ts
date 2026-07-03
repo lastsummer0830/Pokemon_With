@@ -20,7 +20,9 @@ const DEBUG_COLLISION = false;
 // dir = 그 방향으로 "들어설 때만" 워프 발동(계단 옆을 가로질러 지나가도 안 켜짐).
 // face = 워프 후 도착해서 바라보는 방향.
 // climb = 계단을 밟았을 때 전환 전 "올라서는" 이동칸 오프셋 [dx,dy]. (거실 계단은 오른쪽→왼쪽 위로 = [-1,-1] 식)
-interface Warp { x: number; y: number; to: string; ax?: number; ay?: number; kind?: string; dir?: Dir; face?: Dir; climb?: [number, number] }
+// climb = 워프 칸 기준 오르는 경로. 한 칸이면 [dx,dy], 여러 칸이면 [[dx,dy],[dx,dy],...] (계단 발판을 따라).
+// climbFace = 계단을 오르는 동안 바라보는 방향(기본 "up" = 계단을 정면으로 바라봄).
+interface Warp { x: number; y: number; to: string; ax?: number; ay?: number; kind?: string; dir?: Dir; face?: Dir; climb?: number[] | number[][]; climbFace?: Dir }
 interface RoomDef { img: string; cols: number; rows: number; blocked: number[][]; start: [number, number]; warps: Warp[] }
 type Rooms = Record<string, RoomDef>;
 type Dir = "down" | "left" | "right" | "up";
@@ -32,6 +34,7 @@ export default class InteriorScene extends Phaser.Scene {
 
   private player!: Phaser.GameObjects.Sprite;
   private roomImg!: Phaser.GameObjects.Image;
+  private overImg!: Phaser.GameObjects.Image;      // 가구 전경 오버레이(캐릭터보다 위 depth) — 가구 뒤로 지나가게
   private stairsDeco!: Phaser.GameObjects.Image;   // 거실(1F)에 깔아주는 2층식 계단 그림
   private dbg?: Phaser.GameObjects.Graphics;       // 검증용 충돌/워프 오버레이
   private nemona?: Phaser.GameObjects.Sprite;      // 컷신용 라이벌 네모
@@ -79,9 +82,17 @@ export default class InteriorScene extends Phaser.Scene {
 
   preload(): void {
     this.gender = (this.registry.get("playerGender") as Gender) ?? "boy";
-    this.load.json("rooms", "assets/house/rooms.json");
-    this.load.image("room_bedroom", "assets/house/red_room_2f.png");
-    this.load.image("room_living", "assets/house/red_living_1f_stairs.png");
+    // 방 데이터/이미지가 바뀌어도 옛 캐시를 물지 않도록 매번 새로 읽는다(개발 중 stale 방지).
+    //  ⚠️ 브라우저 HTTP 캐시가 rooms.json/이미지를 물면 새 코드가 옛 맵을 읽어 "고쳐도 똑같음" 발생.
+    //     → URL에 ?v=타임스탬프를 붙여 매 로드마다 무조건 새로 받는다.
+    const v = "?v=" + Date.now();
+    this.cache.json.remove("rooms");
+    this.load.json("rooms", "assets/house/rooms.json" + v);
+    this.load.image("room_bedroom", "assets/house/red_room_2f.png" + v);
+    this.load.image("room_living", "assets/house/red_living_1f_stairs.png" + v);
+    // 가구 전경 오버레이(막힌 칸=가구만 남긴 PNG) — 캐릭터가 가구 뒤로 지나가게 위에 덮는다.
+    this.load.image("over_bedroom", "assets/house/red_room_2f_over.png" + v);
+    this.load.image("over_living", "assets/house/red_living_1f_stairs_over.png" + v);
     this.load.image("stairs_living", "assets/house/stairs_living.png");
     this.load.audio("sfx_door", "assets/audio/door.ogg");
     const file = this.gender === "girl"
@@ -96,7 +107,7 @@ export default class InteriorScene extends Phaser.Scene {
     this.rooms = this.cache.json.get("rooms") as Rooms;
 
     // 도트는 또렷하게(픽셀 보존) — 화질 개선의 핵심
-    for (const k of ["room_bedroom", "room_living", "stairs_living", "nemona", this.texKey]) {
+    for (const k of ["room_bedroom", "room_living", "over_bedroom", "over_living", "stairs_living", "nemona", this.texKey]) {
       this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
     }
     this.cameras.main.roundPixels = true;   // 소수점 좌표로 인한 흐릿함 방지
@@ -109,6 +120,9 @@ export default class InteriorScene extends Phaser.Scene {
     // 거실 계단 그림 — 발판(아래끝)을 워프 칸 바닥에 맞춤. 바닥보다 위, 주인공보다 아래.
     this.stairsDeco = this.add.image(0, 0, "stairs_living").setOrigin(0, 1).setDepth(5).setVisible(false);
     this.player = this.add.sprite(0, 0, this.texKey, this.idleFrame.down).setOrigin(0.5, 1);
+    // 가구 전경 오버레이 — 캐릭터 위에 덮으면 가구 근처에서 머리가 잘려 보여서 끔(setVisible false).
+    //  (전경 오버레이 방식은 back wall/소품까지 머리를 가려 '대가리 잘림'이 생김. 캐릭터를 그냥 앞에 그린다.)
+    this.overImg = this.add.image(0, 0, "over_bedroom").setOrigin(0, 0).setDepth(15).setName("overImg").setVisible(false);
     this.cursors = this.input.keyboard!.createCursorKeys();
 
     if (DEBUG_COLLISION) {
@@ -119,7 +133,7 @@ export default class InteriorScene extends Phaser.Scene {
 
     // 안내(컷신 동안엔 숨김)
     const name = this.playerName();
-    this.add.text(12, 12, `${name ? name + "  |  " : ""}방향키: 이동  |  계단: 층 이동  |  거실 아래 문: 마을로`, {
+    this.add.text(12, 12, `${name ? name + "  |  " : ""}방향키: 이동  |  계단: 위로↑ 올라가기  |  문: 마을로   ★맵수정판★`, {
       fontFamily: "Galmuri11, sans-serif", fontSize: "16px", color: "#ffffff",
       backgroundColor: "#00000077", padding: { x: 8, y: 4 },
     }).setName("hud").setScrollFactor(0).setDepth(100);
@@ -158,6 +172,7 @@ export default class InteriorScene extends Phaser.Scene {
     this.roomKey = key;
     this.def = this.rooms[key];
     this.roomImg.setTexture(key === "bedroom" ? "room_bedroom" : "room_living");
+    this.overImg.setTexture(key === "bedroom" ? "over_bedroom" : "over_living");
     this.tx = tx; this.ty = ty;
     this.facing = face;
     this.player.stop();
@@ -175,6 +190,7 @@ export default class InteriorScene extends Phaser.Scene {
     this.origin = { x: Math.round((width - w) / 2), y: Math.round((height - h) / 2) };
     this.tile = 32 * this.zoom;
     this.roomImg.setPosition(this.origin.x, this.origin.y).setScale(this.zoom);
+    this.overImg.setPosition(this.origin.x, this.origin.y).setScale(this.zoom);
 
     this.player.setScale(this.zoom * 0.92);
     this.player.setDepth(10);
@@ -265,19 +281,40 @@ export default class InteriorScene extends Phaser.Scene {
     if (w.dir && this.facing !== w.dir) return;
     this.busy = true;
     this.sound.play("sfx_door", { volume: 0.6 });
-    // 계단이면 곧장 순간이동하지 말고 한두 칸 "올라서는" 연출 후 전환(성급하게 넘어가는 느낌 제거).
-    if (w.kind === "stairs") {
-      const [dx, dy] = w.climb ?? this.dirVec(this.facing);
-      const nx = this.tx + dx, ny = this.ty + dy;
-      this.player.play(`walk-${this.facing}`, true);
-      this.tweens.add({
-        targets: this.player, x: this.cx(nx), y: this.cy(ny), duration: 260,
-        onComplete: () => this.doWarpTransition(w),
-      });
+    // 계단: climb 경로가 있으면 그 칸을 따라 올라선 뒤 전환. 없으면(정통 포켓몬식) 밟는 즉시 전환.
+    //  → 방향 시비(직진/대각선)를 없애려면 climb를 빼서 '밟으면 바로 내려감'으로 둔다.
+    if (w.kind === "stairs" && Array.isArray(w.climb) && w.climb.length) {
+      const face = w.climbFace ?? "up";
+      this.facing = face;
+      this.player.setFrame(this.idleFrame[face]);
+      this.climbAlong(this.climbCells(w), face, () => this.doWarpTransition(w));
     } else {
       this.player.stop();
       this.doWarpTransition(w);
     }
+  }
+
+  // 워프의 climb 정의를 "올라갈 절대 칸 목록"으로 편다.
+  //  climb 없음 → 바라보는 방향으로 한 칸. [dx,dy] → 한 칸. [[dx,dy],...] → 여러 칸(계단 스텝 경로).
+  private climbCells(w: Warp): Array<[number, number]> {
+    const raw = w.climb;
+    if (!raw || raw.length === 0) {
+      const [dx, dy] = this.dirVec(this.facing);
+      return [[w.x + dx, w.y + dy]];
+    }
+    const steps: number[][] = Array.isArray(raw[0]) ? (raw as number[][]) : [raw as number[]];
+    return steps.map(([dx, dy]) => [w.x + dx, w.y + dy] as [number, number]);
+  }
+
+  // 계단 스텝을 한 칸씩 순서대로 걸어 올라간 뒤 done() 호출(마지막 칸에 다다르면 층 전환).
+  private climbAlong(cells: Array<[number, number]>, face: Dir, done: () => void): void {
+    if (cells.length === 0) { this.player.stop(); done(); return; }
+    const [nx, ny] = cells[0];
+    this.player.play(`walk-${face}`, true);
+    this.tweens.add({
+      targets: this.player, x: this.cx(nx), y: this.cy(ny), duration: 200,
+      onComplete: () => { this.tx = nx; this.ty = ny; this.climbAlong(cells.slice(1), face, done); },
+    });
   }
 
   private dirVec(d: Dir): [number, number] {

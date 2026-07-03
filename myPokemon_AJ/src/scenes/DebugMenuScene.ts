@@ -42,6 +42,7 @@ export default class DebugMenuScene extends Phaser.Scene {
       ["6. 배틀(Battle)", "BattleScene"],
       ["7. 집 꾸미기(House)", "HouseScene"],
       ["8. 시작 집 - 침실 바로가기(skip)", "InteriorScene", { room: "bedroom", skipIntro: true }],
+      ["9. 포켓몬 연구소(스타팅 선택)", "LabScene"],
     ];
     const go = (key: string, data?: object) => {
       // 테스트용 기본값 — 인트로를 건너뛰어도 씬이 동작하도록
@@ -50,7 +51,7 @@ export default class DebugMenuScene extends Phaser.Scene {
       this.scene.start(key, data);
     };
 
-    const keyNames = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT"];
+    const keyNames = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE"];
     const startY = height * 0.32, gap = height * 0.075;
     scenes.forEach(([label, key, data], i) => {
       const t = this.add.text(width / 2, startY + i * gap, label, {

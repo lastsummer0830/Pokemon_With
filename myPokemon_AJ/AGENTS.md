@@ -139,7 +139,8 @@ myPokemon_AJ/
 > **경로 처리(중요):** 사용자는 여러 PC를 오가며 작업한다.
 > - **집 PC** = `C:\Users\ONE\Documents\GitHub\Pokemon_With` (WSL `/mnt/c/Users/ONE/Documents/GitHub/Pokemon_With`)
 > - **학원/현재 PC** = `D:\dev\Pokemon_With` (WSL `/mnt/d/dev/Pokemon_With`)
-> - ⚠️ 집 PC는 아직 워크스페이스 리네임 전이라 리포 폴더명이 다를 수 있다. 그러니 **절대경로를 박지 말고 항상 리포 루트 기준 상대경로로 처리한다.** 리포 루트는 `git rev-parse --show-toplevel`로 잡는다.
+> - 두 PC 모두 리포 루트 폴더명 = **`Pokemon_With`** 로 통일한다(집 PC를 `...\GitHub\AJ_Proj\vcPortfolio_AJ` → `...\GitHub\Pokemon_With` 로 이사, AJ_Proj 밖으로 단독 분리). 아직 옛 폴더명(`vcPortfolio_AJ`)으로 보이면 이사 미완인 PC다.
+> - ⚠️ 폴더명·드라이브가 PC마다/이사 시점마다 다를 수 있으므로 **절대경로를 박지 말고 항상 리포 루트 기준 상대경로로 처리한다.** 리포 루트는 `git rev-parse --show-toplevel`로 잡는다.
 > - **기준 폴더 = `<repo-root>/00_ImportBox/작업일지/`** (리포 안, git 추적되어 PC 간 동기화됨. 없으면 만든다). 날짜는 `MMDD` 형식(예: `0701`).
 
 1. **작업일지는 항상 리포 안에 md 파일 하나로(날짜 하위폴더 만들지 않음):** `<repo-root>/00_ImportBox/작업일지/` 안에 바로 **`MMDD_PokemonWith_작업일지.md`** 파일을 만든다(예: `0701_PokemonWith_작업일지.md`). 이관 파일이 있든 없든 **`MMDD/` 같은 날짜 하위폴더는 만들지 않는다.** 일지는 깃으로 PC 간 동기화되므로 리포 안에 두면 된다. 같은 날 파일이 이미 있으면 덮어쓰지 말고 이어서 보강한다.

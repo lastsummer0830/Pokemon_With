@@ -2,7 +2,8 @@ import struct, os, glob, json
 from rubymarshal.reader import loads
 from PIL import Image
 AR="/mnt/c/Users/ONE/Desktop/Pokemon Another Red_PWT_250829"
-PUB="/mnt/c/Users/ONE/Documents/GitHub/AJ_Proj/vcPortfolio_AJ/myPokemon_AJ/public/assets/house"
+# 리포 폴더명/경로가 PC·이사에 따라 바뀌므로 스크립트 위치 기준 상대경로로 잡는다.
+PUB=os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),"..","..","public","assets","house"))
 os.makedirs(PUB, exist_ok=True)
 def b2s(x): return x.decode('utf-8','replace') if isinstance(x,(bytes,bytearray)) else str(x)
 def parse_table(ud):
