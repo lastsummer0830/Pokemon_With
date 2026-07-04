@@ -80,3 +80,30 @@ playwright 로컬설치됨(myPokemon_AJ/node_modules). chromium 시스템lib 없
 ## 이관/동기화
 - 코드·에셋·AGENTS.md·작업일지 = **git 커밋**(다음 세션/PC는 pull). memory(홈 `.claude`, 깃X)는 바탕화면 `PokemonWith_이관_0704/memory/`에 최신 사본 갱신.
 - 갱신 memory: `starter-lab-flow`(연구소 완성반영), `research-official-before-building`(신규·공식검증 교훈), `ask-check-with-localhost-url`(신규·확인요청시 주소동봉), MEMORY.md 색인.
+
+---
+
+# 0704 (세번째 세션 · dev PC=user) — 스타팅 선택 "원작화" + 버그수정
+
+## D. 스타팅 선택 화면 전면 재작성 v2 (사용자 "개판" 지적 → 원작 FRLG/AR대로)
+v1(커서로 훑고 탁자에 움직이는 포켓몬 세움)이 원작과 다르다고 격노 → 실제 게임 방식으로 교체. **중요장면은 실제 렌더+검증, 후보는 Pick에 실제 캡쳐로 보여주고 고르게** 하라는 규칙 재확인받음.
+- **탁자 위 포켓볼 3개**: `Object ball.png`(32px 시트) 프레임0을 초록탁자 칸 **(8,4)(9,4)(10,4)** 에 올림. 플레이어는 (8,5)(9,5)(10,5)에서 위보고 A. 탁자칸=원본PNG 32px격자 실측 확정.
+- **선택 = 포켓볼별 개별선택**(커서훑기·머리위 이름표 폐기). A→**정지 액자(정사각 프레임 + Front frame0 정지컷 중앙정렬)** + 하단 대화창.
+- **액자 스타일 3후보 실제 렌더비교**(`tools/shot-lab.mjs`, `01_Resources/Pick/09_스타팅선택/`): A크림/남색·B라벤더·C성별카드(황금/크림). → **사용자 선택 = C(인트로 성별카드와 통일된 크림 카드)**. `LabScene.frameStyle` 기본값 `card`, drawWindow에 3분기 남김.
+  - ⚠️ 처음에 후보를 `AskUserQuestion` ASCII mockup으로 물었다가 격노(규칙=Pick에 실제 렌더). memory `previews-where-user-sees`에 박음.
+- **대사 흐름(사용자 지정)**: 공식 도감소개(`○○. ○○타입, 분류.`)→공식 도감설명→오박사 "오,{이름}은 {포켓몬}가 마음에 드는 거니?" 예/아니오→"별명을 지어주겠니?" 예/아니오→**한글 별명입력(HTML input, 인트로 askName과 동일 IME)**→배웅. `Pokemon`에 `nickname?` 추가, 표시=`nickname??name`.
+- **한국어 조사 자동선택 `josa(word,kind)`**: 마지막 글자 받침((code-0xAC00)%28)로 은/는·이/가·을/를·과/와·(으)로. kind 문자열은 **[받침있음,받침없음] 순서**(한번 "와과" 뒤집어 버그냄→"과와" 수정).
+- **공식 도감 데이터**: PokeAPI `pokemon-species/{id}` genera·flavor(ko). ⚠️**나오하(906,9세대)는 PokeAPI에 ko도감 없음(en만)** → SV공식도감(pokemon.playgroup.kr/namu)에서 문장 인용. 파이리=도롱뇽포켓몬/개구마르=거품개구리포켓몬.
+
+## E. 버그 수정 2건 (실제 게임 검증)
+1. **나오하 스프라이트 깨짐(초록 스머지)** = 프레임규격 아니라 **WebGL 최대 텍스처폭(≈4096) 초과**. Front 애니시트 폭: 파이리2226·개구마르2976 OK, **나오하 5088>4096 → GPU가 텍스처 뭉갬 → frame0 크롭이 엉뚱한 픽셀**. 해결 `ensureStill(key)`: frame0만 fh×fh 캔버스로 그려 `addCanvas` 소형텍스처로 사용(캔버스는 크기제한 없음). 세 마리 통일. (몽타주가 픽셀 뭉개보인 건 PIL resize 탓, 게임은 NEAREST라 선명 — 별개)
+2. **가구·기계 밟힘** — blocked가 가구와 어긋남. 원본PNG 픽셀로 **바닥비율 자동판별**(밝고 저채도 mn>165&max-min<38, <70%면 blocked) 후 `oak_lab.json` 재생성. ⚠️**흰 회복기계는 밝아서 바닥 오판→수동 cols0-2/rows3-5 강제 막기**. 탁자·책장·화분·벽 막고 스폰(6,12)·선택칸(8-10,5)·중앙통로(5-7)·출구(6,13) 열기.
+- **검증**: playwright로 `scene.getScene("LabScene").walkable(x,y)` 직접 조회 → 가구 전부 false·통로 true 통과. (주행은 텐덤타이밍이라 1:1 안 맞음 → walkable() 조회가 확실. 키 이동은 `keyboard.down/up` 홀드라야 update의 isDown 폴링이 잡음.)
+
+## 커밋/이관 상태
+- 세션 중 커밋 `30a36b5 "0704"` = LabScene.ts·Pokemon.ts·DialogBox·shot-lab.mjs·shot-lab-flow.mjs 포함(그래서 diff 안 뜸). **미커밋 = `oak_lab.json`(충돌 재생성) + 임시스크립트 삭제 2개.** (커밋은 사용자 지시 대기)
+- 검증 툴 추가: `tools/shot-lab.mjs`(액자 후보 렌더), `tools/shot-lab-flow.mjs`(대사흐름 키입력 구동). LabScene에 프리뷰 훅 `init({preview,pick})` — `__game.scene.start("LabScene",{preview:"card"|"lavender"|"cream", pick:0~2 or -1})`로 특정 화면 직접 캡쳐(pick<0=맵만). DebugMenu 예/아니오 **기본커서=예** — 예 고르려면 ArrowUp 말고 Space만.
+- **memory 갱신분 이관 = 바탕화면 `PokemonWith_이관_0704/memory/`에 최신 사본 재복사(17:29).** 오늘 변경: `previews-where-user-sees`(후보는 실제렌더 Pick, ASCII금지), `starter-lab-flow`(v2 재작성·WebGL텍스처함정·충돌재작성), `research-official-before-building`, `ask-check-with-localhost-url`, MEMORY.md. skills 변경 없음.
+
+## 다음 세션 1순위(변동 없음)
+1. 집 거실 잘못된 맵(Map67→Map154 레드의집) 교체. 2. 정식 마을 타일맵. 3. 파티→배틀 연결+save 반영. 4. 스타팅 화면 폴리시 사용자 피드백 대기.
