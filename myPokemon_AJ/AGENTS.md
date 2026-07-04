@@ -31,7 +31,15 @@
   - 🟢 가장 쉬움: 폴더의 **`게임실행.bat` 더블클릭** (Windows. 최초엔 자동 npm install 후 실행)
   - 한 줄 명령: **`npm run app`** = dev서버 + 창을 한 번에 (wait-on으로 서버 뜬 뒤 electron 실행, 창 닫으면 둘 다 종료)
   - 수동(2터미널): `npm run dev` + `npm run electron`
-  - 진입점(main) = `electron/main.cjs`. .exe 패키징 = `npm run app:build`
+  - 진입점(main) = `electron/main.cjs`.
+- **⭐ 실행본(exe) 굽기 = 사용자가 더블클릭하는 본체 (2026-07 확정, 자세히는 memory `launch-via-bat-only`):**
+  - 사용자 본체 = `build_win/win-unpacked/PokemonWith.exe` (어나더레드 Game.exe 격). **코드 고치면 다시 굽기 전까진 exe에 반영 안 됨** — 굽기 빼먹으면 "안 바뀐다" 분노 발생.
+  - **평상시 굽기(코드만 변경) = `npm run app:bake`** (= `tools/bake-exe.sh`: build로 dist 굽고 기존 app.asar 안 dist만 교체 — 빠름).
+  - ⚠️ **`npm run app:build`(= 그냥 electron-builder)는 WSL에서 리눅스 타겟을 굽는 헛수고.** 전체 재빌드(electron/네이티브 의존성 변경)만 **`npx electron-builder --win --x64`** 사용.
+  - 굽기 전 **게임(PokemonWith.exe) 먼저 종료** (dll 잠기면 `unlinkat input/output error`로 실패): `powershell.exe -NoProfile -Command "Get-Process -Name 'PokemonWith' -EA SilentlyContinue | Stop-Process -Force"`.
+  - 출력 폴더 = **`build_win`** 으로 통일(package.json `directories.output`과 일치). 우회용 `build_new`는 폐기.
+  - 최상위·바탕화면 실행은 **바로가기(`.lnk`)** 로 제공(`Pokemon_With\PokemonWith.lnk`, `Desktop\PokemonWith.lnk` → build_win exe). exe는 옆 dll·app.asar와 같이 있어야 하니 **혼자 옮기면 깨짐.** `*.lnk`는 .gitignore. 폴더명 바꾸면 .lnk 재생성.
+  - 자주 굽지 말 것: 패키징(~200MB)은 변경량 무관 매번 일정시간 → 여러 수정 모아 dev로 확인 후 **체크포인트마다 1회만** 굽기.
   - WSLg에서 WebGL 막히면 `electron/main.cjs`의 `ignore-gpu-blocklist`/`enable-unsafe-swiftshader` 플래그가 풀어줌(실제 윈도우엔 영향 없음). WSL 실행 시 `--no-sandbox` 필요할 수 있음.
   - ⚠️ `npm install` 시 Electron 본체(~216MB)를 GitHub에서 받는데 `504` 뜨면 미러 사용:
     `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm install` (윈도우 CMD는 `set ELECTRON_MIRROR=...`)
@@ -42,6 +50,13 @@
   이게 없으면 코드를 고쳐도 브라우저에 반영이 안 되고, 서버 curl로는 새 코드가 보여서 디버깅이 미궁에 빠진다.
 - 코드 수정 후 화면이 안 바뀌면 → 브라우저에서 **`Ctrl+Shift+R`** (강력 새로고침) 한 번.
 - `localhost`는 윈도우에서 `wslrelay.exe`가 WSL 서버로 포워딩해준다 (정상).
+
+### ⭐ 집 내부 맵 충돌격자 규칙 (눈대중 금지 — 2026-07 확정, 자세히는 memory `collision-grid-from-raw-png`)
+- **충돌격자를 게임 실행화면 눈대중으로 찍지 말 것.** 매번 어긋난다(몇 주째 반복된 분노의 근본원인). 화면은 스케일·중앙정렬·스프라이트겹침으로 셀 경계를 착각하게 만든다.
+- **정답: 방 원본 PNG(`public/assets/house/*.png`, 640×480 = 20×15칸 ×32px)에 PIL로 32px 격자+좌표라벨+blocked/warp 오버레이를 얹어 셀↔가구 1:1로 맞춘다.** 가구 사각형 좌표로 blocked를 **스크립트 생성**(눈대중 숫자 타이핑 금지) → 원본에 다시 얹어 검증 → 게임 주행 검증. 큰 가구뿐 아니라 **작은 소품 픽셀까지** 훑는다.
+- **계단 규칙(사용자 확정):** 계단 그림의 **파란 난간은 밟기 금지(막음)**, **노란 발판만** 층이동. **카펫에서 계단으로 진입이 정답 루트.** rooms.json warp의 `climb`(=[[dx,dy],...] 경로)로 그림 계단방향대로 대각선 오르게 하고 도착점은 상대 계단 입구 아래로.
+- **가구 뒤로 지나가게 하는 평면 전경 오버레이 금지** — 캐릭터 머리가 잘려 보임(사용자 격노). `overImg`는 `setVisible(false)`로 꺼둠. 캐릭터를 그냥 앞에 그리는 게 표준(넣으려면 per-가구 Y정렬 필요).
+- **"고쳤는데 똑같다" 함정:** ①브라우저 HTTP 캐시 → `this.load` URL에 `?v=`+Date.now() + `cache.json.remove` ②vite dev서버는 켠 뒤 새로 만든 public 파일을 안 잡음(text/html 폴백) → **새 에셋 만들면 dev서버 재시작 필수**(`curl -w '%{content_type}'`가 image/png 아니면 재시작).
 
 ## 3. 폴더 구조 & 사용 규칙
 ```
@@ -101,7 +116,10 @@ myPokemon_AJ/
   애니 `.../{게임}/anim/normal/{이름}.gif`, HOME `sprites/home/normal/{이름}.png`, 아트워크 `artwork/large/{이름}.jpg`.
 
 ### C. Another Red (RPG Maker XP 팬게임, 로컬 원본) ⭐ 9세대 픽셀의 핵심
-- 원본 위치(현재 PC): `D:/Pokemon Another Red_PWT_250829/` (Graphics/ Audio/ Data/ ...).
+- 원본 위치는 **PC마다 다르다**(리포 밖 소스라 git 동기화 안 됨) — 절대경로를 맹신하지 말고 아래로 확인:
+  - **학원/현재 PC(user)**: `/mnt/d/Pokemon Another Red_PWT_250829/` (= `D:\Pokemon Another Red_PWT_250829\`).
+  - **집 PC(ONE)**: `/mnt/c/Users/ONE/Desktop/Pokemon Another Red_PWT_250829/` (작업일지에 이 경로로 적힐 수 있음 — 이 PC 얘기 아님).
+  - **못 찾으면 추측 말고 탐색**: `find /mnt/d /mnt/c/Users/*/Desktop -maxdepth 4 -iname "*Another*Red*" -type d`. (참고: MapInfos 기준 태초마을=Map055, 오박사 연구소 내부=Map157 "Pokémon Lab".)
 - **쓸 수 있는 것:** `Graphics/`(PNG 이미지) + `Audio/`(음악·효과음) + `Fonts/`. → public/assets로 복사해서 사용.
 - **못 쓰는 것:** `Data/*.rxdata` = RPG Maker 바이너리(맵 배치·Ruby 스크립트). **맵/스토리 로직은 직접 못 가져옴** → 타일셋 "그림"만 쓰고 맵 배열·로직은 Phaser로 재구성(참고용).
 - **포켓몬 Front 스프라이트 = 가로로 이어붙인 정사각 프레임 애니메이션 시트** (프레임=이미지높이, 개수=너비/높이). 9세대 전부 애니 포함(KORAIDON/OGERPON/SPRIGATITO...). 파일명 **대문자**, 변형은 `_1`,`_female` 등.

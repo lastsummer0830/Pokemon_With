@@ -34,7 +34,6 @@ export default class InteriorScene extends Phaser.Scene {
 
   private player!: Phaser.GameObjects.Sprite;
   private roomImg!: Phaser.GameObjects.Image;
-  private overImg!: Phaser.GameObjects.Image;      // 가구 전경 오버레이(캐릭터보다 위 depth) — 가구 뒤로 지나가게
   private stairsDeco!: Phaser.GameObjects.Image;   // 거실(1F)에 깔아주는 2층식 계단 그림
   private dbg?: Phaser.GameObjects.Graphics;       // 검증용 충돌/워프 오버레이
   private nemona?: Phaser.GameObjects.Sprite;      // 컷신용 라이벌 네모
@@ -90,9 +89,6 @@ export default class InteriorScene extends Phaser.Scene {
     this.load.json("rooms", "assets/house/rooms.json" + v);
     this.load.image("room_bedroom", "assets/house/red_room_2f.png" + v);
     this.load.image("room_living", "assets/house/red_living_1f_stairs.png" + v);
-    // 가구 전경 오버레이(막힌 칸=가구만 남긴 PNG) — 캐릭터가 가구 뒤로 지나가게 위에 덮는다.
-    this.load.image("over_bedroom", "assets/house/red_room_2f_over.png" + v);
-    this.load.image("over_living", "assets/house/red_living_1f_stairs_over.png" + v);
     this.load.image("stairs_living", "assets/house/stairs_living.png");
     this.load.audio("sfx_door", "assets/audio/door.ogg");
     const file = this.gender === "girl"
@@ -107,7 +103,7 @@ export default class InteriorScene extends Phaser.Scene {
     this.rooms = this.cache.json.get("rooms") as Rooms;
 
     // 도트는 또렷하게(픽셀 보존) — 화질 개선의 핵심
-    for (const k of ["room_bedroom", "room_living", "over_bedroom", "over_living", "stairs_living", "nemona", this.texKey]) {
+    for (const k of ["room_bedroom", "room_living", "stairs_living", "nemona", this.texKey]) {
       this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
     }
     this.cameras.main.roundPixels = true;   // 소수점 좌표로 인한 흐릿함 방지
@@ -120,9 +116,7 @@ export default class InteriorScene extends Phaser.Scene {
     // 거실 계단 그림 — 발판(아래끝)을 워프 칸 바닥에 맞춤. 바닥보다 위, 주인공보다 아래.
     this.stairsDeco = this.add.image(0, 0, "stairs_living").setOrigin(0, 1).setDepth(5).setVisible(false);
     this.player = this.add.sprite(0, 0, this.texKey, this.idleFrame.down).setOrigin(0.5, 1);
-    // 가구 전경 오버레이 — 캐릭터 위에 덮으면 가구 근처에서 머리가 잘려 보여서 끔(setVisible false).
-    //  (전경 오버레이 방식은 back wall/소품까지 머리를 가려 '대가리 잘림'이 생김. 캐릭터를 그냥 앞에 그린다.)
-    this.overImg = this.add.image(0, 0, "over_bedroom").setOrigin(0, 0).setDepth(15).setName("overImg").setVisible(false);
+    // (가구 전경 오버레이 방식은 back wall/소품까지 캐릭터 머리를 가려 '대가리 잘림'이 생겨 폐기. 캐릭터를 그냥 앞에 그린다. AGENTS.md 참고.)
     this.cursors = this.input.keyboard!.createCursorKeys();
 
     if (DEBUG_COLLISION) {
@@ -133,7 +127,7 @@ export default class InteriorScene extends Phaser.Scene {
 
     // 안내(컷신 동안엔 숨김)
     const name = this.playerName();
-    this.add.text(12, 12, `${name ? name + "  |  " : ""}방향키: 이동  |  계단: 위로↑ 올라가기  |  문: 마을로   ★맵수정판★`, {
+    this.add.text(12, 12, `${name ? name + "  |  " : ""}방향키: 이동  |  계단: 위로↑ 올라가기  |  문: 마을로`, {
       fontFamily: "Galmuri11, sans-serif", fontSize: "16px", color: "#ffffff",
       backgroundColor: "#00000077", padding: { x: 8, y: 4 },
     }).setName("hud").setScrollFactor(0).setDepth(100);
@@ -172,7 +166,6 @@ export default class InteriorScene extends Phaser.Scene {
     this.roomKey = key;
     this.def = this.rooms[key];
     this.roomImg.setTexture(key === "bedroom" ? "room_bedroom" : "room_living");
-    this.overImg.setTexture(key === "bedroom" ? "over_bedroom" : "over_living");
     this.tx = tx; this.ty = ty;
     this.facing = face;
     this.player.stop();
@@ -190,7 +183,6 @@ export default class InteriorScene extends Phaser.Scene {
     this.origin = { x: Math.round((width - w) / 2), y: Math.round((height - h) / 2) };
     this.tile = 32 * this.zoom;
     this.roomImg.setPosition(this.origin.x, this.origin.y).setScale(this.zoom);
-    this.overImg.setPosition(this.origin.x, this.origin.y).setScale(this.zoom);
 
     this.player.setScale(this.zoom * 0.92);
     this.player.setDepth(10);
