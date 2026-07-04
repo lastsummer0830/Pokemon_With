@@ -177,6 +177,7 @@ myPokemon_AJ/
 | 이런 말/의도가 보이면 | 발동할 스킬 |
 |---|---|
 | 실행·빌드·"왜 안 떠"·화면 안 바뀜·exe 다시 구워·스크린샷·플레이테스트 | `build-run-debug` |
+| 자동으로 클릭/이동 눌러보며 검증·"진짜 되는지 테스트"·콘솔 에러 잡기·특정 화면 자동확인(Playwright) | `webapp-testing` |
 | 배틀·전투·데미지 계산·타입 상성·기술/스탯 | `turn-battle-system` |
 | 마을맵·타일맵·칸(격자) 이동·충돌·문/워프 | `tiled-map-grid-movement` |
 | 스프라이트·에셋·타일셋·도감 받아·소스 비교·"후보 뽑아와" | `pokemon-asset-pipeline` |

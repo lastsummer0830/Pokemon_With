@@ -1,6 +1,6 @@
 ---
 name: webapp-testing
-description: Toolkit for interacting with and testing local web applications using Playwright. Supports verifying frontend functionality, debugging UI behavior, capturing browser screenshots, and viewing browser logs.
+description: Playwright로 로컬 웹앱(이 게임=localhost:5180)을 자동으로 열어 클릭·키입력·이동을 시뮬레이션하며 실제 동작을 검증하는 스킬. DOM/셀렉터 확인, 콘솔 에러 캡쳐, 특정 화면 스크린샷, UI 동작 디버깅. Toolkit for interacting with and testing local web applications using Playwright — verify frontend functionality, debug UI behavior, capture browser screenshots, view browser logs. 트리거 예: "자동으로 플레이해서 확인해줘", "버튼/이동 진짜 되는지 테스트", "콘솔 에러 잡아줘", "이 화면 실제로 동작하는지 검증해", "playwright로 눌러봐". (게임 그냥 켜기·빌드·exe 재굽기는 build-run-debug.)
 license: Complete terms in LICENSE.txt
 ---
 
