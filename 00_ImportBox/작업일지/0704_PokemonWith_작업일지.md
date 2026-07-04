@@ -47,3 +47,36 @@
 
 ## 플레이 검증 환경(이 PC, WSL)
 playwright 로컬설치됨(myPokemon_AJ/node_modules). chromium 시스템lib 없어서 `apt-get download libnss3 libnspr4`→dpkg-deb -x 추출→`LD_LIBRARY_PATH` 로 실행(경로는 scratchpad/sodir.txt). `window.__game`으로 씬 조작(scene.start), 키보드 주행. 자세히는 `collision-grid-from-raw-png` 메모리.
+> **추가(0704 두번째 세션):** playwright는 `chromium.launch({args:['--no-sandbox','--use-gl=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist']})` 로 headless 실행됨(WebGL swiftshader). `window.__game.scene.getScene('LabScene')` 로 씬 인스턴스의 tx/ty/busy/selecting 등 런타임 필드 직접 읽어 주행 검증. 키는 홀드 말고 `press`+240ms 간격으로 한 칸씩(홀드는 오버슛). 대화창은 타이핑식이라 Space 두 번(완료+넘김).
+
+---
+
+# 0704 (두번째 세션 · dev PC=user) — 환경정리 + 검증셋업 + 연구소(LabScene) 완성
+
+## A. 작업환경/규칙 정리 (커밋됨)
+- **0704 신규 규칙이 memory에만 있어 PC 넘어가면 증발**하던 것 → git-synced **AGENTS.md에 박음**: 충돌격자=원본PNG 32px·계단규칙·캐시/vite함정(`myPokemon_AJ/AGENTS.md` §2), exe굽기(app:bake·build_win·.lnk, ⚠️`app:build`는 WSL 리눅스타겟 헛수고), AR소스 **PC별 경로표+find 탐색**(§4C), 루트 AGENTS.md §3에 "PC절대경로 맹신금지·find확인·규칙은 memory아닌 AGENTS.md에".
+- **AR소스 경로 오판**: 작업일지의 ONE PC경로만 보고 "없다" 단정했다가 실제 `D:\Pokemon Another Red_PWT_250829`에 있음(user PC). → 규칙화.
+- 정리: 사장코드 `overImg` 전경오버레이 제거 + 임시표식 `★맵수정판★` 제거 + 안쓰는 `*_over.png` 삭제.
+
+## B. 검증 셋업 (커밋됨)
+- **webapp-testing 스킬** 설치(`.claude/skills/`, 공식 anthropics/skills) + 자연어 트리거 연결(§8 라우팅표).
+- **커밋 전 tsc 훅**(`.claude/settings.json` PreToolUse): `git commit` 시 `myPokemon_AJ`에서 `tsc --noEmit`, 타입에러면 커밋 차단(리포루트=`git rev-parse`라 PC무관).
+- AGENTS.md §4에 검증 워크플로(변경→`/verify`→`/code-review`→커밋).
+
+## C. 연구소(LabScene) 전면 재작성 — 오늘 핵심
+- **Map157 실제 내부맵 추출**: `tools/ar-map` 로직 재사용(AR=D:)해 `public/assets/world/oak_lab.png`+`oak_lab.json`. 검정 void 여백 크롭→13×14. 스폰(6,12)/출구(6,13)→마을(28,15).
+- **LabScene = 실내 타일맵+격자이동/충돌** 로 재작성(기존 사각형 배경 폐기). 오박사(8,3)·네모(11,3)·**스타팅 3마리를 초록탁자(8~9,4) 위에** 올림. 걸어가 탁자앞 Space→◀▶ 살펴보기(머리 위 `[타입]이름` 표)→예/아니오. **실제 포켓몬게임 방식(FRLG/SV 검색확인): 도감설명·박사낭독 없음.**
+- **공용 대화창 `src/ui/DialogBox.ts` 신규** — 집/인트로와 텍스트박스 통일(그동안 LabScene만 자체구현이라 튀던 것). InteriorScene의 HGSS 대화창을 컴포넌트화.
+- **공식 데이터 교정**(사용자 격노 반영): 물스타팅 **개구마르=Froakie #656**(내가 Sobble=울머기#816 넣었던 것 교체), 이름 **나오하**(냐오하 아님). 도감/분류 PokeAPI 공식.
+- **스프라이트 정렬 함정**: Front 프레임크기 제각각(파이리42/나오하·개구마르96px) → 픽셀스캔(frontMetrics)으로 내용경계 측정해 크기통일+발정렬. `getBounds`는 투명여백 포함이라 이름표 위치엔 실측값 사용.
+- **검증**: playwright 전구간 OK(개구마르 선택→파티 id656→출구→마을), 콘솔에러 0. DebugMenu 9번 진입.
+
+## ⚠️ 다음 세션 1순위 (남은 것)
+1. **집 거실이 잘못된 맵** — 현재 `Map67`('House'=화산섬 민가!)인데 진짜 주인공집은 **`Map154 레드의집`**(계단12,4↔방155·11,3 / 출구7,11→마을17,8). rooms.json+InteriorScene 교체. ⚠️충돌격자 재작성 주의(`collision-grid-from-raw-png` 규칙).
+2. 정식 마을 타일맵 다듬기 · 건물 충돌.
+3. 파티→배틀 연결(BattleScene 데모), save.ts에 playerParty 반영.
+4. 연구소 폴리시 여지: 탁자 위 포켓몬 위치/크기·이름표 톤(사용자 피드백 대기).
+
+## 이관/동기화
+- 코드·에셋·AGENTS.md·작업일지 = **git 커밋**(다음 세션/PC는 pull). memory(홈 `.claude`, 깃X)는 바탕화면 `PokemonWith_이관_0704/memory/`에 최신 사본 갱신.
+- 갱신 memory: `starter-lab-flow`(연구소 완성반영), `research-official-before-building`(신규·공식검증 교훈), `ask-check-with-localhost-url`(신규·확인요청시 주소동봉), MEMORY.md 색인.
