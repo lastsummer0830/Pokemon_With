@@ -45,6 +45,12 @@
 - 검증하지 못한 부분은 "검증 못 했다"고 **명확히 말한다.** 실행하지 않은 검증을 했다고 말하지 않는다.
 - 실패하면 같은 시도를 반복하지 말고 **원인부터 다시 본다.**
 - 작업이 끝나면 짧게 보고한다: **바꾼 파일 / 바꾼 내용 / 한 검증 / 못 한 것·남은 위험.**
+- **검증 도구(이미 설치됨 — 새로 만들지 말고 이걸 쓴다):**
+  - `/verify` — 앱을 실제로 띄워 변경이 동작하는지 확인(컴파일만 말고 "진짜 도냐").
+  - `/code-review` — 커밋 전 diff 버그·정리 리뷰(effort medium 권장). 품질만 정리는 `/simplify`.
+  - **`webapp-testing` skill**(`.claude/skills/webapp-testing/`) — Playwright로 localhost:5180 게임을 자동 플레이테스트·스샷·콘솔로그 확인. 실행 함정(포트 5180 고정, WSL libnss 우회)은 `build-run-debug` skill 참고.
+  - **커밋 전 tsc 훅**(`.claude/settings.json`의 PreToolUse): `git commit` 시 `myPokemon_AJ`에서 `tsc --noEmit`를 돌려 **타입에러가 있으면 커밋을 자동 차단**한다. 차단되면 타입부터 고친다(훅 무력화 금지).
+- **권장 흐름:** 변경 → `/verify`(실동작) → `/code-review` → 커밋(tsc 훅 통과 확인).
 
 ## 5. Git · 승인이 필요한 작업
 
