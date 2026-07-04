@@ -1,7 +1,8 @@
 // 포켓몬 한 마리가 가져야 하는 정보들의 "약속"
 export interface Pokemon {
   id: number;            // 도감 번호
-  name: string;          // 이름 (예: "파이리")
+  name: string;          // 이름 (종족명, 예: "파이리")
+  nickname?: string;     // 별명 (플레이어가 지어준 이름 — 없으면 종족명 사용)
   type: string;          // 속성 (예: "불꽃")
   level: number;         // 레벨
   maxHp: number;         // 최대 체력
