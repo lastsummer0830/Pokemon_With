@@ -40,3 +40,28 @@ export function makeAnimatedFront(
 
   return scene.add.sprite(x, y, sheetKey).setScale(scale).play(animKey);
 }
+
+// Front 시트의 "첫 프레임(정지컷)"만 안전하게 뽑아 이미지로 놓는다.
+//  넓은 애니 시트(폭 5000px+)는 WebGL 텍스처 한계로 통째 업로드하면 깨진다 → 캔버스로 96x96만 잘라 addCanvas.
+//  (배틀 배틀러처럼 애니 없이도 되는 곳에 쓴다. preload에서 frontPath image를 먼저 로드해둘 것.)
+export function makeStillFront(
+  scene: Phaser.Scene,
+  imageKey: string,
+  x: number,
+  y: number,
+  scale = 1,
+): Phaser.GameObjects.Image {
+  const src = scene.textures.get(imageKey).getSourceImage() as HTMLImageElement;
+  const fh = src.height; // 프레임 = 정사각(높이)
+  const stillKey = imageKey + "__still";
+  if (!scene.textures.exists(stillKey)) {
+    const cvs = document.createElement("canvas");
+    cvs.width = fh; cvs.height = fh;
+    const ctx = cvs.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(src, 0, 0, fh, fh, 0, 0, fh, fh); // 왼쪽 첫 프레임만
+    scene.textures.addCanvas(stillKey, cvs);
+    scene.textures.get(stillKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
+  }
+  return scene.add.image(x, y, stillKey).setScale(scale);
+}

@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { playBgm } from "../game/bgm";
 
 // 게임 메인(타이틀) 화면 — 가장 먼저 뜨는 화면.
 // 노을 마을 배경 + "Pokémon With" 로고 + 아래에 PRESS START! 안내.
@@ -11,10 +12,16 @@ export default class TitleScene extends Phaser.Scene {
     // 타이틀 배경(새 시작화면)과 로고. 둘 다 public/assets/title/ 에 있음.
     this.load.image("title_bg", "assets/title/title_bg_new.png");
     this.load.image("title_logo", "assets/title/logo.png");
+    // 시작 BGM — public/assets/audio/title_bgm.ogg (없으면 조용히 넘어감).
+    //  ★ 이 파일을 원하는 곡(DP 호수 테마 등)으로 교체하면 그게 시작 브금이 된다.
+    this.load.audio("bgm_title", "assets/audio/title_bgm.ogg");
   }
 
   create(): void {
     const { width, height } = this.scale;
+
+    // 시작 BGM 재생(타이틀→메뉴→인트로까지 이어짐). 자동재생 잠김이면 첫 입력 때 소리남.
+    playBgm(this, "bgm_title", 0.4);
 
     // 1) 배경 — 화면을 꽉 채우되 비율 유지(가장자리는 살짝 잘림 = cover 방식)
     const bg = this.add.image(width / 2, height / 2, "title_bg").setOrigin(0.5);

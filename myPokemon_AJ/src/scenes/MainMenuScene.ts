@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
 
 // 메인 메뉴 화면 — 타이틀(로고+PRESS START)에서 엔터/클릭하면 이 화면이 뜬다.
 // 톤 = 화이트/블루. 밝은 하늘 그라데 배경 + 몬스터볼(우하단) + AR식 가로 메뉴 바.
@@ -30,6 +31,7 @@ export default class MainMenuScene extends Phaser.Scene {
     this.load.image("menu_ball", "assets/title/menu_ball.png");         // 몬스터볼 스프라이트(별도)
     this.load.image("menu_bar", "assets/title/menu_bar.png");           // 메뉴 바(평소)
     this.load.image("menu_bar_sel", "assets/title/menu_bar_sel.png");   // 메뉴 바(선택)
+    preloadCommonAudio(this);
   }
 
   create(): void {
@@ -110,9 +112,11 @@ export default class MainMenuScene extends Phaser.Scene {
   private move(d: number): void {
     this.idx = (this.idx + d + this.items.length) % this.items.length;
     this.refresh();
+    playSfx(this, SFX.cursor, 0.4);
   }
 
   private choose(): void {
+    playSfx(this, SFX.decision, 0.45);
     const action = this.items[this.idx].action;
     if (action === "new") {
       this.cameras.main.fadeOut(250, 0, 0, 0);

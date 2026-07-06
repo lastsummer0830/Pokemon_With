@@ -1,5 +1,7 @@
 import Phaser from "phaser";
 import { Gender } from "../data/Player";
+import { playBgm } from "../game/bgm";
+import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 
 // 첫 마을 = 어나더레드 '태초마을'(Map55)을 소스에서 그대로 추출한 실제 맵.
 //  - 맵 이미지: assets/world/pallet_town.png (52x20칸, 32px 타일)
@@ -25,6 +27,7 @@ export default class WorldScene extends Phaser.Scene {
   private tile = 32 * SCALE;
   private tx = START.x; private ty = START.y;
   private moving = false; private busy = false;
+  private lastBump = 0;   // 벽 부딪힘 효과음 연타 방지용
 
   private warps: Warp[] = [
     { x: 28, y: 14, to: "lab", dir: "up" },                         // 포켓몬 연구소
@@ -44,7 +47,7 @@ export default class WorldScene extends Phaser.Scene {
     this.gender = (this.registry.get("playerGender") as Gender) ?? "boy";
     this.load.image("pallet", "assets/world/pallet_town.png?v=" + Date.now());
     this.load.json("pallet_col", "assets/world/pallet_town.json?v=" + Date.now());
-    this.load.audio("sfx_door", "assets/audio/door.ogg");
+    preloadCommonAudio(this);
     const file = this.gender === "girl" ? "assets/characters/trainer_DAWN.png" : "assets/characters/trainer_RED.png";
     this.load.spritesheet(this.texKey, file, { frameWidth: 32, frameHeight: 48 });
   }
@@ -72,6 +75,8 @@ export default class WorldScene extends Phaser.Scene {
     this.cameras.main.setRoundPixels(true);
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15);
     this.cameras.main.fadeIn(400, 0, 0, 0);
+
+    playBgm(this, BGM.town, 0.35); // 마을 BGM(팰릿타운 테마)
 
     // HUD(화면 고정)
     const name = (this.registry.get("playerName") as string) ?? "";
@@ -102,7 +107,11 @@ export default class WorldScene extends Phaser.Scene {
     else { this.player.stop(); this.player.setFrame(this.idleFrame[this.facing]); return; }
 
     const ntx = this.tx + dx, nty = this.ty + dy;
-    if (!this.walkable(ntx, nty)) { this.player.stop(); this.player.setFrame(this.idleFrame[this.facing]); return; }
+    if (!this.walkable(ntx, nty)) {
+      this.player.stop(); this.player.setFrame(this.idleFrame[this.facing]);
+      if (this.time.now - this.lastBump > 300) { playSfx(this, SFX.bump, 0.4); this.lastBump = this.time.now; } // 벽 부딪힘(연타 방지)
+      return;
+    }
 
     this.moving = true;
     this.player.play(`walk-${this.facing}`, true);
@@ -118,7 +127,7 @@ export default class WorldScene extends Phaser.Scene {
     if (w.dir && this.facing !== w.dir) return;
     this.busy = true;
     this.player.stop();
-    this.sound.play("sfx_door", { volume: 0.5 });
+    playSfx(this, SFX.doorIn, 0.5);
     this.cameras.main.fadeOut(320, 0, 0, 0);
     this.time.delayedCall(340, () => {
       if (w.to === "lab") this.scene.start("LabScene");

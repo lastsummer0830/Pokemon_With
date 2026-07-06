@@ -3,6 +3,8 @@ import { Gender } from "../data/Player";
 import { createPokemon, Pokemon } from "../data/Pokemon";
 import { frontPath } from "../game/pokemonSprite";
 import DialogBox from "../ui/DialogBox";
+import { playBgm } from "../game/bgm";
+import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 
 // 포켓몬 연구소(오박사 랩) — 어나더레드 실제 내부맵(Map157) 추출본.
 //  실제 FRLG/AR 스타팅 방식: 탁자 위에 "포켓볼 3개"가 놓여 있고, 플레이어가 포켓볼 하나 앞에 서서
@@ -67,6 +69,9 @@ export default class LabScene extends Phaser.Scene {
   preload(): void {
     this.gender = (this.registry.get("playerGender") as Gender) ?? "boy";
     const v = "?v=" + Date.now();
+    // ⚠️ Phaser는 같은 키가 캐시에 있으면 다시 안 받는다 → 맵/충돌 갱신이 반영되게 먼저 제거(재입장 시 최신 격자).
+    this.cache.json.remove("lab_col");
+    if (this.textures.exists("lab_map")) this.textures.remove("lab_map");
     this.load.image("lab_map", "assets/world/oak_lab.png" + v);
     this.load.json("lab_col", "assets/world/oak_lab.json" + v);
     this.load.spritesheet("oak", "assets/characters/trainer_PROFESSOR.png", { frameWidth: 32, frameHeight: 48 });
@@ -74,7 +79,8 @@ export default class LabScene extends Phaser.Scene {
     this.load.spritesheet("obj_ball", "assets/characters/Object ball.png", { frameWidth: 32, frameHeight: 32 });
     const hero = this.gender === "girl" ? "assets/characters/trainer_DAWN.png" : "assets/characters/trainer_RED.png";
     this.load.spritesheet(this.texKey, hero, { frameWidth: 32, frameHeight: 48 });
-    this.load.audio("sfx_door", "assets/audio/door.ogg");
+    preloadCommonAudio(this);
+    this.load.audio(BGM.lab, "assets/audio/bgm_lab.ogg"); // 연구소 전용 BGM(AR Lab 테마)
     for (const s of STARTERS) this.load.image(s.key, frontPath(s.key));
   }
 
@@ -87,6 +93,7 @@ export default class LabScene extends Phaser.Scene {
       if (this.textures.exists(k)) this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.cameras.main.setBackgroundColor("#000000");
 
+    playBgm(this, BGM.lab, 0.4); // 연구소 BGM — AR Map157의 실제 곡 'Lab'
     this.mapImg = this.add.image(0, 0, "lab_map").setOrigin(0, 0).setDepth(0);
     const mk = (key: string, frames: number[]) =>
       this.anims.create({ key: `lab-${key}`, frames: this.anims.generateFrameNumbers(this.texKey, { frames }), frameRate: 8, repeat: -1 });
@@ -128,15 +135,19 @@ export default class LabScene extends Phaser.Scene {
   }
 
   // Front 애니 시트(가로로 긴 5088px 등)를 GL에 그대로 올리면 WebGL 최대 텍스처폭(≈4096) 초과로
-  //  텍스처가 뭉개진다(나오하 스머지 버그). → frame0만 96×96 캔버스로 잘라 새 텍스처로 등록해 사용.
+  //  텍스처가 뭉개진다(나오하 스머지 버그). → frame0만 잘라 새 텍스처로 등록해 사용.
+  // ⚠️ 캔버스 텍스처(addCanvas)는 WebGL에서 setFilter(NEAREST)가 잘 안 먹혀 업스케일 시 흐려진다.
+  //   → 캔버스 안에서 미리 정수배(UP)로 nearest 확대해 고해상도로 구운 뒤, 표시 땐 항상 축소만 하게 한다(또렷).
+  private static readonly STILL_UP = 6;
   private ensureStill(key: string): string {
     const stillKey = key + "__still";
     if (this.textures.exists(stillKey)) return stillKey;
     const src = this.textures.get(key).getSourceImage() as HTMLImageElement;
     const fh = src.height;
-    const cvs = document.createElement("canvas"); cvs.width = fh; cvs.height = fh;
-    const ctx = cvs.getContext("2d")!; ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(src, 0, 0, fh, fh, 0, 0, fh, fh);   // 프레임0(왼쪽 정사각)만
+    const UP = LabScene.STILL_UP;
+    const cvs = document.createElement("canvas"); cvs.width = fh * UP; cvs.height = fh * UP;
+    const ctx = cvs.getContext("2d")!; ctx.imageSmoothingEnabled = false;   // 픽셀 보존(계단식 확대)
+    ctx.drawImage(src, 0, 0, fh, fh, 0, 0, fh * UP, fh * UP);   // 프레임0(왼쪽 정사각)을 UP배로 nearest 확대
     this.textures.addCanvas(stillKey, cvs);
     this.textures.get(stillKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
     return stillKey;
@@ -246,7 +257,7 @@ export default class LabScene extends Phaser.Scene {
     await this.dlg.say(pick.dex);
     // 2) 오박사 확인
     await this.dlg.say(`오, ${you}${this.josa(you, "은는")} ${pick.name}${this.josa(pick.name, "이가")} 마음에 드는 거니?`, "오박사");
-    if (!(await this.dlg.askYesNo())) { this.closeWindow(); this.dlg.hide(); this.busy = false; return; }
+    if (!(await this.dlg.askYesNo())) { await this.dlg.say("그래, 천천히 골라보렴.", "오박사"); this.closeWindow(); this.dlg.hide(); this.busy = false; return; }
     // 3) 별명 지어주기
     await this.dlg.say(`그래! 그럼 ${pick.name}에게 별명을 지어주겠니?`, "오박사");
     let nickname: string | undefined;
@@ -257,6 +268,7 @@ export default class LabScene extends Phaser.Scene {
     const party = (this.registry.get("playerParty") as Pokemon[]) ?? [];
     party.push(mon); this.registry.set("playerParty", party); this.registry.set("starterChosen", pick.key);
     this.chosen = true;
+    playSfx(this, SFX.pkmnGet, 0.6); // 포켓몬 획득 팡파레
     // 고른 포켓볼은 탁자에서 사라짐(플레이어가 가져감)
     this.tweens.add({ targets: this.balls[i], alpha: 0, duration: 250, onComplete: () => this.balls[i].setVisible(false) });
     this.closeWindow();
@@ -264,7 +276,8 @@ export default class LabScene extends Phaser.Scene {
     const disp = nickname ?? pick.name;
     if (nickname) await this.dlg.say(`${nickname}! 좋은 이름이구나.`, "오박사");
     await this.dlg.say(`${disp}${this.josa(disp, "과와")} 함께 좋은 여행이 되길 바란다!`, "오박사");
-    await this.dlg.say(`좋았어! ${you}, 나중에 꼭 나랑 배틀하자! 약속이야!`, "네모");
+    await this.dlg.say(`좋았어, 결정했구나! ${you}, 이제 우린 라이벌이야.`, "네모");
+    await this.dlg.say("언젠가 서로 전력을 다해 부딪히는 최고의 배틀 — 꼭 하자! 약속이야!", "네모");
     this.dlg.hide();
     this.hint.setText("아래 문으로 나가 마을로!").setVisible(true);
     this.busy = false;
@@ -341,7 +354,7 @@ export default class LabScene extends Phaser.Scene {
     await this.wait(450);
     await this.dlg.say(`오, ${name}! 잘 왔다.`, "오박사");
     await this.dlg.say("탁자 위 세 포켓볼이 네 첫 파트너 후보란다.", "오박사");
-    await this.dlg.say(`${name}! 나도 완전 두근두근해! 잘 골라봐!`, "네모");
+    await this.dlg.say(`${name}! 나까지 두근거리잖아! 네가 고른 파트너랑 배틀할 생각에 벌써 신난다고!`, "네모");
     await this.dlg.say("마음에 드는 포켓볼 앞에 서서 살펴보렴.", "오박사");
     this.dlg.hide();
     this.hint.setText("방향키: 이동  |  포켓볼 앞에서 Space: 살펴보기  |  아래 문: 나가기").setVisible(true);
@@ -351,11 +364,12 @@ export default class LabScene extends Phaser.Scene {
   private tryExit(): void {
     if (!this.chosen) {
       this.busy = true;
-      this.dlg.say("아직 파트너를 안 골랐잖니! 포켓볼 앞에서 골라보렴.", "오박사").then(() => { this.dlg.hide(); this.busy = false; });
+      const you = this.playerName();
+      this.dlg.say(`${you}, 파트너 없이 나가기엔 위험하단다. 어서 파트너를 골라보렴.`, "오박사").then(() => { this.dlg.hide(); this.busy = false; });
       return;
     }
     this.busy = true; this.player.stop();
-    this.sound.play("sfx_door", { volume: 0.5 });
+    playSfx(this, SFX.doorOut, 0.5);
     this.cameras.main.fadeOut(340, 0, 0, 0);
     const [tx, ty] = this.map.exit.toTown;
     this.time.delayedCall(360, () => this.scene.start("WorldScene", { spawn: [tx, ty], face: "down" }));

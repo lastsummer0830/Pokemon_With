@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { playSfx, SFX } from "../game/sfx";
 
 // 공용 HGSS 감성 대화창 — 집(InteriorScene)/인트로/연구소가 같은 박스를 쓰도록 뽑아낸 컴포넌트.
 //  스타일 기준: 크림 테두리(0xf6efd8) + 남색 본문(0x21314f) + 파란 내부선, 타자기 출력, 이름창, 예/아니오.
@@ -104,7 +105,7 @@ export default class DialogBox {
       const timer = this.scene.time.addEvent({
         delay: 38, loop: true, callback: () => { i++; this.boxText.setText(text.slice(0, i)); if (i >= text.length) finishTyping(); },
       });
-      const onAdvance = () => { if (typing) finishTyping(); else { cleanup(); resolve(); } };
+      const onAdvance = () => { if (typing) finishTyping(); else { playSfx(this.scene, SFX.decision, 0.4); cleanup(); resolve(); } };
       kb.on("keydown-SPACE", onAdvance); kb.on("keydown-ENTER", onAdvance); kb.on("keydown-Z", onAdvance);
       this.scene.input.on("pointerdown", onAdvance);
     });
@@ -134,9 +135,10 @@ export default class DialogBox {
     place();
     return new Promise((resolve) => {
       const kb = this.scene.input.keyboard!;
-      const move = (d: number) => { idx = (idx + d + opts.length) % opts.length; place(); };
+      const move = (d: number) => { idx = (idx + d + opts.length) % opts.length; place(); playSfx(this.scene, SFX.cursor, 0.4); };
       const up = () => move(-1); const down = () => move(1);
       const confirm = () => {
+        playSfx(this.scene, SFX.decision, 0.4);
         kb.off("keydown-UP", up); kb.off("keydown-DOWN", down);
         kb.off("keydown-ENTER", confirm); kb.off("keydown-Z", confirm); kb.off("keydown-SPACE", confirm);
         g.destroy(); rows.forEach((r) => r.destroy()); cursor.destroy();

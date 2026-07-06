@@ -1,5 +1,7 @@
 import Phaser from "phaser";
 import { Gender } from "../data/Player";
+import { stopBgm } from "../game/bgm";
+import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
 
 // 게임 인트로 — 옛날 픽셀 포켓몬 게임 오프닝 감성.
 // 어두운 스포트라이트 배경 → "…" → "여기는 어디지…?" → 오박사 등장 →
@@ -38,6 +40,7 @@ export default class IntroScene extends Phaser.Scene {
     this.load.image("intro_dark", "assets/intro/intro_dark.png"); // 시작 스포트라이트 배경
     this.load.image("boy_red", "assets/intro/boy_red.png");     // 남=1세대 RED
     this.load.image("girl_dawn", "assets/intro/girl_dawn.png"); // 여=4세대 DAWN
+    preloadCommonAudio(this);
   }
 
   create(): void {
@@ -56,7 +59,7 @@ export default class IntroScene extends Phaser.Scene {
     this.boxG = this.add.graphics();
     this.namePlate = this.add.graphics();
     this.boxText = this.add.text(0, 0, "", {
-      fontFamily: this.FONT, fontSize: "18px", color: "#ffffff", lineSpacing: 8,
+      fontFamily: this.FONT, fontSize: "18px", color: "#ffffff", lineSpacing: 5,
     }).setOrigin(0, 0);
     this.nameTag = this.add.text(0, 0, "", {
       fontFamily: this.FONT, fontSize: "18px", color: "#ffe27a",
@@ -92,8 +95,9 @@ export default class IntroScene extends Phaser.Scene {
     const h = Math.max(height * 0.24, 140);
     const x = (width - w) / 2;
     const y = height - h - Math.max(height * 0.04, 18);
-    const pad = Math.round(h * 0.16);
-    const font = Math.max(18, Math.round(h * 0.16));
+    // 오프닝 나레이션에 최대 4줄 문단이 있어 여백·폰트를 조금 줄여 한 박스에 담기게 함(박스 높이·위치는 그대로 → 성별/이름 화면 영향 없음).
+    const pad = Math.round(h * 0.13);
+    const font = Math.max(18, Math.round(h * 0.135));
     this.boxRect = { x, y, w, h, pad, font };
 
     this.drawBox();
@@ -186,7 +190,25 @@ export default class IntroScene extends Phaser.Scene {
     await this.say("…　…　…");
     await this.say("…　…　…　…？");
     await this.say("여기는… 어디지…?");
-    await this.wait(150);
+    await this.wait(400);
+
+    // ── 오프닝 나레이션(시작의 숲 · 잊혀진 유대) — 오박사 등장 전.
+    //    start02.txt 문단 그대로: 빈 줄=박스 하나, 박스 안 줄바꿈은 원문대로 \n 유지.
+    await this.say("……정신이 드나?");
+    await this.say("다행이군. 여긴 시작의 숲.\n아주 오래전, 인간과 포켓몬이\n처음 마음을 나누었다고 전해지는 곳이지.");
+    await this.say("그 시절의 인간과 포켓몬은 서로를 두려워하지 않았다.\n포켓몬은 인간의 도구가 아니었고,\n인간도 포켓몬의 주인이 아니었다.");
+    await this.say("하지만 시간이 흐르며 인간의 마음은 변해갔다.");
+    await this.say("더 강한 힘.\n더 많은 승리.\n더 큰 명예.\n그리고 더 많은 이익.");
+    await this.say("어느 순간부터 사람들은 포켓몬을\n친구가 아닌 수단으로 여기기 시작했다.");
+    await this.say("강한 포켓몬은 끝없는 배틀에 내몰렸고,\n약한 포켓몬은 쓸모없다는 이유로 버려졌다.");
+    await this.say("상처받은 포켓몬들은 하나둘 인간 곁을 떠났다.");
+    await this.say("누군가는 깊은 숲으로 숨어들었고,\n누군가는 폐허가 된 마을을 떠돌았으며,\n또 누군가는 다시는 인간을 믿지 않게 되었다.");
+    await this.say("그날 이후, 포켓몬과 마음을 나누는 일은\n더 이상 당연한 일이 아니게 되었다.");
+    await this.say("몬스터볼을 던진다고 해서,\n모두가 네 곁에 와주는 시대는 끝난 것이다.");
+    await this.say("너는 이제 여행을 떠나게 될 것이다.");
+    await this.say("상처받은 포켓몬들의 마음을 마주하고,\n잊혀진 유대를 되찾기 위한 길을 찾아라.");
+    await this.say("자, 이젠 눈을 떠야한다.\n네가 만들어갈 이야기는,\n이곳에서부터 시작된다.");
+    await this.wait(300);
 
     // 오박사 등장
     await this.showOak();
@@ -226,6 +248,7 @@ export default class IntroScene extends Phaser.Scene {
     this.registry.set("playerGender", gender);
     try { localStorage.setItem("myPokemon.intro", JSON.stringify({ name, gender })); } catch { /* 무시 */ }
 
+    stopBgm(); // 시작 BGM 종료 — 여기부터 실제 게임(집/월드)
     this.cameras.main.fadeOut(700, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("InteriorScene"));
   }
@@ -265,7 +288,7 @@ export default class IntroScene extends Phaser.Scene {
       });
       const onAdvance = () => {
         if (typing) finishTyping();
-        else if (waitInput) { cleanup(); resolve(); }
+        else if (waitInput) { playSfx(this, SFX.decision, 0.4); cleanup(); resolve(); }
       };
       if (waitInput) {
         this.input.keyboard!.on("keydown-SPACE", onAdvance);

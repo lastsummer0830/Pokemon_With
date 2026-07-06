@@ -39,7 +39,7 @@ export default class DebugMenuScene extends Phaser.Scene {
       ["3. 시작 집 - 침실(인트로부터)", "InteriorScene"],
       ["4. 시작 집 - 거실 바로가기", "InteriorScene", { room: "living", skipIntro: true }],
       ["5. 마을(World)", "WorldScene"],
-      ["6. 배틀(Battle)", "BattleScene"],
+      ["6. 배틀(Battle) - 야생 데모", "BattleScene", { wild: true }],
       ["7. 집 꾸미기(House)", "HouseScene"],
       ["8. 시작 집 - 침실 바로가기(skip)", "InteriorScene", { room: "bedroom", skipIntro: true }],
       ["9. 포켓몬 연구소(스타팅 선택)", "LabScene"],

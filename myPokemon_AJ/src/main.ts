@@ -9,6 +9,7 @@ import WorldScene from "./scenes/WorldScene";
 import LabScene from "./scenes/LabScene";
 import BattleScene from "./scenes/BattleScene";
 import HouseScene from "./scenes/HouseScene";
+import { loadArDb } from "./data/ar";
 
 // 게임을 켜는 시작 파일 (예전 스윙의 GameMain 역할)
 const config: Phaser.Types.Core.GameConfig = {
@@ -42,6 +43,8 @@ function loadFont(family: string, url: string, weight = "400") {
     return Promise.resolve();
   }
 }
+// AR 배틀 데이터(타입·종족·기술)도 미리 데워둔다(배틀 진입 지연 방지). 실패해도 게임은 켠다.
+loadArDb().catch(() => {});
 Promise.all([
   loadFont("Baloo 2", "assets/fonts/Baloo2-700.ttf", "700"),
   loadFont("Galmuri11", "assets/fonts/Galmuri11.ttf", "400"),

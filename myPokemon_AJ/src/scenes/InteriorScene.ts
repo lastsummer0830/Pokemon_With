@@ -1,5 +1,7 @@
 import Phaser from "phaser";
 import { Gender } from "../data/Player";
+import { playBgm } from "../game/bgm";
+import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 
 // ⚠️ 검증용 임시 오버레이 — 충돌(빨강)·워프(초록) 칸을 화면에 그린다. 확인 끝나면 false로.
 const DEBUG_COLLISION = false;
@@ -54,6 +56,7 @@ export default class InteriorScene extends Phaser.Scene {
   private ty = 0;
   private moving = false;                // 칸 사이 이동(트윈) 중인지
   private busy = false;                  // 워프/컷신 중 입력 잠금
+  private lastBump = 0;                  // 벽 부딪힘 효과음 연타 방지
 
   // ── 대화창(IntroScene과 같은 HGSS 감성) ──
   private readonly FONT = "Galmuri11";
@@ -90,7 +93,7 @@ export default class InteriorScene extends Phaser.Scene {
     this.load.image("room_bedroom", "assets/house/red_room_2f.png" + v);
     this.load.image("room_living", "assets/house/red_living_1f_stairs.png" + v);
     this.load.image("stairs_living", "assets/house/stairs_living.png");
-    this.load.audio("sfx_door", "assets/audio/door.ogg");
+    preloadCommonAudio(this);
     const file = this.gender === "girl"
       ? "assets/characters/trainer_DAWN.png"
       : "assets/characters/trainer_RED.png";
@@ -111,6 +114,8 @@ export default class InteriorScene extends Phaser.Scene {
     // 걷기 애니메이션(행0=아래,1=왼쪽,2=오른쪽,3=위, 각 4프레임)
     this.makeWalkAnims(this.texKey, "walk");
     this.makeWalkAnims("nemona", "nemona");
+
+    playBgm(this, BGM.town, 0.35); // 집 BGM(마을 테마와 동일 — 젠1 정통)
 
     this.roomImg = this.add.image(0, 0, "room_bedroom").setOrigin(0, 0).setName("roomImg");
     // 거실 계단 그림 — 발판(아래끝)을 워프 칸 바닥에 맞춤. 바닥보다 위, 주인공보다 아래.
@@ -254,7 +259,9 @@ export default class InteriorScene extends Phaser.Scene {
 
     const ntx = this.tx + dx, nty = this.ty + dy;
     if (!this.walkable(ntx, nty, this.facing)) {
-      this.player.stop(); this.player.setFrame(this.idleFrame[this.facing]); return;
+      this.player.stop(); this.player.setFrame(this.idleFrame[this.facing]);
+      if (this.time.now - this.lastBump > 300) { playSfx(this, SFX.bump, 0.4); this.lastBump = this.time.now; }
+      return;
     }
 
     this.moving = true;
@@ -272,7 +279,7 @@ export default class InteriorScene extends Phaser.Scene {
     // 방향 지정 워프(계단/문)는 그 방향으로 "들어설 때"만 발동 → 옆으로 지나가다 발동하는 버그 방지.
     if (w.dir && this.facing !== w.dir) return;
     this.busy = true;
-    this.sound.play("sfx_door", { volume: 0.6 });
+    playSfx(this, SFX.doorIn, 0.6);
     // 계단: climb 경로가 있으면 그 칸을 따라 올라선 뒤 전환. 없으면(정통 포켓몬식) 밟는 즉시 전환.
     //  → 방향 시비(직진/대각선)를 없애려면 climb를 빼서 '밟으면 바로 내려감'으로 둔다.
     if (w.kind === "stairs" && Array.isArray(w.climb) && w.climb.length) {
@@ -338,31 +345,38 @@ export default class InteriorScene extends Phaser.Scene {
     await this.say(`${name}은(는) 방에서 눈을 떴다.`);
     await this.say("띵— 동—");
     await this.say(`어머, 왔니? ${name}은(는) 2층에 있단다.`, "엄마");
-    await this.say("터벅… 터벅…");
-
-    // 네모가 계단(10,3)에서 방으로 올라온다
+    // 네모가 계단으로 올라온다 — 걷는 동안 "터벅 터벅" 발소리만 띄운다(별도 나레이션 없음)
     this.nemona = this.add.sprite(this.cx(10), this.cy(3), "nemona", 0)
       .setOrigin(0.5, 1).setScale(this.zoom * 0.92).setDepth(10);
-    await this.walkNemona([[10, 3], [11, 3], [11, 5], [9, 5]], "down");
-    // 주인공이 네모를 바라봄(위쪽)
+    this.setDialogVisible(true); this.setSpeaker(null); this.arrow.setVisible(false);
+    this.boxText.setText("터벅… 터벅…");
+    // 계단(10,3)에서 오른쪽(11열)으로 빠져 내려온 뒤, 주인공(8,9) 바로 위 (8,8)까지 걸어와 마주 선다.
+    //  → 멀리서 멈추지 않고 플레이어 앞에 와서, 아래(플레이어)를 바라본 채 대화한다.
+    await this.walkNemona([[10, 3], [11, 3], [11, 8], [8, 8]], "down");
+    // 주인공도 네모(바로 위)를 바라봄(위쪽) → 서로 정면으로 마주봄
     this.facing = "up"; this.player.setFrame(this.idleFrame.up);
     await this.wait(150);
 
-    await this.say(`${name}! 좋은 아침!`, "???");
+    await this.say(`${name}—! 좋은 아침!! ……앗, 아직 잠이 덜 깬 얼굴인데?`, "???");
     await this.say("너는…?", name);
-    await this.say("응? 네모잖아! 잠이 덜 깼구나—!", "네모");
-    await this.say(`${name}! 오늘 오박사님께 가기로 한 날이잖아! 잊은 거 아니지?`, "네모");
+    await this.say("에이, 나야 나! 네모! 아침부터 그런 멍한 표정 짓지 말라고~", "네모");
+    await this.say(`${name}, 오늘 드디어 오박사님한테 첫 파트너를 받는 날이잖아!`, "네모");
+    await this.say("난 어젯밤부터 두근거려서 잠도 설쳤다니까!", "네모");
+    await this.say("설마 잊은 건 아니지?", "네모");
 
     const yes = await this.askYesNo();
     if (yes) {
-      await this.say("좋아! 얼른 준비해서 나와! 먼저 연구소에 가서 기다릴게!", "네모");
+      await this.say(`역시 ${name}! 좋아, 난 먼저 연구소 가서 몸 풀고 있을게.`, "네모");
+      await this.say("네가 파트너를 고르면 — 바로 나랑 첫 배틀이다! 얼른 와!", "네모");
     } else {
-      await this.say("뭐!? 와보길 잘했네! 얼른 준비해서 나와! 먼저 연구소에 가서 기다릴게!", "네모");
+      await this.say("뭐어?! 이런 걸 잊으면 어떡해~", "네모");
+      await this.say("얼른 준비하고 나와! 연구소에서 기다릴게. 배틀 생각에 벌써 근질근질하다고!", "네모");
     }
 
-    // 네모가 다시 계단으로 내려간다 → 주인공이 지켜봄
-    await this.walkNemona([[9, 5], [11, 5], [11, 3], [10, 3]], "up");
-    this.sound.play("sfx_door", { volume: 0.5 });
+    // (8,8)에서 오른쪽(11열)으로 빠져 계단(10,3)으로 가 사라진다. 계단은 아래-왼쪽으로 내려가므로
+    //  마지막 걸음(왼쪽=계단 방향) 그대로 "left"로 서서 계단을 바라본 채 사라진다(위=벽 보게 하지 않음).
+    await this.walkNemona([[8, 8], [11, 8], [11, 3], [10, 3]], "left");
+    playSfx(this, SFX.doorOut, 0.5);
     await this.fadeOutNemona();
     await this.wait(200);
 
