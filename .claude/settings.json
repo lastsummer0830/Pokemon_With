@@ -1,6 +1,11 @@
 {
   "skillListingBudgetFraction": 0.02,
   "skillListingMaxDescChars": 1536,
+  "permissions": {
+    "deny": [
+      "Read(00_ImportBox/Important/**)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
