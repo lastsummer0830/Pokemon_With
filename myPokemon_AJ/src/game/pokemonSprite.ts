@@ -8,6 +8,43 @@ export function frontPath(name: string): string {
   return `assets/pokemon/front/${name.toUpperCase()}.png`;
 }
 
+// 포켓몬 이름 → Back(뒷모습) 이미지 경로. 내 포켓몬은 배틀에서 뒷모습을 쓴다.
+// (AR Back도 Front와 동일한 "정사각 프레임 애니 시트"라 makeStillFront/makeAnimatedFront 그대로 사용 가능)
+export function backPath(name: string): string {
+  return `assets/pokemon/back/${name.toUpperCase()}.png`;
+}
+
+// 포켓몬 이름 → 파티/박스용 아이콘 경로. 아이콘 시트 = 128x64 (=64x64 2프레임, 까딱이는 애니).
+export function iconPath(name: string): string {
+  return `assets/pokemon/icons/${name.toUpperCase()}.png`;
+}
+
+// 아이콘(64x64 2프레임)을 스프라이트로 배치(2프레임 까딱 애니). preload에서 iconPath image를 먼저 로드해둘 것.
+// 파티창·박스 그리드 양쪽에서 공용으로 쓴다.
+export function makePartyIcon(
+  scene: Phaser.Scene,
+  imageKey: string,
+  x: number,
+  y: number,
+  scale = 1,
+): Phaser.GameObjects.Sprite {
+  const img = scene.textures.get(imageKey).getSourceImage() as HTMLImageElement;
+  const sheetKey = imageKey + "__icon";
+  if (!scene.textures.exists(sheetKey)) {
+    scene.textures.addSpriteSheet(sheetKey, img as any, { frameWidth: 64, frameHeight: 64 });
+    scene.textures.get(sheetKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
+  }
+  const animKey = imageKey + "__iconanim";
+  if (!scene.anims.exists(animKey)) {
+    scene.anims.create({
+      key: animKey,
+      frames: scene.anims.generateFrameNumbers(sheetKey, { start: 0, end: 1 }),
+      frameRate: 3, repeat: -1,
+    });
+  }
+  return scene.add.sprite(x, y, sheetKey).setScale(scale).play(animKey);
+}
+
 // preload 에서 frontPath 로 image 를 먼저 불러온 뒤, create 에서 이 함수로 애니메이션 스프라이트를 만든다.
 // imageKey = preload 때 쓴 키.
 export function makeAnimatedFront(

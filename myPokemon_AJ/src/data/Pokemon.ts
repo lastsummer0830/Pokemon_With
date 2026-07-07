@@ -36,6 +36,7 @@ export interface Pokemon {
 
   heldItem: string | null; // ★ 지닌 도구 (없으면 null)
   condition: number;       // ★ 컨디션(집에서 쉰 정도) — 집 꾸미기와 배틀을 잇는 값
+  gender: "male" | "female" | null; // 성별(무성=null). 파티/상세창 ♀♂ 표시용.
 }
 
 // 표시 이름(별명 우선)
@@ -75,6 +76,7 @@ export function createFromSpecies(speciesId: string, level = 5): Pokemon {
       speciesId: key, id: 0, name: key, types: ["NORMAL"], type: "NORMAL", level,
       maxHp: 20, currentHp: 20, attack: 10, defense: 10, spAttack: 10, spDefense: 10, speed: 10,
       moves: [{ id: "TACKLE", pp: 35, maxPp: 35 }], status: null, heldItem: null, condition: 0,
+      gender: Math.random() < 0.5 ? "male" : "female",
     };
   }
   const b: BaseStats = sp.baseStats;
@@ -97,6 +99,7 @@ export function createFromSpecies(speciesId: string, level = 5): Pokemon {
     status: null,
     heldItem: null,
     condition: 0,
+    gender: Math.random() < 0.5 ? "male" : "female",
   };
 }
 
@@ -107,6 +110,6 @@ export function createPokemon(name: string, type: string): Pokemon {
     speciesId: name.toUpperCase(), id: 0, name, types: [type], type, level: 5,
     maxHp: 30, currentHp: 30, attack: 10, defense: 10, spAttack: 10, spDefense: 10, speed: 10,
     moves: [{ id: "TACKLE", pp: 35, maxPp: 35 }], status: null,
-    heldItem: null, condition: 0,
+    heldItem: null, condition: 0, gender: null,
   };
 }

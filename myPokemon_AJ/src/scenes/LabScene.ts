@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { Gender } from "../data/Player";
-import { createPokemon, Pokemon } from "../data/Pokemon";
+import { createFromSpecies, Pokemon } from "../data/Pokemon";
+import { loadArDb } from "../data/ar";
 import { frontPath } from "../game/pokemonSprite";
 import DialogBox from "../ui/DialogBox";
 import { playBgm } from "../game/bgm";
@@ -263,7 +264,9 @@ export default class LabScene extends Phaser.Scene {
     let nickname: string | undefined;
     if (await this.dlg.askYesNo()) nickname = await this.askNickname(pick.name);
 
-    const mon: Pokemon = createPokemon(pick.name, pick.type); mon.id = pick.id;
+    // AR 종족 데이터로 실제 스탯·기술·속성을 갖춘 스타터를 만든다(예전 createPokemon 폴백=HP30·몸통박치기뿐이라 배틀 불가).
+    await loadArDb();
+    const mon: Pokemon = createFromSpecies(pick.key, 5); mon.id = pick.id;
     if (nickname) mon.nickname = nickname;
     const party = (this.registry.get("playerParty") as Pokemon[]) ?? [];
     party.push(mon); this.registry.set("playerParty", party); this.registry.set("starterChosen", pick.key);

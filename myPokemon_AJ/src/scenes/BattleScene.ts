@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { frontPath, makeStillFront } from "../game/pokemonSprite";
+import { frontPath, backPath, makeStillFront } from "../game/pokemonSprite";
 import { Pokemon, MoveSlot, createFromSpecies, displayName } from "../data/Pokemon";
 import { loadArDb, getMove } from "../data/ar";
 import { performMove, movesFirst, isFainted, effectivenessText } from "../systems/battle";
@@ -19,6 +19,8 @@ export interface BattleInit {
   ally?: Pokemon;
   enemy?: Pokemon;
   wild?: boolean;   // 야생 여부(도망 가능)
+  returnPos?: [number, number]; // 배틀 끝나고 돌아갈 월드 좌표(승리/도망 시)
+  returnFacing?: "down" | "left" | "right" | "up";
 }
 
 // HP 박스 한 개(이름/레벨/HP바)를 그리고 갱신하는 작은 헬퍼.
@@ -87,6 +89,9 @@ export default class BattleScene extends Phaser.Scene {
   private pendingEnemy: Pokemon | null = null;
   private allySpecies = "charmander";
   private enemySpecies = "pidgey";
+  private outcome: "win" | "lose" | "run" = "win";  // 배틀 결과
+  private returnPos: [number, number] | undefined;   // 승리/도망 시 돌아갈 좌표
+  private returnFacing: "down" | "left" | "right" | "up" = "down";
 
   constructor() { super("BattleScene"); }
 
@@ -97,11 +102,14 @@ export default class BattleScene extends Phaser.Scene {
     this.wild = data?.wild ?? true;
     this.allySpecies = (data?.ally?.speciesId ?? "CHARMANDER").toLowerCase();
     this.enemySpecies = (data?.enemy?.speciesId ?? "PIDGEY").toLowerCase();
+    this.returnPos = data?.returnPos;
+    this.returnFacing = data?.returnFacing ?? "down";
+    this.outcome = "win";
   }
 
   preload(): void {
-    this.load.image("battle_ally", frontPath(this.allySpecies));
-    this.load.image("battle_enemy", frontPath(this.enemySpecies));
+    this.load.image("battle_ally", backPath(this.allySpecies));   // 내 포켓몬 = 뒷모습
+    this.load.image("battle_enemy", frontPath(this.enemySpecies)); // 상대 = 앞모습
     preloadCommonAudio(this);
     this.load.audio(BGM.battle, "assets/audio/bgm_battle.ogg"); // 배틀 전용 BGM
   }
@@ -165,7 +173,7 @@ export default class BattleScene extends Phaser.Scene {
     while (true) {
       const choice = await this.selectCommand();
       if (choice === "run") {
-        if (this.wild) { playSfx(this, SFX.flee, 0.5); await this.dlg.say("무사히 도망쳤다!"); break; }
+        if (this.wild) { this.outcome = "run"; playSfx(this, SFX.flee, 0.5); await this.dlg.say("무사히 도망쳤다!"); break; }
         await this.dlg.say("도망칠 수 없다!");
         continue;
       }
@@ -190,7 +198,21 @@ export default class BattleScene extends Phaser.Scene {
       if (ended) break;
     }
 
-    this.time.delayedCall(400, () => this.scene.start("WorldScene"));
+    await this.endBattle();
+  }
+
+  // 배틀 종료 처리: 패배=파티 전체 회복 후 집으로(화이트아웃) / 승리·도망=원위치 월드 복귀.
+  private async endBattle(): Promise<void> {
+    if (this.outcome === "lose") {
+      await this.dlg.say("눈앞이 깜깜해졌다...");
+      const party = this.registry.get("playerParty") as Pokemon[] | undefined;
+      party?.forEach((p) => { p.currentHp = p.maxHp; p.status = null; }); // 집에서 요양 → 전원 회복
+      this.cameras.main.fadeOut(450, 0, 0, 0);
+      this.time.delayedCall(500, () => this.scene.start("InteriorScene", { room: "living", skipIntro: true }));
+    } else {
+      this.time.delayedCall(300, () =>
+        this.scene.start("WorldScene", { spawn: this.returnPos, face: this.returnFacing }));
+    }
   }
 
   // 한 포켓몬이 기술 하나 사용 → 메시지 + HP 연출
@@ -219,10 +241,12 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   private async win(): Promise<void> {
+    this.outcome = "win";
     this.fadeOutSprite(this.enemySprite);
     await this.dlg.say(`상대 ${displayName(this.enemy)}을(를) 쓰러뜨렸다!`);
   }
   private async lose(): Promise<void> {
+    this.outcome = "lose";
     this.fadeOutSprite(this.allySprite);
     await this.dlg.say(`${displayName(this.ally)}은(는) 쓰러졌다...`);
   }

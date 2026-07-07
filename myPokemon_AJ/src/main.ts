@@ -9,6 +9,7 @@ import WorldScene from "./scenes/WorldScene";
 import LabScene from "./scenes/LabScene";
 import BattleScene from "./scenes/BattleScene";
 import HouseScene from "./scenes/HouseScene";
+import MenuScene from "./scenes/MenuScene";
 import { loadArDb } from "./data/ar";
 
 // 게임을 켜는 시작 파일 (예전 스윙의 GameMain 역할)
@@ -22,7 +23,7 @@ const config: Phaser.Types.Core.GameConfig = {
     height: "100%",
   },
   // 맨 앞 씬이 가장 먼저 실행됨. Title → Intro(성별·이름) → Interior(시작 집: 방2층↔거실1층) → World 순서.
-  scene: [TitleScene, MainMenuScene, IntroScene, InteriorScene, BedroomScene, DebugMenuScene, WorldScene, LabScene, BattleScene, HouseScene],
+  scene: [TitleScene, MainMenuScene, IntroScene, InteriorScene, BedroomScene, DebugMenuScene, WorldScene, LabScene, BattleScene, HouseScene, MenuScene],
 };
 
 // ★ 게임 시작 전에 폰트를 확실히 로드한다.

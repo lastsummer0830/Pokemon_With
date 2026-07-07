@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { Gender } from "../data/Player";
+import { Pokemon } from "../data/Pokemon";
 import { playBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 
@@ -83,7 +84,13 @@ export default class WorldScene extends Phaser.Scene {
     this.add.text(12, 12, `${name ? name + "  |  " : ""}방향키: 이동  |  연구소 문으로 들어가기`, {
       fontFamily: "Galmuri11, sans-serif", fontSize: "16px", color: "#ffffff", backgroundColor: "#00000088", padding: { x: 8, y: 4 },
     }).setScrollFactor(0).setDepth(100);
-    this.input.keyboard!.on("keydown-B", () => this.scene.start("BattleScene"));
+    // (임시 디버그) B키 = 야생 배틀. 내 파티 선두를 아군으로 넘긴다(없으면 BattleScene 데모 폴백).
+    this.input.keyboard!.on("keydown-B", () => this.startWildBattle());
+    // Enter/X = 인게임 메뉴(포켓몬/가방/저장) 오버레이 열기.
+    this.input.keyboard!.on("keydown-ENTER", () => this.openMenu());
+    this.input.keyboard!.on("keydown-X", () => this.openMenu());
+    // 메뉴 닫혀 이 씬이 재개되면 입력을 다시 켠다.
+    this.events.on(Phaser.Scenes.Events.RESUME, () => { this.input.enabled = true; });
   }
 
   private cx(tx: number): number { return (tx + 0.5) * this.tile; }
@@ -119,6 +126,22 @@ export default class WorldScene extends Phaser.Scene {
       targets: this.player, x: this.cx(ntx), y: this.cy(nty), duration: 150,
       onComplete: () => { this.tx = ntx; this.ty = nty; this.moving = false; this.handleWarp(); },
     });
+  }
+
+  // 인게임 메뉴 열기: 이 씬을 멈추고 입력을 끈 뒤 MenuScene을 오버레이로 띄운다.
+  private openMenu(): void {
+    if (this.busy || this.moving) return;
+    this.input.enabled = false;
+    this.scene.pause();
+    this.scene.launch("MenuScene", { from: "WorldScene" });
+  }
+
+  // 야생 배틀 시작: 내 파티 선두를 아군으로 넘긴다(없으면 BattleScene 데모 폴백).
+  private startWildBattle(): void {
+    if (this.busy || this.moving) return;
+    const party = this.registry.get("playerParty") as Pokemon[] | undefined;
+    const ally = party && party.length ? party[0] : undefined;
+    this.scene.start("BattleScene", { ally, wild: true, returnPos: [this.tx, this.ty], returnFacing: this.facing });
   }
 
   private handleWarp(): void {

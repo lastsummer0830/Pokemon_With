@@ -38,6 +38,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'd=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -f \"$d/.claude/hooks/guard-ui-edit.sh\" ] && bash \"$d/.claude/hooks/guard-ui-edit.sh\" || exit 0'",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }
