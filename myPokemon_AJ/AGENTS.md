@@ -128,6 +128,18 @@ myPokemon_AJ/
 - 더 필요할 때(뒷모습·Followers·트레이너배틀·배경·UI): `node tools/import-from-anotherred.mjs "<AR경로>" <back|followers|trainers|battlebacks|ui>`.
 - ⚠️ 팬게임 에셋 → **개인 포트폴리오·비상업 한정.** 재배포/상업화 금지. 무거우니 git엔 쓰는 것만 골라 넣는다.
 
+### D. PokeRogue (사용자 포크) ⭐ 폴백 소스 — AR·공식에 마땅한 게 없을 때만
+> **우선순위: ① Another Red(C) / 공식(PokeAPI A) 를 먼저 뒤진다. 거기서 마땅한 게 안 나올 때에만 여기서 찾는다.** (사용자 지정, 2026-07-07)
+- 게임 레포: **https://github.com/lastsummer0830/pokerogue** (사용자 포크. 상류 `pagefaultgames/pokerogue`. Phaser3+TS라 우리와 같은 스택 — 로더 방식 참고 가능. default branch = `beta`).
+- **에셋은 이 레포 안에 없다 — git 서브모듈이다.** 실제 에셋 본체 = **`pagefaultgames/pokerogue-assets`** (branch `beta`). 브라우징·다운로드는 여기로.
+  - raw 베이스(다운로드용): `https://raw.githubusercontent.com/pagefaultgames/pokerogue-assets/beta/<경로>`. raw.githubusercontent은 **CORS 열림** → 급하면 URL 직접 로드도 되지만, 무거우니 **쓸 것만 골라 `public/assets/`로 복사**해 쓴다(§3).
+- **폴더 구조**(`pokerogue-assets/`): `images/`(스프라이트·UI) · `audio/`(BGM·SFX) · `battle-anims/`(배틀 애니) · `fonts/`.
+  - `images/pokemon/` = 포켓몬 배틀 스프라이트(gen5풍 **애니 도트**, front/back/shiny/variant/exp/female 하위). ⚠️ **AR Front처럼 단순 정사각 프레임이 아니라 PNG+JSON 아틀라스(atlas)** — Phaser `load.atlas`로 로드(naive 프레임 슬라이스 금지).
+  - 포켓몬 아이콘 = images 루트의 `pokemon_icons_<세대>.png`+`.json` 아틀라스.
+  - `images/character/` = 트레이너·NPC·플레이어 오버월드. `images/arenas/` = 배틀 배경. 그 외 `pokeball/ items/ egg/ effects/ inputs/ cg/ mystery-encounters/`.
+- ⚠️ **화풍 = 픽셀 전용 규칙(§1.5) 준수**: PokeRogue 스프라이트는 도트라 OK. 로고·CG·mp4 같은 매끈한 건 인게임 금지.
+- ⚠️ **라이선스: 게임코드 AGPL-3.0, 에셋 레포는 자체 `LICENSES/`+`REUSE.toml`(스프라이트별 상이, 다수 CC 계열).** AR과 동일하게 **개인 포트폴리오·비상업 한정**으로만 쓴다. 상업화/재배포 금지.
+
 ### 공통 규칙
 - **GIF는 Phaser가 첫 프레임만 읽는다.** 움직이는 도트가 필요하면 GIF → 스프라이트시트로 변환 후 로드. (Another Red Front는 이미 PNG 시트라 바로 애니됨)
 - 자주 쓰는 에셋은 `npm run fetch <도감번호...>` 로 받아 `public/assets/pokemon/`에 두면 빠르고 오프라인 OK.

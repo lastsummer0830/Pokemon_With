@@ -7,6 +7,17 @@
     ]
   },
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'd=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -f \"$d/.claude/hooks/remind.sh\" ] && bash \"$d/.claude/hooks/remind.sh\"; exit 0'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -15,6 +26,16 @@
             "type": "command",
             "command": "bash -c 'cat | grep -q \"git commit\" || exit 0; r=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0; cd \"$r/myPokemon_AJ\" || exit 0; o=$(npx tsc --noEmit 2>&1) || { echo \"tsc 타입에러 - 커밋 차단. 고친 뒤 다시 커밋:\" >&2; echo \"$o\" | head -30 >&2; exit 2; }'",
             "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'd=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -f \"$d/.claude/hooks/guard-map-edit.sh\" ] && bash \"$d/.claude/hooks/guard-map-edit.sh\" || exit 0'",
+            "timeout": 10
           }
         ]
       }
