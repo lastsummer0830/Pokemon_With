@@ -37,10 +37,14 @@ changed = [c for c in changed if os.path.exists(c)]
 if not changed:
     sys.exit(0)  # UI 변경 없음 → 통과
 newest_ui = max(os.path.getmtime(c) for c in changed)
+import re as _re
 pngs = glob.glob(os.path.join(root, ".claude/.verify", "*.png"))
+# '아무 스샷이나' 통과 방지 — 레퍼런스와 나란히 비교한 증거만 인정(파일명에 compare/montage/vs/비교/나란히/diff).
+cmp_tok = _re.compile(r"(compare|montage|vs|비교|나란히|diff)", _re.I)
+pngs = [p for p in pngs if cmp_tok.search(os.path.basename(p))]
 newest_ev = max((os.path.getmtime(p) for p in pngs), default=0.0)
 if newest_ev >= newest_ui:
-    sys.exit(0)  # 편집 후 캡쳐 증거 있음 → 통과
+    sys.exit(0)  # 편집 후 '비교' 캡쳐 증거 있음 → 통과
 rels = ", ".join(os.path.relpath(c, root) for c in changed)
 msg = (
     "⛔ UI 씬을 고쳤는데 '편집 이후 렌더링 확인' 증거가 없다: " + rels + "\n"

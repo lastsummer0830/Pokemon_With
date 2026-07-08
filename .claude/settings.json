@@ -1,4 +1,5 @@
 {
+  "disableClaudeAiConnectors": true,
   "skillListingBudgetFraction": 0.02,
   "skillListingMaxDescChars": 1536,
   "permissions": {
