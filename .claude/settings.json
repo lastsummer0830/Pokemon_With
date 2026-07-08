@@ -7,17 +7,6 @@
     ]
   },
   "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash -c 'd=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -f \"$d/.claude/hooks/remind.sh\" ] && bash \"$d/.claude/hooks/remind.sh\"; exit 0'",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -40,11 +29,22 @@
         ]
       },
       {
-        "matcher": "Write",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
             "command": "bash -c 'd=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -f \"$d/.claude/hooks/guard-ui-edit.sh\" ] && bash \"$d/.claude/hooks/guard-ui-edit.sh\" || exit 0'",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'd=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; [ -f \"$d/.claude/hooks/enforce-ui-verify.sh\" ] && bash \"$d/.claude/hooks/enforce-ui-verify.sh\" || exit 0'",
             "timeout": 10
           }
         ]

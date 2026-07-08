@@ -78,3 +78,7 @@ myPokemon_AJ/src/**/*.js.map
 # 로컬 실행 바로가기 (각자 빌드한 exe를 가리킴 — git엔 안 올림)
 # =========================
 *.lnk
+
+# UI 렌더링 검증 증거(로컬 전용, .gitkeep만 추적)
+.claude/.verify/*
+!.claude/.verify/.gitkeep

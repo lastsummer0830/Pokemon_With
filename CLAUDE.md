@@ -14,5 +14,7 @@
 > 소프트 규칙(위 1~4)은 '읽고 지키길 바라는' 것이라 반복 위반됨. 그래서 자주 틀리는 지점만 훅으로 하드화한다.
 - **커밋 전 `tsc --noEmit` 실패 시 커밋 자동 차단** (PreToolUse/Bash).
 - **`00_ImportBox/Important/**`(개인 메모) Read 차단** (permissions.deny).
-- **매 턴 STOP 체크리스트 자동 주입** — 스킬 라우팅·memory 재검증·맵/에셋 규칙 (UserPromptSubmit → `.claude/hooks/remind.sh`).
-- **맵 충돌격자·집 내부 파일(`rooms.json`·`oak_lab.json`·world/house·InteriorScene/WorldScene/LabScene) Edit/Write 직전 `ask` 확인** — 눈대중 금지 (PreToolUse/Edit|Write → `.claude/hooks/guard-map-edit.sh`).
+- **맵 충돌격자·집 내부 파일(`rooms.json`·`oak_lab.json`·world/house·InteriorScene/WorldScene/LabScene) Edit/Write 직전 `ask` 확인** — 눈대중 금지 (PreToolUse → `.claude/hooks/guard-map-edit.sh`).
+- **포켓몬 UI 씬(Menu/Party/Bag/Box/Summary/Pokedex·`ui/*.ts`) Edit/Write 직전 `ask` 확인** — 공식/AR 레이아웃 조사 없이 지어내기 금지 (PreToolUse → `.claude/hooks/guard-ui-edit.sh`).
+
+> ⚠️ 성능·규칙엄수 원칙(2026-07): 규칙을 **더 쓰는 것**이 규칙위반의 원인이다(공식: 비대한 지침은 실제 규칙을 묻는다). 강제는 위 훅이 하고, 상시 텍스트(AGENTS/memory)는 **최소로** 유지한다. 작업 전환 시 `/clear`, 길어지면 `/compact`.

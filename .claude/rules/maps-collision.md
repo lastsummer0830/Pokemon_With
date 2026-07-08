@@ -10,7 +10,7 @@ paths:
 
 # ⛔ 맵 충돌격자 — 눈대중 금지 (STOP 체크리스트)
 
-> 정본: `myPokemon_AJ/AGENTS.md` §2 "⭐집 내부 맵 충돌격자 규칙" / memory `collision-grid-from-raw-png`.
+> 정본: `myPokemon_AJ/AGENTS.md` §2 "⭐집 내부 맵 충돌격자 규칙".
 > 몇 주째 반복된 분노의 근본원인 = 게임 화면 눈대중. 이 파일을 건드리면 아래를 그대로 따른다.
 
 1. **게임 실행화면 눈대중으로 blocked/warp 좌표를 타이핑하지 않는다.** 스케일·중앙정렬·스프라이트겹침이 셀 경계를 착각시킨다.
