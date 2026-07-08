@@ -29,14 +29,16 @@ export default class MenuScene extends Phaser.Scene {
   private dim?: Phaser.GameObjects.Rectangle;
   private t: Theme = THEMES.navy;
 
-  private readonly MAIN_ITEMS = ["포켓몬", "가방", "저장", "닫기"];
+  // 시안 A(하단 상시 바) — 사용자 확정 디자인(01_Resources/Pick/메뉴UI/시안A). 아이콘은 그 시안에서 추출.
+  private readonly MAIN_ITEMS = ["도감", "포켓몬", "가방", "저장", "설정"];
+  private readonly MAIN_ICONS = ["ic_dex", "ic_ball", "ic_bag", "ic_save", "ic_set"];
 
   constructor() { super("MenuScene"); }
 
   init(data: MenuInit): void {
     this.from = data?.from ?? "WorldScene";
     this.state = "main";
-    this.idx = 0;
+    this.idx = 1;   // 시안 A: 기본 선택 = 포켓몬(가운데)
   }
 
   preload(): void {
@@ -51,13 +53,16 @@ export default class MenuScene extends Phaser.Scene {
     const P = "assets/ui/party/";
     //  선택 패널은 레퍼런스가 '파랑+빨강테'라 내가 만든 blue_sel을 쓴다(원본 _sel은 초록+빨강테).
     for (const f of ["bg",
-      "panel_rect", "panel_round", "panel_rect_blue_sel", "panel_round_blue_sel",
+      "panel_rect", "panel_round", "panel_rect_swap_sel2", "panel_round_swap_sel2",
       "panel_rect_faint", "panel_round_faint",
       "overlay_hp_back", "overlay_hp", "overlay_lv",
       "icon_ball", "icon_ball_sel"]) {
       const k = "pui_" + f;
       if (!this.textures.exists(k)) this.load.image(k, P + f + ".png");
     }
+    // 하단 바 아이콘(시안 A에서 추출한 도트) — assets/ui/menu/ic_*.png
+    for (const k of this.MAIN_ICONS)
+      if (!this.textures.exists(k)) this.load.image(k, `assets/ui/menu/${k}.png`);
   }
 
   create(): void {
@@ -68,7 +73,7 @@ export default class MenuScene extends Phaser.Scene {
 
     // 도트(픽셀) UI 텍스처는 NEAREST로 — 안 하면 확대 시 뭉개져서 테두리가 지저분해진다(스킬 지침).
     this.textures.getTextureKeys().forEach((k) => {
-      if (k.startsWith("pui_") || k.startsWith("icon_")) this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      if (k.startsWith("pui_") || k.startsWith("icon_") || k.startsWith("ic_")) this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
     });
 
     const kb = this.input.keyboard!;
@@ -97,6 +102,8 @@ export default class MenuScene extends Phaser.Scene {
   private renderState(): void {
     if (this.layer) this.layer.destroy();
     this.layer = this.add.container(0, 0).setDepth(10);
+    // 하단 바(main)는 시안 A대로 월드를 딤 없이 그대로 보여준다. 전체화면 파티/상세만 딤.
+    this.dim?.setVisible(this.state !== "main");
     if (this.state === "main") this.renderMain();
     else if (this.state === "party") this.renderParty();
     else this.renderDetail();
@@ -119,8 +126,8 @@ export default class MenuScene extends Phaser.Scene {
     }
     if (this.state === "main") {
       const n = this.MAIN_ITEMS.length;
-      if (dir === "up") this.idx = (this.idx - 1 + n) % n;
-      else if (dir === "down") this.idx = (this.idx + 1) % n;
+      if (dir === "left") this.idx = (this.idx - 1 + n) % n;   // 하단 바 = 좌우 이동
+      else if (dir === "right") this.idx = (this.idx + 1) % n;
       else return;
       playSfx(this, SFX.cursor, 0.4); this.renderState(); return;
     }
@@ -140,9 +147,10 @@ export default class MenuScene extends Phaser.Scene {
     if (this.state === "main") {
       const item = this.MAIN_ITEMS[this.idx];
       if (item === "포켓몬") { if (!this.party.length) { this.toast("아직 포켓몬이 없어."); return; } this.state = "party"; this.idx = 0; this.renderState(); }
+      else if (item === "도감") { this.toast("도감은 준비 중이야."); }
       else if (item === "가방") { this.toast("가방은 준비 중이야."); }
       else if (item === "저장") { this.toast("저장은 준비 중이야."); }
-      else if (item === "닫기") { this.close(); }
+      else if (item === "설정") { this.toast("설정은 준비 중이야."); }
     } else if (this.state === "party") {
       if (!this.party.length) return;
       this.detailIdx = this.idx; this.state = "detail"; this.renderState();
@@ -152,7 +160,7 @@ export default class MenuScene extends Phaser.Scene {
   private cancel(): void {
     playSfx(this, SFX.cancel, 0.4);
     if (this.state === "main") { this.close(); }
-    else if (this.state === "party") { this.state = "main"; this.idx = 0; this.renderState(); }
+    else if (this.state === "party") { this.state = "main"; this.idx = 1; this.renderState(); }
     else { this.state = "party"; this.idx = this.detailIdx; this.renderState(); }
   }
 
@@ -176,20 +184,43 @@ export default class MenuScene extends Phaser.Scene {
     this.layer.add(t); return t;
   }
 
+  // 시안 A: 하단 상시 바. 크림 테두리+남색 본문, 5칸(도감·포켓몬·가방·저장·설정),
+  //  선택칸=노란 하이라이트 박스에 아이콘 크게(라벨 숨김), 나머지=아이콘+라벨.
   private renderMain(): void {
     const { width, height } = this.scale;
-    const w = Math.min(width * 0.28, 300);
-    const x = width - w - Math.max(width * 0.03, 16);
-    const rowH = Math.max(56, height * 0.09);
-    const h = rowH * this.MAIN_ITEMS.length + 28;
-    const y = Math.max(height * 0.06, 24);
-    this.panel(x, y, w, h);
-    const fs = Math.max(22, Math.round(rowH * 0.34));
+    const barH = Math.max(76, Math.round(height * 0.135));
+    const m = Math.max(12, Math.round(width * 0.012));
+    const barW = width - m * 2;
+    const bx = m, by = height - barH - m;
+
+    const g = this.add.graphics();
+    g.fillStyle(0x000000, 0.35); g.fillRoundedRect(bx + 3, by + 6, barW, barH, 14);
+    g.fillStyle(0xf6efd8, 1); g.fillRoundedRect(bx, by, barW, barH, 14);        // 크림 테두리
+    g.fillStyle(0x222f43, 1); g.fillRoundedRect(bx + 5, by + 5, barW - 10, barH - 10, 10); // 남색 본문
+    this.layer.add(g);
+
+    const slotW = barW / this.MAIN_ITEMS.length;
+    const labelFs = Math.max(14, Math.round(barH * 0.2));
     this.MAIN_ITEMS.forEach((label, i) => {
-      const ty = y + 18 + i * rowH;
+      const cx = bx + slotW * (i + 0.5);
       const sel = i === this.idx;
-      if (sel) this.txt(x + 22, ty, "▶", fs, this.t.accent);
-      this.txt(x + 58, ty, label, fs, sel ? this.t.accent : this.t.text);
+      const iconKey = this.MAIN_ICONS[i];
+      if (sel) {
+        const hw = slotW * 0.84, hh = barH * 0.78;
+        const hg = this.add.graphics();
+        hg.fillStyle(0x000000, 0.25); hg.fillRoundedRect(cx - hw / 2 + 2, by + barH * 0.13, hw, hh, 12);
+        hg.fillStyle(0xffe27a, 1); hg.fillRoundedRect(cx - hw / 2, by + barH * 0.11, hw, hh, 12);
+        this.layer.add(hg);
+      }
+      if (this.textures.exists(iconKey)) {
+        const tex = this.textures.get(iconKey).getSourceImage();
+        const target = sel ? barH * 0.5 : barH * 0.42;    // 선택칸 아이콘은 조금 더 크게
+        const sc = target / Math.max(tex.width, tex.height);
+        const iy = sel ? by + barH * 0.5 : by + barH * 0.4;
+        const ic = this.add.image(cx, iy, iconKey).setOrigin(0.5).setScale(sc);
+        this.layer.add(ic);
+      }
+      if (!sel) this.txt(cx, by + barH * 0.68, label, labelFs, this.t.text, 0.5);
     });
   }
 
@@ -197,7 +228,7 @@ export default class MenuScene extends Phaser.Scene {
   private otext(x: number, y: number, s: string, size: number, color = "#ffffff", origin = 0): Phaser.GameObjects.Text {
     const t = this.add.text(x, y, s, {
       fontFamily: FONT, fontSize: `${Math.round(size)}px`, color,
-      stroke: "#173026", strokeThickness: Math.max(2, Math.round(size * 0.14)),
+      stroke: "#173026", strokeThickness: Math.max(1, Math.round(size * 0.09)),
     }).setOrigin(origin, 0);
     this.layer.add(t); return t;
   }
@@ -207,9 +238,11 @@ export default class MenuScene extends Phaser.Scene {
   private renderParty(): void {
     const { width, height } = this.scale;
     const VW = 512, VH = 384;
-    const barH = Math.max(46, Math.round(height * 0.13));   // 하단 메시지바 높이
+    const barH = Math.max(46, Math.round(height * 0.11));   // 하단 메시지바 높이
     const s = Math.min(width / VW, (height - barH) / VH);   // 가로/세로 중 작은 배율(contain)
-    const offX = Math.round((width - VW * s) / 2), offY = 0;
+    const offX = Math.round((width - VW * s) / 2);
+    // 슬롯 블록(≈native y0~320)이 위로만 몰려 하단이 비지 않게, 재생영역 세로 중앙에 배치(AR도 상하 여백 있음).
+    const offY = Math.max(0, Math.round(((height - barH) - 320 * s) / 2));
 
     // 배경: 남는 여백은 청록으로 채우고, 그 위에 원본 bg(6칸 홈이 구워진 512x384)를 얹는다.
     this.layer.add(this.add.rectangle(0, 0, width, height, 0x49b4bc).setOrigin(0));
@@ -254,53 +287,55 @@ export default class MenuScene extends Phaser.Scene {
     const faint = p.currentHp <= 0;
     const lead = i === 0;                        // 선두만 라운드 패널
     const L = (lx: number, ly: number): [number, number] => [x + lx * s, y + ly * s];
-    // 패널: 초록(기본) / 파랑+빨강테(선택, 레퍼런스 색) / 회색(기절). 선두=round, 나머지=rect.
+    // 패널: 초록(기본) / 파랑+흰+빨강테(선택 = AR 공식 swap_sel2, 레퍼런스와 동일) / 회색(기절). 선두=round.
     const key = faint ? (lead ? "pui_panel_round_faint" : "pui_panel_rect_faint")
-      : sel ? (lead ? "pui_panel_round_blue_sel" : "pui_panel_rect_blue_sel")
+      : sel ? (lead ? "pui_panel_round_swap_sel2" : "pui_panel_rect_swap_sel2")
         : (lead ? "pui_panel_round" : "pui_panel_rect");
     if (this.textures.exists(key)) this.layer.add(this.add.image(x, y, key).setOrigin(0).setScale(s));
 
-    // 몬스터볼(44x56) — 원본 크기 그대로 좌측 홈에. 선택 시 열린 볼.
+    // 몬스터볼(44x56) — 좌측 하단에. 선택 시 열린 볼. (AR 레퍼런스 실측: 볼은 아래로 내려가 있고 위엔 포켓몬이 얹힌다)
     const ballKey = sel ? "pui_icon_ball_sel" : "pui_icon_ball";
+    // 볼: 좌하단. 선두는 라운드(좌측 곡선)라 조금 더 안쪽으로.
+    const ballX = lead ? 34 : 28;
     if (this.textures.exists(ballKey)) {
-      const [bx, by] = L(26, 50);
+      const [bx, by] = L(ballX, 58);
       this.layer.add(this.add.image(bx, by, ballKey).setOrigin(0.5).setScale(s));
     }
-    // 포켓몬 아이콘 — 볼 위에.
+    // 포켓몬 아이콘 — AR처럼 패널 좌측을 '크게' 채우며 세로 중앙쯤(볼과 겹쳐 볼 아랫부분 살짝 드러남).
     const ik = "icon_" + p.speciesId;
     if (this.textures.exists(ik)) {
-      const [ix, iy] = L(29, 40);
-      const ic = makePartyIcon(this, ik, ix, iy, s * 58 / 64); ic.setOrigin(0.5); this.layer.add(ic);
+      const [ix, iy] = L(ballX + 14, 48);
+      const ic = makePartyIcon(this, ik, ix, iy, s * 62 / 64); ic.setOrigin(0.5); this.layer.add(ic);
     }
 
-    // 이름(좌상) + 성별(우상)
-    this.otext(x + 74 * s, y + 6 * s, displayName(p), 26 * s);
+    // 이름(상단, 포켓몬 오른쪽) + 성별(우상). 상단 여백 두고 안쪽에(튀어나오지 않게).
+    this.otext(x + 100 * s, y + 11 * s, displayName(p), 18 * s);
     if (p.gender) {
       const gs = p.gender === "female" ? "♀" : "♂";
       const gc = p.gender === "female" ? "#f06898" : "#5aa8f0";
-      this.otext(x + 244 * s, y + 8 * s, gs, 24 * s, gc, 1);
+      this.otext(x + 238 * s, y + 12 * s, gs, 16 * s, gc, 1);
     }
 
     // HP바: 원본 overlay_hp_back(138x14) 프레임 + 안쪽 groove(로컬 x28~129, y4~10)에 색 채움.
     if (this.textures.exists("pui_overlay_hp_back")) {
-      const [hx, hy] = L(72, 46);
+      const [hx, hy] = L(92, 40);
       this.layer.add(this.add.image(hx, hy, "pui_overlay_hp_back").setOrigin(0).setScale(s));
       const ratio = Math.max(0, Math.min(1, p.currentHp / p.maxHp));
       const col = ratio > 0.5 ? 0x60f860 : ratio > 0.2 ? 0xf8d800 : 0xf85858; // 원본 overlay_hp 3색
-      const [fx, fy] = L(72 + 28, 46 + 4);
+      const [fx, fy] = L(92 + 28, 40 + 4);
       const g = this.add.graphics();
       g.fillStyle(col, 1); g.fillRect(fx, fy, 101 * s * ratio, 6 * s);
       this.layer.add(g);
     }
-    // HP 수치(바 아래 우측)
-    this.otext(x + 240 * s, y + 62 * s, `${Math.max(0, p.currentHp)} / ${p.maxHp}`, 22 * s, "#ffffff", 1);
+    // HP 수치(HP바 아래 우측) — AR는 이름보다 큼(크게).
+    this.otext(x + 238 * s, y + 55 * s, `${Math.max(0, p.currentHp)} / ${p.maxHp}`, 23 * s, "#ffffff", 1);
 
-    // Lv 태그 + 레벨 숫자(좌하)
+    // Lv 태그 + 레벨 숫자(좌하 밴드 — 패널 안쪽 유지, 바닥 밖으로 안 나가게).
     if (this.textures.exists("pui_overlay_lv")) {
-      const [vx, vy] = L(6, 78);
+      const [vx, vy] = L(8, 70);
       this.layer.add(this.add.image(vx, vy, "pui_overlay_lv").setOrigin(0).setScale(s));
     }
-    this.otext(x + 33 * s, y + 77 * s, `${p.level}`, 17 * s);
+    this.otext(x + 32 * s, y + 68 * s, `${p.level}`, 15 * s);
   }
 
   private hpBar(x: number, y: number, w: number, p: Pokemon): void {

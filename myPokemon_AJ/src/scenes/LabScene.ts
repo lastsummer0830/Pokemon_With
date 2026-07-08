@@ -59,6 +59,7 @@ export default class LabScene extends Phaser.Scene {
   private winG!: Phaser.GameObjects.Graphics;
   private winSpr!: Phaser.GameObjects.Sprite;
   private winOpen = false;
+  private winSpecies = "";   // 현재 액자에 띄운 포켓몬 원본 텍스처 key(정지컷 굽기용)
 
   private previewData: PreviewData = {};
 
@@ -136,19 +137,18 @@ export default class LabScene extends Phaser.Scene {
   }
 
   // Front 애니 시트(가로로 긴 5088px 등)를 GL에 그대로 올리면 WebGL 최대 텍스처폭(≈4096) 초과로
-  //  텍스처가 뭉개진다(나오하 스머지 버그). → frame0만 잘라 새 텍스처로 등록해 사용.
-  // ⚠️ 캔버스 텍스처(addCanvas)는 WebGL에서 setFilter(NEAREST)가 잘 안 먹혀 업스케일 시 흐려진다.
-  //   → 캔버스 안에서 미리 정수배(UP)로 nearest 확대해 고해상도로 구운 뒤, 표시 땐 항상 축소만 하게 한다(또렷).
-  private static readonly STILL_UP = 6;
-  private ensureStill(key: string): string {
-    const stillKey = key + "__still";
+  //  텍스처가 뭉개진다(나오하 스머지 버그). → 원본 <img>(GL과 무관, 온전함)에서 프레임0만 잘라 쓴다.
+  // ⚠️ 예전엔 6배로 구운 뒤 표시 때 '축소'했는데, 전역 antialias=true라 축소 시 GL이 보간해 도로 흐려졌다.
+  //   → 정답: 프레임0을 '표시할 화면 픽셀 크기 그대로' 캔버스 nearest로 굽고 scale 1.0(1:1)로 얹는다.
+  //     1:1이면 WebGL이 확대/축소 보간을 할 여지 자체가 없어 필터모드와 무관하게 항상 또렷하다.
+  private bakeStill(species: string, dispPx: number): string {
+    const stillKey = `${species}__still${dispPx}`;
     if (this.textures.exists(stillKey)) return stillKey;
-    const src = this.textures.get(key).getSourceImage() as HTMLImageElement;
-    const fh = src.height;
-    const UP = LabScene.STILL_UP;
-    const cvs = document.createElement("canvas"); cvs.width = fh * UP; cvs.height = fh * UP;
-    const ctx = cvs.getContext("2d")!; ctx.imageSmoothingEnabled = false;   // 픽셀 보존(계단식 확대)
-    ctx.drawImage(src, 0, 0, fh, fh, 0, 0, fh * UP, fh * UP);   // 프레임0(왼쪽 정사각)을 UP배로 nearest 확대
+    const src = this.textures.get(species).getSourceImage() as HTMLImageElement;
+    const fh = src.height;                       // 프레임0 = 왼쪽 fh×fh 정사각(예: 96)
+    const cvs = document.createElement("canvas"); cvs.width = dispPx; cvs.height = dispPx;
+    const ctx = cvs.getContext("2d")!; ctx.imageSmoothingEnabled = false;   // 픽셀 보존(nearest)
+    ctx.drawImage(src, 0, 0, fh, fh, 0, 0, dispPx, dispPx);   // 프레임0을 표시크기로 nearest 확대
     this.textures.addCanvas(stillKey, cvs);
     this.textures.get(stillKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
     return stillKey;
@@ -248,7 +248,7 @@ export default class LabScene extends Phaser.Scene {
   private async openWindow(i: number): Promise<void> {
     const pick = STARTERS[i];
     this.busy = true; this.winOpen = true;
-    this.winSpr.setTexture(this.ensureStill(pick.key));   // 정지컷(프레임0) 전용 소형 텍스처
+    this.winSpecies = pick.key;   // 정지컷 텍스처는 drawWindow에서 '표시 크기'로 구워 얹는다
     this.drawWindow();
     this.winG.setVisible(true); this.winSpr.setVisible(true);
 
@@ -341,14 +341,18 @@ export default class LabScene extends Phaser.Scene {
       g.fillStyle(0x21314f, 1); g.fillRoundedRect(bx + 6, by + 6, boxW - 12, boxH - 12, 15);
       g.lineStyle(2, 0x4a6aa5, 0.85); g.strokeRoundedRect(bx + 11, by + 11, boxW - 22, boxH - 22, 12);
     }
-    // 정지 스프라이트: 내용 세로경계 기준으로 액자 안에 꽉 차게 중앙 배치
-    const key = this.winSpr.texture.key;
-    const m = this.frontMetrics(key);
+    // 정지 스프라이트: 원본(native) 프레임0 기준으로 액자 안에 꽉 차게 중앙 배치.
+    //  표시 크기(dispPx)를 먼저 구해 그 크기로 구운 텍스처를 scale 1.0으로 얹는다(1:1 → 또렷).
+    const m = this.frontMetrics(this.winSpecies);
     const inner = boxW - 64;
-    const sc = inner / Math.max(1, m.bottom - m.top);
-    this.winSpr.setScale(sc);
+    const f = inner / Math.max(1, m.bottom - m.top);      // native 96px → 화면 픽셀 배율
+    const dispPx = Math.max(1, Math.round(m.frameH * f)); // 프레임 전체를 이 화면크기로 구움
+    this.winSpr.setTexture(this.bakeStill(this.winSpecies, dispPx)).setScale(1);
     const contentCx = m.frameW / 2, contentCy = (m.top + m.bottom) / 2;
-    this.winSpr.setPosition(bx + boxW / 2 + (m.frameW / 2 - contentCx) * sc, by + boxH / 2 + (m.frameH / 2 - contentCy) * sc);
+    this.winSpr.setPosition(
+      Math.round(bx + boxW / 2 + (m.frameW / 2 - contentCx) * f),
+      Math.round(by + boxH / 2 + (m.frameH / 2 - contentCy) * f),
+    );
   }
 
   private async runIntro(): Promise<void> {

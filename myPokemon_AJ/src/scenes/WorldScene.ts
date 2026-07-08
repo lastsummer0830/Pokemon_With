@@ -36,12 +36,14 @@ export default class WorldScene extends Phaser.Scene {
   ];
 
   private spawn = { ...START, face: "down" as Dir };
+  private autoMenu = false;   // 디버그 '인게임 메뉴' 바로가기: 마을 위에 메뉴를 바로 연다
 
   constructor() { super("WorldScene"); }
 
-  init(data: { spawn?: [number, number]; face?: Dir }): void {
+  init(data: { spawn?: [number, number]; face?: Dir; openMenu?: boolean }): void {
     if (data?.spawn) this.spawn = { x: data.spawn[0], y: data.spawn[1], face: data.face ?? "down" };
     else this.spawn = { ...START, face: "down" };
+    this.autoMenu = !!data?.openMenu;
   }
 
   preload(): void {
@@ -91,6 +93,10 @@ export default class WorldScene extends Phaser.Scene {
     this.input.keyboard!.on("keydown-X", () => this.openMenu());
     // 메뉴 닫혀 이 씬이 재개되면 입력을 다시 켠다.
     this.events.on(Phaser.Scenes.Events.RESUME, () => { this.input.enabled = true; });
+
+    // 디버그 '인게임 메뉴' 바로가기로 진입 시: 마을을 먼저 그린 뒤 그 위에 메뉴 오버레이를 연다
+    //  (예전엔 MenuScene을 단독 start해 뒤에 아무것도 없어 '검은 배경 위 메뉴'로 보였다).
+    if (this.autoMenu) this.time.delayedCall(80, () => this.openMenu());
   }
 
   private cx(tx: number): number { return (tx + 0.5) * this.tile; }

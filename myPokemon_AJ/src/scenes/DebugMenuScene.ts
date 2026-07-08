@@ -58,7 +58,8 @@ export default class DebugMenuScene extends Phaser.Scene {
           createFromSpecies("BULBASAUR", 5), createFromSpecies("SQUIRTLE", 4),
           createFromSpecies("RATTATA", 2), createFromSpecies("CATERPIE", 3),
         ]); // 파티 UI(2열×3행 6칸) 레이아웃 검증용 풀 파티
-        this.scene.start("MenuScene", { from: "WorldScene" });
+        // 마을(WorldScene)을 띄운 뒤 그 위에 메뉴 오버레이를 연다(검은 배경 방지 — 실제 게임과 동일).
+        this.scene.start("WorldScene", { openMenu: true });
         return;
       }
       this.scene.start(key, data);
