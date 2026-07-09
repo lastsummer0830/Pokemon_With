@@ -1,13 +1,14 @@
 // 방/거실 실게임 캡처 — 타이틀 → D(디버그) → 8(침실)/4(거실) → 스크린샷.
 // 사용: node tools/shot-interior.mjs [출력폴더]
 import { chromium } from "playwright";
+import { snap } from "./_snap.mjs";
 import { mkdirSync } from "fs";
 
 const OUT = process.argv[2] || "/mnt/c/Users/user/Desktop/PokemonWith_shots";
 mkdirSync(OUT, { recursive: true });
 
 const URL = "http://localhost:5180";
-const browser = await chromium.launch({
+const browser = await chromium.launch({ headless: false,
   args: [
     "--use-gl=angle", "--use-angle=swiftshader",
     "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader",
@@ -24,7 +25,7 @@ async function capture(numKey, name) {
   await page.keyboard.press(numKey);        // 씬 바로가기
   await page.waitForTimeout(1800);          // 씬 로드 + fadeIn
   const p = `${OUT}/${name}.png`;
-  await page.screenshot({ path: p });
+  await snap(page, p);
   console.log("saved", p);
 }
 

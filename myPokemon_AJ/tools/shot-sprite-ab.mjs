@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
+import { snap } from "./_snap.mjs";
 const OUT="/mnt/d/dev/Pokemon_With/.claude/.verify";
-const b=await chromium.launch({args:["--use-gl=angle","--use-angle=swiftshader","--ignore-gpu-blocklist","--enable-unsafe-swiftshader","--enable-webgl","--no-sandbox"]});
+const b=await chromium.launch({ headless: false,args:["--use-gl=angle","--use-angle=swiftshader","--ignore-gpu-blocklist","--enable-unsafe-swiftshader","--enable-webgl","--no-sandbox"]});
 const p=await b.newPage({viewport:{width:900,height:520}});
 await p.goto("http://localhost:5180",{waitUntil:"networkidle"});
 await p.waitForFunction(()=>window.__game&&window.__game.isBooted,{timeout:15000});
@@ -30,8 +31,7 @@ await p.evaluate(()=>{
   s.add.text(560,40,"NEW (표시크기 1:1 nearest)",{fontFamily:"Galmuri11",fontSize:"22px",color:"#207020"}).setScrollFactor(0).setDepth(2002);
 });
 await p.waitForTimeout(800);
-await p.screenshot({path:`${OUT}/sprite_ab_samepane.png`});
+await snap(p, `${OUT}/sprite_ab_samepane.png`);
 // 눈 부위 확대 크롭
-const {clip}= {clip:null};
-await p.screenshot({path:`${OUT}/sprite_ab_zoom.png`, clip:{x:120,y:120,width:660,height:280}});
+await snap(p, `${OUT}/sprite_ab_zoom.png`); // snap은 전체 캔버스 캡처(clip 미지원) — 확대 크롭이 필요하면 PIL로 후처리
 await b.close();console.log("DONE");

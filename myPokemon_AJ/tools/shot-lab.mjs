@@ -1,13 +1,14 @@
 // 스타팅 선택 액자 후보 렌더 — LabScene을 preview 데이터로 직접 띄워 캡처.
 //  사용: node tools/shot-lab.mjs [출력폴더]
 import { chromium } from "playwright";
+import { snap } from "./_snap.mjs";
 import { mkdirSync } from "fs";
 
 const OUT = process.argv[2] || "/tmp/lab-shots";
 mkdirSync(OUT, { recursive: true });
 const URL = "http://localhost:5180";
 
-const browser = await chromium.launch({
+const browser = await chromium.launch({ headless: false,
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--ignore-gpu-blocklist",
     "--enable-unsafe-swiftshader", "--enable-webgl", "--no-sandbox"],
 });
@@ -25,7 +26,7 @@ async function startLab(data) {
 }
 async function shot(name) {
   const p = `${OUT}/${name}.png`;
-  await page.screenshot({ path: p });
+  await snap(page, p);
   console.log("saved", p);
 }
 

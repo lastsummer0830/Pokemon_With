@@ -64,7 +64,7 @@
 ## 6. 장면 확인 · 진행 (사용자 확정 워크플로 — 항상 적용)
 - **새 씬은 `DebugMenuScene`에 등록**(타이틀 **D키 → DebugMenuScene**에서 숫자키로 바로 진입) → `src/scenes/DebugMenuScene.ts`. 사용자가 매번 인트로/이동 안 거치고 그 화면만 바로 확인.
 - **look(생김새)이 갈리는 UI**(가방·메뉴·박스·저장 등)는 임의 확정 말고 **2~3개 스타일 변형을 playwright 실제 스샷으로 Pick에 넣고(+비교 몽타주) 사용자가 고른다**(§3 후보규칙과 동일 철학 — 기능은 내가 만들되 look은 사용자 결정).
-- 현재 진행상태(무엇이 됐고 뭐가 남았나)는 memory [[starter-lab-flow]] 참조(문서에 고정 서술하면 stale 위험).
+- 현재 진행상태(무엇이 됐고 뭐가 남았나)는 메모리 노트 `starter-lab-flow` 참조(문서에 고정 서술하면 stale 위험).
 
 ## 7. 작업 일지 규칙
 사용자가 "작업일지 작성"(동일 의도 포함) 하면: **`<repo-root>/00_ImportBox/작업일지/`**(git 동기화됨)에 **`MMDD_PokemonWith_작업일지.md`** 한 파일로 만든다(날짜 하위폴더 만들지 않음, 같은 날 파일 있으면 덮지 말고 이어 보강). 리포 루트는 `git rev-parse --show-toplevel`(절대경로 박지 말 것 — 폴더명·드라이브가 PC마다 다름). **내용:** 오늘 한 것(무엇/왜/어느 파일)·주의사항·다음 이어서 할 스텝·그날 새로 바뀐 지침/skills/memory 요지(다른 PC의 Claude가 이 문서만 보고 이어받게). git 동기화 안 되는 것(memory·`~/.claude` skills)만 현재 PC **바탕화면 `PokemonWith_이관_MMDD/`**에 사본을 두고 그 경로를 사용자에게 알린다(리포 안엔 이관폴더 X). 이관할 게 없으면 md 파일만.
@@ -83,5 +83,7 @@
 | 저장·불러오기·이어하기·세이브 | `save-state-system` |
 | 집 꾸미기·가구·컨디션·집↔배틀 연결 | `home-bonus-system` |
 | UI·메뉴·HUD·텍스트박스·"예쁘게/간지나게/촌스러워" | `game-ui-hud-polish` |
+| "원본이랑 비교"·"AR이랑 똑같은지"·픽셀 대조·재현 검증 | `ar-compare` |
 
+- 경계: **비교·재현 검증=`ar-compare`** / 소스 후보 수집=`pokemon-asset-pipeline` / 동작 확인=`webapp-testing`.
 - 에셋·디자인은 §3 후보규칙, §1.5 확정 디자인을 함께 따른다. **추측 금지 — 의도 애매하면 인계문서/Pick 미리보기로 확인 후 착수.**

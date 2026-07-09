@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
+import { snap } from "./_snap.mjs";
 const OUT="/mnt/d/dev/Pokemon_With/.claude/.verify";
-const b=await chromium.launch({args:["--use-gl=angle","--use-angle=swiftshader","--ignore-gpu-blocklist","--enable-unsafe-swiftshader","--enable-webgl","--no-sandbox"]});
+const b=await chromium.launch({ headless: false,args:["--use-gl=angle","--use-angle=swiftshader","--ignore-gpu-blocklist","--enable-unsafe-swiftshader","--enable-webgl","--no-sandbox"]});
 const p=await b.newPage({viewport:{width:1000,height:1000}});
 await p.goto("http://localhost:5180",{waitUntil:"networkidle"});
 await p.waitForFunction(()=>window.__game&&window.__game.isBooted,{timeout:15000});
@@ -19,5 +20,5 @@ await p.evaluate(()=>{window.__game.scene.getScene("LabScene").cursors.down.isDo
 await p.waitForTimeout(300);
 const fin=await p.evaluate(()=>{const s=window.__game.scene.getScene("LabScene");return[s.tx,s.ty];});
 console.log("책장 앞(2,6)에서 아래로 밀기 후:",JSON.stringify(fin),"→ [2,6] 유지(책장에 못 들어감)여야");
-await p.screenshot({path:`${OUT}/shelf_after_fixed.png`});
+await snap(p, `${OUT}/shelf_after_fixed.png`);
 await b.close();console.log("DONE");

@@ -42,9 +42,21 @@ pngs = glob.glob(os.path.join(root, ".claude/.verify", "*.png"))
 # '아무 스샷이나' 통과 방지 — 레퍼런스와 나란히 비교한 증거만 인정(파일명에 compare/montage/vs/비교/나란히/diff).
 cmp_tok = _re.compile(r"(compare|montage|vs|비교|나란히|diff)", _re.I)
 pngs = [p for p in pngs if cmp_tok.search(os.path.basename(p))]
-newest_ev = max((os.path.getmtime(p) for p in pngs), default=0.0)
-if newest_ev >= newest_ui:
-    sys.exit(0)  # 편집 후 '비교' 캡쳐 증거 있음 → 통과
+def _bright(path):
+    try:
+        from PIL import Image
+        im = Image.open(path).convert("L")
+        w, h = im.size
+        # 나란히 몽타주(내것|원본|diff)는 왼쪽 1/3(내 캡처 패널)만 측정 — 원본 패널 밝기로 통과되는 구멍 방지
+        im = im.crop((0, 0, max(1, w // 3), h))
+        px = list(im.getdata())
+        return (sum(px)/len(px)) if px else 0
+    except Exception:
+        return 999  # PIL 없으면 밝기검사 스킵(통과 허용 — fail-open)
+# 편집보다 새롭고 '밝은(검지 않은)' 비교 PNG만 유효 증거. 검은 캡처로 '검증했다' 치는 구멍 차단.
+valid = [q for q in pngs if os.path.getmtime(q) >= newest_ui and _bright(q) >= 15]
+if valid:
+    sys.exit(0)  # 편집 후 '밝은 비교' 캡쳐 증거 있음 → 통과
 rels = ", ".join(os.path.relpath(c, root) for c in changed)
 msg = (
     "⛔ UI 씬을 고쳤는데 '편집 이후 렌더링 확인' 증거가 없다: " + rels + "\n"

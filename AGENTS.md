@@ -12,6 +12,7 @@
 
 ## 1. 이 작업 공간 · 사용자
 - 메인 = **`myPokemon_AJ`**(Phaser3+TS+Vite+Electron 포켓몬 팬게임). 게임 작업 전 `myPokemon_AJ/AGENTS.md` 먼저 읽는다.
+- **작업일지 = `<repo-root>/00_ImportBox/작업일지/MMDD_PokemonWith_작업일지.md`** (플랫, git 동기화. 상세 규칙 `myPokemon_AJ/AGENTS.md` §7. MyStudy 쪽 아님).
 - 폴더: `myPokemon_AJ/`=게임 코드/에셋(작업 거의 여기) · `00_ImportBox/`=외부자료+인계문서(⚠️`Important/` 개인메모는 **읽지 않음** — deny로 차단됨) · `01_Resources/Pick/`=에셋 후보 보관소(`_미리보기` 삭제 금지).
 - 사용자: **한국어로 답한다**(코드·식별자·파일명은 원문 유지). 풀스택 지향 학습자(Java 경험, 완전초보 아님) — 힌트만 말고 **실제 결과물까지** 만든다. 과한 확인질문 싫어함 → 가능한 건 가정 짧게 밝히고 진행, 단 **되돌리기 어려운 핵심 분기**(어느 그림/방식)만 한 번 확인.
 

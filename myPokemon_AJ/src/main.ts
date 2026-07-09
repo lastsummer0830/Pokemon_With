@@ -16,6 +16,8 @@ import { loadArDb } from "./data/ar";
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,         // WebGL이 되면 WebGL, 안 되면 Canvas로 자동 선택
   backgroundColor: "#000000",
+  // dev에서만: WebGL 캔버스가 스크린샷에 검게 나오는 것 방지(preserveDrawingBuffer). 배포 exe엔 영향 없음.
+  render: { preserveDrawingBuffer: import.meta.env.DEV },
   parent: "game",            // index.html의 <div id="game">에 붙는다
   scale: {
     mode: Phaser.Scale.RESIZE,  // 캔버스를 브라우저 창 크기에 꽉 맞춤 (검은 여백 없음)

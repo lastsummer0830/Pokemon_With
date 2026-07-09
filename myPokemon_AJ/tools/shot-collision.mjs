@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
+import { snap } from "./_snap.mjs";
 const OUT="/mnt/d/dev/Pokemon_With/.claude/.verify";
-const b=await chromium.launch({args:["--use-gl=angle","--use-angle=swiftshader","--ignore-gpu-blocklist","--enable-unsafe-swiftshader","--enable-webgl","--no-sandbox"]});
+const b=await chromium.launch({ headless: false,args:["--use-gl=angle","--use-angle=swiftshader","--ignore-gpu-blocklist","--enable-unsafe-swiftshader","--enable-webgl","--no-sandbox"]});
 const p=await b.newPage({viewport:{width:960,height:720}});
 await p.goto("http://localhost:5180",{waitUntil:"networkidle"});
 await p.waitForFunction(()=>window.__game&&window.__game.isBooted,{timeout:15000});
@@ -14,5 +15,5 @@ await drive("up",6800);           // 가운데 통로로 끝까지 위로
 console.log("up 후:",await pos());
 await drive("left",2400);         // 카운터쪽(막힘) 시도
 console.log("left 후:",await pos(),"(기대: tx=6 유지 — (5,2)카운터에 막힘)");
-await p.screenshot({path:`${OUT}/collision_blocked_live.png`});
+await snap(p, `${OUT}/collision_blocked_live.png`);
 await b.close(); console.log("DONE");

@@ -20,7 +20,7 @@ if not any(fnmatch.fnmatch(fp, p) for p in pats):
     sys.exit(0)
 reason = (
     "⛔ 포켓몬 UI(파티/박스/가방/메뉴/상세) 만들기 전 확인:\n"
-    "1) AR 실제 UI 에셋을 봤나? — /mnt/d/Pokemon Another Red_PWT_250829/Graphics/UI/"
+    "1) AR 실제 UI 에셋을 봤나? — /mnt/d/Pokemon Another Red_PWT_250829/Graphics/UI/ (이 경로는 학원PC 기준. 다른 PC면 myPokemon_AJ/AGENTS.md §4C의 PC별 경로 확인)"
     "{Party,Storage,Bag,Summary,Ready Menu} (파티=2열 라운드패널 그리드, 박스=벽지+6x5, 가방=포켓탭+목록).\n"
     "2) 공식 HGSS/포켓몬 화면 레이아웃과 대조했나? 밋밋한 세로 리스트로 '지어내지' 말 것.\n"
     "3) 직접 그리지 말고 AR UI 그래픽을 import해 그 위에 아이콘/텍스트를 얹었나?(§4 에셋규칙)\n"

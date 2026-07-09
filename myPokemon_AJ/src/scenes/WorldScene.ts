@@ -138,6 +138,7 @@ export default class WorldScene extends Phaser.Scene {
   private openMenu(): void {
     if (this.busy || this.moving) return;
     this.input.enabled = false;
+    this.cameras.main.resetFX();  // 진행 중이던 fadeIn(400ms)이 pause로 얼어 월드가 어둑하게 멈추는 것 방지
     this.scene.pause();
     this.scene.launch("MenuScene", { from: "WorldScene" });
   }

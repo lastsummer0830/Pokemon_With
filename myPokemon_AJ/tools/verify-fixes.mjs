@@ -1,13 +1,14 @@
 // 3대 수정 실검증: (1) examine 스프라이트 또렷 (2) 메뉴가 월드 위 (3) 상단 카운터 충돌.
 //  사용: node tools/verify-fixes.mjs [출력폴더]
 import { chromium } from "playwright";
+import { snap } from "./_snap.mjs";
 import { mkdirSync } from "fs";
 
 const OUT = process.argv[2] || "/mnt/d/dev/Pokemon_With/.claude/.verify";
 mkdirSync(OUT, { recursive: true });
 const URL = "http://localhost:5180";
 
-const browser = await chromium.launch({
+const browser = await chromium.launch({ headless: false,
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--ignore-gpu-blocklist",
     "--enable-unsafe-swiftshader", "--enable-webgl", "--no-sandbox"],
 });
@@ -16,7 +17,7 @@ page.on("console", (m) => { if (m.type() === "error") console.log("  [browser er
 await page.goto(URL, { waitUntil: "networkidle" });
 await page.waitForFunction(() => window.__game && window.__game.isBooted, { timeout: 15000 });
 
-const shot = async (name) => { await page.screenshot({ path: `${OUT}/${name}.png` }); console.log("saved", name); };
+const shot = async (name) => { await snap(page, `${OUT}/${name}.png`); console.log("saved", name); };
 const startScene = async (key, data) => {
   await page.evaluate(({ key, data }) => {
     const g = window.__game;

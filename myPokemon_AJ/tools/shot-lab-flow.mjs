@@ -1,13 +1,14 @@
 // 스타팅 선택 대사 흐름 검증 — 별명 입력 경로까지 단계별 캡처.
 //  사용: node tools/shot-lab-flow.mjs [출력폴더]
 import { chromium } from "playwright";
+import { snap } from "./_snap.mjs";
 import { mkdirSync } from "fs";
 
 const OUT = process.argv[2] || "/tmp/lab-flow";
 mkdirSync(OUT, { recursive: true });
 const URL = "http://localhost:5180";
 
-const browser = await chromium.launch({
+const browser = await chromium.launch({ headless: false,
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--ignore-gpu-blocklist",
     "--enable-unsafe-swiftshader", "--enable-webgl", "--no-sandbox"],
 });
@@ -26,7 +27,7 @@ await page.waitForTimeout(2800);           // 씬 로드 + 첫 대사 타이핑 
 let n = 0;
 const shot = async (label) => {
   const p = `${OUT}/${String(++n).padStart(2, "0")}_${label}.png`;
-  await page.screenshot({ path: p }); console.log("saved", p);
+  await snap(page, p); console.log("saved", p);
 };
 const key = async (k, w = 700) => { await page.keyboard.press(k); await page.waitForTimeout(w); };
 // 타자기 완성 후 캡처 → 다음으로 진행
