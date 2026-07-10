@@ -46,6 +46,9 @@ export default class IntroScene extends Phaser.Scene {
   create(): void {
     const { width, height } = this.scale;
 
+    // 인트로(나레이션)부터는 타이틀곡을 끈다 — 여기부터 무음, 이후 집/월드에서 상황별 BGM이 시작된다.
+    stopBgm();
+
     // 1) 배경 — 단계별. 도입부는 공식 스포트라이트 이미지(intro_dark), 오박사/선택은 그라데(this.bg).
     this.bg = this.add.graphics().setDepth(-10);
     this.darkBg = this.add.image(0, 0, "intro_dark").setOrigin(0.5).setDepth(-9);
@@ -248,7 +251,7 @@ export default class IntroScene extends Phaser.Scene {
     this.registry.set("playerGender", gender);
     try { localStorage.setItem("myPokemon.intro", JSON.stringify({ name, gender })); } catch { /* 무시 */ }
 
-    stopBgm(); // 시작 BGM 종료 — 여기부터 실제 게임(집/월드)
+    // (타이틀곡은 인트로 시작 시 이미 정지됨) — 여기선 집으로 넘어가기만 한다.
     this.cameras.main.fadeOut(700, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("InteriorScene"));
   }

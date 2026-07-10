@@ -19,6 +19,9 @@ function createWindow() {
     autoHideMenuBar: true,        // 상단 메뉴바 숨김 (게임답게)
     webPreferences: {
       contextIsolation: true,
+      // 데스크톱 앱(exe)에선 첫 입력 없이도 BGM이 창 뜨자마자 나게 자동재생 허용.
+      // (브라우저 탭은 정책상 첫 클릭/키 전까지 무음 — 이건 못 바꿈. exe에서만 즉시 재생.)
+      autoplayPolicy: "no-user-gesture-required",
     },
   });
 
