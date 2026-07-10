@@ -76,7 +76,7 @@ export default class LabScene extends Phaser.Scene {
     if (this.textures.exists("lab_map")) this.textures.remove("lab_map");
     this.load.image("lab_map", "assets/world/oak_lab.png" + v);
     this.load.json("lab_col", "assets/world/oak_lab.json" + v);
-    this.load.spritesheet("oak", "assets/characters/trainer_PROFESSOR.png", { frameWidth: 32, frameHeight: 48 });
+    this.load.spritesheet("oak_ow", "assets/characters/trainer_PROFESSOR.png", { frameWidth: 32, frameHeight: 48 }); // 키를 oak_ow로 — IntroScene의 큰 인물 이미지("oak")와 캐시 충돌 방지(안 그러면 연구소 오박사가 거인)
     this.load.spritesheet("nemona_ow", "assets/characters/trainer_NEMONA.png", { frameWidth: 32, frameHeight: 48 });
     this.load.spritesheet("obj_ball", "assets/characters/Object ball.png", { frameWidth: 32, frameHeight: 32 });
     const hero = this.gender === "girl" ? "assets/characters/trainer_DAWN.png" : "assets/characters/trainer_RED.png";
@@ -91,7 +91,7 @@ export default class LabScene extends Phaser.Scene {
     this.tx = this.map.spawn[0]; this.ty = this.map.spawn[1]; this.facing = "up";
     if (this.previewData.preview) this.frameStyle = this.previewData.preview;
 
-    for (const k of ["lab_map", "oak", "nemona_ow", "obj_ball", this.texKey, ...STARTERS.map(s => s.key)])
+    for (const k of ["lab_map", "oak_ow", "nemona_ow", "obj_ball", this.texKey, ...STARTERS.map(s => s.key)])
       if (this.textures.exists(k)) this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.cameras.main.setBackgroundColor("#000000");
 
@@ -101,7 +101,7 @@ export default class LabScene extends Phaser.Scene {
       this.anims.create({ key: `lab-${key}`, frames: this.anims.generateFrameNumbers(this.texKey, { frames }), frameRate: 8, repeat: -1 });
     mk("down", [0, 1, 2, 3]); mk("left", [4, 5, 6, 7]); mk("right", [8, 9, 10, 11]); mk("up", [12, 13, 14, 15]);
 
-    this.oak = this.add.sprite(0, 0, "oak", 0).setOrigin(0.5, 1).setDepth(4);
+    this.oak = this.add.sprite(0, 0, "oak_ow", 0).setOrigin(0.5, 1).setDepth(4);
     this.nemona = this.add.sprite(0, 0, "nemona_ow", 0).setOrigin(0.5, 1).setDepth(4);
     // 탁자 위 포켓볼 3개(닫힌 볼 = obj_ball 프레임 0)
     this.balls = BALL_TILES.map(() => this.add.sprite(0, 0, "obj_ball", 0).setOrigin(0.5, 1).setDepth(3));
