@@ -2,7 +2,6 @@ import Phaser from "phaser";
 import { Gender } from "../data/Player";
 import { createFromSpecies, Pokemon } from "../data/Pokemon";
 import { loadArDb } from "../data/ar";
-import { frontPath } from "../game/pokemonSprite";
 import DialogBox from "../ui/DialogBox";
 import { playBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
@@ -12,18 +11,19 @@ import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 //  A(Space)를 누르면 → 액자 프레임에 그 포켓몬 정지스프라이트가 뜨고 하단 대화창 "○○은 불꽃포켓몬
 //  파이리로 하는 거니? 예/아니오". (커서로 훑는 게 아니라 포켓볼별 개별 선택 — 원작 그대로)
 type Dir = "down" | "left" | "right" | "up";
-type FrameStyle = "cream" | "lavender" | "card";
 interface LabMap { img: string; cols: number; rows: number; blocked: number[][]; spawn: [number, number]; exit: { x: number; y: number; toTown: [number, number] }; }
-interface PreviewData { preview?: FrameStyle; pick?: number; }
+interface PreviewData { preview?: boolean; pick?: number; }
 
-interface StarterDef { key: string; name: string; type: string; id: number; category: string; dex: string; }
-// 분류·도감 = PokeAPI/공식 SV 도감에서 받은 한국어 원문(추측 아님).
+interface StarterDef { key: string; name: string; type: string; id: number; category: string; height: string; weight: string; dex: string; }
+// 타입 표준색 — 설명카드 타입칩 배경(관용 팔레트).
+const TYPE_COLOR: Record<string, number> = { "풀": 0x78c850, "불꽃": 0xf08030, "물": 0x6890f0 };
+// 분류·도감·키·무게 = PokeAPI/공식 SV 데이터 원문(추측 아님).
 const STARTERS: StarterDef[] = [
-  { key: "SPRIGATITO", name: "나오하",  type: "풀",   id: 906, category: "풀고양이포켓몬",
+  { key: "SPRIGATITO", name: "나오하",  type: "풀",   id: 906, category: "풀고양이포켓몬", height: "0.4m", weight: "4.1kg",
     dex: "몸에서 나오는 달콤한 향기로 주위를 매료시킨다. 햇빛에 닿으면 향기가 더욱 강해진다." },
-  { key: "CHARMANDER", name: "파이리",  type: "불꽃", id: 4,   category: "도롱뇽포켓몬",
+  { key: "CHARMANDER", name: "파이리",  type: "불꽃", id: 4,   category: "도롱뇽포켓몬",   height: "0.6m", weight: "8.5kg",
     dex: "태어날 때부터 꼬리의 불꽃이 타오르고 있다. 불꽃이 꺼지면 그 생명이 다하고 만다." },
-  { key: "FROAKIE",    name: "개구마르", type: "물",   id: 656, category: "거품개구리포켓몬",
+  { key: "FROAKIE",    name: "개구마르", type: "물",   id: 656, category: "거품개구리포켓몬", height: "0.3m", weight: "7.0kg",
     dex: "가슴과 등에서 거품을 내뿜는다. 탄력 있는 거품으로 공격을 막아내고 데미지를 줄인다." },
 ];
 
@@ -54,12 +54,12 @@ export default class LabScene extends Phaser.Scene {
   private dlg!: DialogBox;
   private hint!: Phaser.GameObjects.Text;
 
-  // 선택 액자(프레임 + 정지 스프라이트)
-  private frameStyle: FrameStyle = "card";   // 인트로 성별카드와 통일된 크림 카드(사용자 선택)
+  // 선택 설명카드(크림 프레임 + 스프라이트 + 정보 텍스트)
   private winG!: Phaser.GameObjects.Graphics;
   private winSpr!: Phaser.GameObjects.Sprite;
+  private winTexts: Phaser.GameObjects.Text[] = [];   // 카드 위 정보 텍스트(그릴 때마다 새로)
   private winOpen = false;
-  private winSpecies = "";   // 현재 액자에 띄운 포켓몬 원본 텍스처 key(정지컷 굽기용)
+  private winSpecies = "";   // 현재 카드에 띄운 포켓몬(STARTERS의 key)
 
   private previewData: PreviewData = {};
 
@@ -83,15 +83,15 @@ export default class LabScene extends Phaser.Scene {
     this.load.spritesheet(this.texKey, hero, { frameWidth: 32, frameHeight: 48 });
     preloadCommonAudio(this);
     this.load.audio(BGM.lab, "assets/audio/bgm_lab.ogg"); // 연구소 전용 BGM(AR Lab 테마)
-    for (const s of STARTERS) this.load.image(s.key, frontPath(s.key));
+    // 카드용 스프라이트 = PokeRogue 정지컷(담백한 도트, 가만히 있는 포즈). AR 애니시트보다 카드에 적합.
+    for (const s of STARTERS) this.load.image("card_" + s.key, "assets/pokemon/card/" + s.key + ".png" + v);
   }
 
   create(): void {
     this.map = this.cache.json.get("lab_col") as LabMap;
     this.tx = this.map.spawn[0]; this.ty = this.map.spawn[1]; this.facing = "up";
-    if (this.previewData.preview) this.frameStyle = this.previewData.preview;
 
-    for (const k of ["lab_map", "oak_ow", "nemona_ow", "obj_ball", this.texKey, ...STARTERS.map(s => s.key)])
+    for (const k of ["lab_map", "oak_ow", "nemona_ow", "obj_ball", this.texKey, ...STARTERS.map(s => "card_" + s.key)])
       if (this.textures.exists(k)) this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.cameras.main.setBackgroundColor("#000000");
 
@@ -109,7 +109,7 @@ export default class LabScene extends Phaser.Scene {
 
     // 선택 액자
     this.winG = this.add.graphics().setScrollFactor(0).setDepth(1010).setVisible(false);
-    this.winSpr = this.add.sprite(0, 0, "SPRIGATITO", 0).setScrollFactor(0).setDepth(1011).setVisible(false);
+    this.winSpr = this.add.sprite(0, 0, "card_SPRIGATITO", 0).setScrollFactor(0).setDepth(1011).setVisible(false);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.dlg = new DialogBox(this);
@@ -136,38 +136,28 @@ export default class LabScene extends Phaser.Scene {
     this.runIntro();
   }
 
-  // Front 애니 시트(가로로 긴 5088px 등)를 GL에 그대로 올리면 WebGL 최대 텍스처폭(≈4096) 초과로
-  //  텍스처가 뭉개진다(나오하 스머지 버그). → 원본 <img>(GL과 무관, 온전함)에서 프레임0만 잘라 쓴다.
-  // ⚠️ 예전엔 6배로 구운 뒤 표시 때 '축소'했는데, 전역 antialias=true라 축소 시 GL이 보간해 도로 흐려졌다.
-  //   → 정답: 프레임0을 '표시할 화면 픽셀 크기 그대로' 캔버스 nearest로 굽고 scale 1.0(1:1)로 얹는다.
-  //     1:1이면 WebGL이 확대/축소 보간을 할 여지 자체가 없어 필터모드와 무관하게 항상 또렷하다.
-  private bakeStill(species: string, dispPx: number): string {
-    const stillKey = `${species}__still${dispPx}`;
-    if (this.textures.exists(stillKey)) return stillKey;
-    const src = this.textures.get(species).getSourceImage() as HTMLImageElement;
-    const fh = src.height;                       // 프레임0 = 왼쪽 fh×fh 정사각(예: 96)
+  // 카드 스프라이트(PokeRogue 정지컷)를 dispPx 정사각 캔버스 중앙에 콘텐츠 꽉 차게 nearest로 구워 텍스처 키 반환.
+  //  imageKey = preload에서 로드한 "card_<종족>". 이미 타이트 크롭된 소형 PNG라 안전(WebGL 폭 문제 없음).
+  private bakeCardSprite(imageKey: string, dispPx: number): string {
+    const key = `${imageKey}__bake${dispPx}`;
+    if (this.textures.exists(key)) return key;
+    const src = this.textures.get(imageKey).getSourceImage() as HTMLImageElement;
+    const cw = src.width, ch = src.height, scale = dispPx / Math.max(cw, ch);
+    const dw = Math.round(cw * scale), dh = Math.round(ch * scale);
     const cvs = document.createElement("canvas"); cvs.width = dispPx; cvs.height = dispPx;
-    const ctx = cvs.getContext("2d")!; ctx.imageSmoothingEnabled = false;   // 픽셀 보존(nearest)
-    ctx.drawImage(src, 0, 0, fh, fh, 0, 0, dispPx, dispPx);   // 프레임0을 표시크기로 nearest 확대
-    this.textures.addCanvas(stillKey, cvs);
-    this.textures.get(stillKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
-    return stillKey;
+    const ctx = cvs.getContext("2d")!; ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(src, 0, 0, cw, ch, Math.round((dispPx - dw) / 2), Math.round((dispPx - dh) / 2), dw, dh);
+    this.textures.addCanvas(key, cvs);
+    this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    return key;
   }
 
-  // 포켓몬 Front 스프라이트 실제 내용 세로경계 측정(정지컷 크기/위치 정규화)
-  private frontMetrics(key: string): { frameH: number; frameW: number; top: number; bottom: number } {
-    const src = this.textures.get(key).getSourceImage() as HTMLImageElement;
-    const cvs = document.createElement("canvas"); cvs.width = src.height; cvs.height = src.height;   // 프레임 0(정사각)만
-    const ctx = cvs.getContext("2d")!; ctx.drawImage(src, 0, 0);
-    const d = ctx.getImageData(0, 0, src.height, src.height).data;
-    let top = src.height, bottom = 0;
-    for (let y = 0; y < src.height; y++) {
-      let op = false;
-      for (let x = 0; x < src.height; x += 2) if (d[(y * src.height + x) * 4 + 3] > 20) { op = true; break; }
-      if (op) { if (y < top) top = y; if (y > bottom) bottom = y; }
-    }
-    if (bottom < top) { top = 0; bottom = src.height - 1; }
-    return { frameH: src.height, frameW: src.height, top, bottom };
+  // 설명카드 위 텍스트 한 줄 추가(Galmuri11, 카드보다 위 depth). winTexts에 모아 닫을 때 정리.
+  private cardText(x: number, y: number, str: string, style: Phaser.Types.GameObjects.Text.TextStyle): Phaser.GameObjects.Text {
+    const t = this.add.text(x, y, str, { fontFamily: "Galmuri11, sans-serif", ...style })
+      .setScrollFactor(0).setDepth(1012);
+    this.winTexts.push(t);
+    return t;
   }
 
   private layout(): void {
@@ -314,45 +304,65 @@ export default class LabScene extends Phaser.Scene {
   private closeWindow(): void {
     this.winOpen = false;
     this.winG.setVisible(false); this.winSpr.setVisible(false);
+    this.winTexts.forEach(t => t.destroy()); this.winTexts = [];
   }
 
-  // 액자 그리기(스타일 2종) + 정지 스프라이트 배치
+  // 설명카드(가로형 도감 엔트리): 크림 프레임 + 스프라이트(좌) + No/이름/타입/키·무게(우) + 분류·도감설명(하단 전폭)
   private drawWindow(): void {
     const { width: W, height: H } = this.scale;
-    const boxW = Math.min(W * 0.42, 360), boxH = boxW;               // 정사각 액자
-    const bx = Math.round(W / 2 - boxW / 2);
-    const by = Math.round(H * 0.30 - boxH / 2 + H * 0.06);           // 상단쪽(하단 대화창 위)
     const g = this.winG; g.clear();
-    if (this.frameStyle === "lavender") {
-      // Image #2 라벤더/보라 액자: 그림자 → 진보라 테두리 → 라벤더 → 밝은 내부
-      g.fillStyle(0x000000, 0.30); g.fillRoundedRect(bx + 5, by + 7, boxW, boxH, 22);
-      g.fillStyle(0x6f4d94, 1); g.fillRoundedRect(bx, by, boxW, boxH, 22);
-      g.fillStyle(0xc9a9e6, 1); g.fillRoundedRect(bx + 7, by + 7, boxW - 14, boxH - 14, 17);
-      g.fillStyle(0xf7f0fb, 1); g.fillRoundedRect(bx + 16, by + 16, boxW - 32, boxH - 32, 11);
-    } else if (this.frameStyle === "card") {
-      // 인트로 성별 선택 카드와 동일 팔레트: 황금브라운 테두리 + 따뜻한 크림 속
-      g.fillStyle(0x000000, 0.30); g.fillRoundedRect(bx + 5, by + 7, boxW, boxH, 18);
-      g.fillStyle(0xc98a3c, 1); g.fillRoundedRect(bx, by, boxW, boxH, 18);
-      g.fillStyle(0xf3e4c8, 1); g.fillRoundedRect(bx + 10, by + 10, boxW - 20, boxH - 20, 12);
-    } else {
-      // 게임 통일 크림/남색 액자(DialogBox와 동일 팔레트)
-      g.fillStyle(0x000000, 0.35); g.fillRoundedRect(bx + 5, by + 7, boxW, boxH, 20);
-      g.fillStyle(0xf6efd8, 1); g.fillRoundedRect(bx, by, boxW, boxH, 20);
-      g.fillStyle(0x21314f, 1); g.fillRoundedRect(bx + 6, by + 6, boxW - 12, boxH - 12, 15);
-      g.lineStyle(2, 0x4a6aa5, 0.85); g.strokeRoundedRect(bx + 11, by + 11, boxW - 22, boxH - 22, 12);
-    }
-    // 정지 스프라이트: 원본(native) 프레임0 기준으로 액자 안에 꽉 차게 중앙 배치.
-    //  표시 크기(dispPx)를 먼저 구해 그 크기로 구운 텍스처를 scale 1.0으로 얹는다(1:1 → 또렷).
-    const m = this.frontMetrics(this.winSpecies);
-    const inner = boxW - 64;
-    const f = inner / Math.max(1, m.bottom - m.top);      // native 96px → 화면 픽셀 배율
-    const dispPx = Math.max(1, Math.round(m.frameH * f)); // 프레임 전체를 이 화면크기로 구움
-    this.winSpr.setTexture(this.bakeStill(this.winSpecies, dispPx)).setScale(1);
-    const contentCx = m.frameW / 2, contentCy = (m.top + m.bottom) / 2;
-    this.winSpr.setPosition(
-      Math.round(bx + boxW / 2 + (m.frameW / 2 - contentCx) * f),
-      Math.round(by + boxH / 2 + (m.frameH / 2 - contentCy) * f),
-    );
+    this.winTexts.forEach(t => t.destroy()); this.winTexts = [];
+    const d = STARTERS.find(s => s.key === this.winSpecies);
+    if (!d) return;
+    // 카드 팔레트(인트로 성별카드와 동일: 황금브라운 테두리 + 크림)
+    const BORDER = 0xc98a3c, CREAM = 0xf3e4c8, DARK = "#3a2a14", SUB = "#7a5a2c", ACCENT = "#b5651d";
+    const pad = 28, botH = 140;                                    // 넉넉한 여백 + 하단 설명영역
+    // 하단 대화창(+이름표)과 겹치지 않게: 그 위 공간에 배치(DialogBox.layout()·applySpeaker와 동일 계산).
+    const dh = Math.max(H * 0.22, 130);
+    const dialogTop = H - dh - Math.max(H * 0.04, 18);
+    const dlgFont = Math.max(18, Math.round(dh * 0.17));
+    const plateH = Math.round(dlgFont * 1.7);                      // 이름표는 대화창 위로 이만큼 튀어나옴
+    const bottomLimit = dialogTop - (plateH - 8) - 12;            // 이름표 위 12px 여유
+    const topLimit = Math.max(H * 0.03, 20);
+    const availH = bottomLimit - topLimit;                        // 카드가 쓸 수 있는 세로
+    const cw = Math.min(W * 0.64, 660);
+    const ch = Math.min(H * 0.80, 510, availH);                    // 공간 모자라면 자동 축소
+    const cx = Math.round(W / 2 - cw / 2);
+    const cy = Math.round(Math.max(topLimit, bottomLimit - ch));
+    // 프레임(그림자 → 테두리 → 크림 속)
+    g.fillStyle(0x000000, 0.30); g.fillRoundedRect(cx + 5, cy + 7, cw, ch, 20);
+    g.fillStyle(BORDER, 1); g.fillRoundedRect(cx, cy, cw, ch, 20);
+    g.fillStyle(CREAM, 1); g.fillRoundedRect(cx + 11, cy + 11, cw - 22, ch - 22, 13);
+    // 스프라이트 박스(좌, 정사각) — 박스보다 스프라이트를 살짝 작게 얹어 여백 확보
+    const sq = ch - pad - botH - 14;
+    g.fillStyle(0xffffff, 0.35); g.fillRoundedRect(cx + pad, cy + pad, sq, sq, 12);
+    g.lineStyle(2, BORDER, 0.5); g.strokeRoundedRect(cx + pad, cy + pad, sq, sq, 12);
+    this.winSpr.anims.stop();
+    this.winSpr.setTexture(this.bakeCardSprite("card_" + d.key, Math.round(sq * 0.84))).setScale(1).setOrigin(0.5)
+      .setPosition(Math.round(cx + pad + sq / 2), Math.round(cy + pad + sq / 2));
+    // 우측 정보 열: No / 이름 / 타입칩 / 키·무게(넉넉한 간격)
+    const rx = cx + pad + sq + 34;
+    this.cardText(rx, cy + pad + 6, "No." + String(d.id).padStart(4, "0"), { fontSize: "20px", color: SUB });
+    this.cardText(rx, cy + pad + 34, d.name, { fontStyle: "bold", fontSize: "38px", color: ACCENT });
+    const pcx = rx + 46, pcy = cy + pad + 112, pw = 92, phh = 34, pr = phh / 2;
+    const tcol = TYPE_COLOR[d.type] ?? 0x888888;
+    g.fillStyle(0x000000, 0.18); g.fillRoundedRect(pcx - pw / 2 + 2, pcy - phh / 2 + 2, pw, phh, pr);
+    g.fillStyle(tcol, 1); g.fillRoundedRect(pcx - pw / 2, pcy - phh / 2, pw, phh, pr);
+    g.lineStyle(2, 0xffffff, 0.65); g.strokeRoundedRect(pcx - pw / 2, pcy - phh / 2, pw, phh, pr);
+    this.cardText(pcx, pcy - 1, d.type, { fontStyle: "bold", fontSize: "22px", color: "#ffffff" }).setOrigin(0.5);
+    // 키/무게 미니 패널
+    const my = cy + pad + 158, mw = cx + cw - pad - rx, mh = sq + cy + pad - my;
+    g.fillStyle(0xffffff, 0.4); g.fillRoundedRect(rx, my, mw, mh, 10);
+    g.lineStyle(2, BORDER, 0.4); g.strokeRoundedRect(rx, my, mw, mh, 10);
+    this.cardText(rx + 16, my + mh / 2 - 30, "키", { fontSize: "18px", color: SUB });
+    this.cardText(rx + mw - 16, my + mh / 2 - 32, d.height, { fontStyle: "bold", fontSize: "22px", color: DARK }).setOrigin(1, 0);
+    this.cardText(rx + 16, my + mh / 2 + 6, "무게", { fontSize: "18px", color: SUB });
+    this.cardText(rx + mw - 16, my + mh / 2 + 4, d.weight, { fontStyle: "bold", fontSize: "22px", color: DARK }).setOrigin(1, 0);
+    // 하단 전폭: 분류 + 도감 설명(줄간격 넉넉)
+    const by = cy + pad + sq + 16;
+    g.lineStyle(2, BORDER, 0.55); g.beginPath(); g.moveTo(cx + pad, by); g.lineTo(cx + cw - pad, by); g.strokePath();
+    this.cardText(cx + pad, by + 14, d.category, { fontStyle: "bold", fontSize: "21px", color: DARK });
+    this.cardText(cx + pad, by + 46, d.dex, { fontSize: "20px", color: DARK, lineSpacing: 8, wordWrap: { width: cw - pad * 2 } });
   }
 
   private async runIntro(): Promise<void> {
