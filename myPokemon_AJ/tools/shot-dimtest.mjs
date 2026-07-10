@@ -1,7 +1,8 @@
 // 메뉴 열림이 월드를 실제로 어둡게 하는지 '측정'으로 확정. 사용: node tools/shot-dimtest.mjs
 import { chromium } from "playwright";
 import fs from "fs";
-const OUT = "/mnt/d/dev/Pokemon_With/.claude/.verify";
+import { fileURLToPath } from "url";
+const OUT = fileURLToPath(new URL("../../.claude/.verify", import.meta.url));
 
 // WebGL 캔버스를 화면에 보이는 그대로 캡처(page.screenshot은 검게 나옴).
 async function snap(page, path) {

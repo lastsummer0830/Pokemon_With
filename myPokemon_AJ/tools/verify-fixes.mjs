@@ -3,8 +3,9 @@
 import { chromium } from "playwright";
 import { snap } from "./_snap.mjs";
 import { mkdirSync } from "fs";
+import { fileURLToPath } from "url";
 
-const OUT = process.argv[2] || "/mnt/d/dev/Pokemon_With/.claude/.verify";
+const OUT = process.argv[2] || fileURLToPath(new URL("../../.claude/.verify", import.meta.url));
 mkdirSync(OUT, { recursive: true });
 const URL = "http://localhost:5180";
 

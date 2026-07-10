@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import { snap } from "./_snap.mjs";
-const OUT="/mnt/d/dev/Pokemon_With/.claude/.verify";
+import { fileURLToPath } from "url";
+const OUT = fileURLToPath(new URL("../../.claude/.verify", import.meta.url));
 const b=await chromium.launch({ headless: false,args:["--use-gl=angle","--use-angle=swiftshader","--ignore-gpu-blocklist","--enable-unsafe-swiftshader","--enable-webgl","--no-sandbox"]});
 const p=await b.newPage({viewport:{width:960,height:720}});
 await p.goto("http://localhost:5180",{waitUntil:"networkidle"});

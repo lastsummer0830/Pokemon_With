@@ -1,7 +1,8 @@
 // 시안 A 하단 바 메뉴 실렌더 캡쳐. 사용: node tools/shot-menuA.mjs
 import { chromium } from "playwright";
 import fs from "fs";
-const OUT = "/mnt/d/dev/Pokemon_With/.claude/.verify";
+import { fileURLToPath } from "url";
+const OUT = fileURLToPath(new URL("../../.claude/.verify", import.meta.url));
 
 // WebGL 캔버스는 page.screenshot()로는 검게 나옴 → 게임 자체 렌더러(Phaser snapshot)로 화면에 보이는 그대로 캡처.
 async function snap(page, path) {
