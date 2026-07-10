@@ -41,5 +41,23 @@
 ### 보류
 - 타이핑 SFX — 제대로 된 텍스트 SE 소스 확보 후(사인파 금지).
 
-## 6. 지침/skills/memory 변경
-- 리포 규칙(AGENTS/rules/hooks) 변경 없음. memory 변경 없음(이 일지로 대체). → **이관 폴더 불필요, 이 md만.**
+## 6. 추가 수정 (같은 세션, 0710 밤~0711)
+### 오박사 거인 버그 — 고침 (커밋 `8c93d63`)
+- 증상: 인트로 거쳐 연구소 오면 오박사가 거인.
+- 원인: **텍스처 키 충돌.** `IntroScene`가 큰 인물이미지(`intro/oak.png` 110×172)를 키 `"oak"`로 로드 → Phaser는 캐시된 키를 재로드 안 함 → `LabScene`이 오버월드 시트(`trainer_PROFESSOR` 32×48)를 같은 `"oak"`로 로드해도 무시되고 큰 이미지가 남아 통짜 렌더. (네모는 `nemona_ow`라 무사.)
+- 수정: LabScene 키를 `oak_ow`로 분리(load·NEAREST루프·add.sprite 3곳). 검증: 인트로→랩 경로에서 오박사 displayHeight 65px=네모 동일, 스샷 확인.
+- ⚠️ **교훈: 씬 간 텍스처 키 공유 금지.** 같은 실물이라도 이미지-로드 vs 스프라이트시트-로드가 키 충돌하면 크기/프레임이 깨진다. 오버월드는 `_ow` 접미사 규칙 지킬 것.
+
+### CRLF → 훅/스크립트 오작동 대수술 (git 동기화 O)
+- **근본 원인**: 프로젝트가 윈도우 편집이라 `.sh` 파일들이 CRLF(`\r`). WSL bash가 실행할 때 `set -euo pipefail\r`·heredoc·`exit 0\r`이 깨짐.
+  - `npm run app:bake` = 첫 줄에서 즉사(이번에 CR 제거 임시본으로 우회 굽기 함).
+  - **`guard-ui-edit.sh`가 판정 반대로 뒤집혀 있었음**(다른 세션 실측: `exit 0`→"numeric argument required"→exit2, 일반파일 차단·UI/맵파일 통과). = **안전장치가 반대로 작동.** 커밋 tsc 훅도 잠재 위험.
+- **수정**: ① `.gitattributes`에 `*.sh text eol=lf` 추가(플랫폼 무관 LF 강제) ② CRLF였던 4개 `.sh`(훅3 + bake-exe) LF 정규화.
+- **실증(정규화 후)**: guard-ui/guard-map = UI·맵파일→`ask`, 일반파일→조용히 exit0 ✅ / enforce-ui-verify(Stop) = UI수정+증거없음→exit2, stop_hook_active→0, 밝은 compare증거→0, 검은compare→2, UI무변경→0 ✅. bake-exe.sh `bash -n` 파싱 OK → 우회 없이 `app:bake` 됨.
+- ⚠️ **한동안 UI/맵 가드가 거꾸로 돌아서**, 그 사이 UI/맵 편집이 잘못 통과됐거나 무관 편집이 막혔을 수 있음. 앞으로는 정상.
+
+### exe 굽기
+- `app.asar` 갱신 완료(autoplay 반영 확인). **단 exe 런타임 자동재생은 미실측**(WSL에서 윈도우 exe 소리 확인 어려움) → 바탕화면 `PokemonWith.lnk`로 직접 켜서 확인 필요.
+
+## 7. 지침/skills/memory 변경
+- **훅 정상화(CRLF→LF)** = 리포 규칙 인프라 수정(위 §6). AGENTS/rules 텍스트 변경은 없음. memory 변경 없음(이 일지로 대체). → **이관 폴더 불필요, 이 md만.**
