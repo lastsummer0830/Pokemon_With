@@ -30,10 +30,16 @@
 - **AR 경로(이 PC)**: `/mnt/c/Users/ONE/Desktop/Pokemon Another Red_PWT_250829/` (Audio·Graphics/Battlebacks·Battle animations 등 소스 다수).
 - shot 스크립트 `snap()`은 `.claude/.verify` 폴더가 있어야 함(리포에 `.gitkeep`으로 커밋돼 있음).
 
-## 5. 다음 이어서 할 스텝
-- (원하면) **배틀 공격기 애니메이션** = AR `Battle animations` → 기술→애니 매핑 작업.
-- (원하면) **로케이션별 배틀 배경** = 인카운터/장소 시스템과 함께 AR `Battlebacks` 적용.
-- (보류) 타이핑 SFX — 제대로 된 텍스트 SE 소스 확보 후.
+## 5. 다음 이어서 할 스텝 (다음 세션 배틀 작업 — 사용자 지시)
+### ★ 배틀 공격기 애니메이션 붙이기 (현재 전혀 없음)
+- **현 상태**: 어떤 기술이든 대상 스프라이트 `flash()`(깜빡, `BattleScene.ts:331`) + 상성별 히트음(`sfx_hit_super/normal/weak`, `:233`)만. **기술 고유 이펙트(불꽃·물대포 등) 전무.** 기술 데이터(`src/systems/battle.ts` 등)에 애니 필드 없음.
+- **소스**: AR `/mnt/c/Users/ONE/Desktop/Pokemon Another Red_PWT_250829/Graphics/Battle animations/` (실제 기술 애니 에셋 있음). *다른 PC면 AR 경로 `find`.*
+- **할 일**: 기술→애니 매핑 테이블 설계 → 에셋 가져와 `public/assets/`에 넣고 → `runMove`(`BattleScene.ts:~220`) 히트 연출 자리에서 기술별 애니 재생(현 `flash` 대체/보강). 타입/기술명 기준 매핑. (별도 큰 작업 — 스킬 `turn-battle-system` 라우팅.)
+### 로케이션별 배틀 배경 (현재 단색 플레이스홀더)
+- **현 상태**: `BattleScene.ts:135-136` 하늘·땅 단색 사각형 2개.
+- **할 일**: 인카운터/장소 시스템 생기면 만나는 NPC·포켓몬 등장 로케이션에 맞춰 AR `Graphics/Battlebacks/`(초원·물가·동굴 등 `*_bg.png` + 발판 base)에서 골라 사각형 대신 배경+발판 스프라이트로 교체.
+### 보류
+- 타이핑 SFX — 제대로 된 텍스트 SE 소스 확보 후(사인파 금지).
 
 ## 6. 지침/skills/memory 변경
 - 리포 규칙(AGENTS/rules/hooks) 변경 없음. memory 변경 없음(이 일지로 대체). → **이관 폴더 불필요, 이 md만.**
