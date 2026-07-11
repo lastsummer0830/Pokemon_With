@@ -123,6 +123,11 @@ export default class InteriorScene extends Phaser.Scene {
     this.player = this.add.sprite(0, 0, this.texKey, this.idleFrame.down).setOrigin(0.5, 1);
     // (가구 전경 오버레이 방식은 back wall/소품까지 캐릭터 머리를 가려 '대가리 잘림'이 생겨 폐기. 캐릭터를 그냥 앞에 그린다. AGENTS.md 참고.)
     this.cursors = this.input.keyboard!.createCursorKeys();
+    // 실내에서도 인게임 메뉴 열기(Enter/X). 대사·워프 중(busy)엔 열리지 않도록 openMenu가 가드.
+    this.input.keyboard!.on("keydown-ENTER", () => this.openMenu());
+    this.input.keyboard!.on("keydown-X", () => this.openMenu());
+    // 메뉴가 닫혀 이 씬이 재개되면 openMenu에서 껐던 입력을 다시 켠다.
+    this.events.on(Phaser.Scenes.Events.RESUME, () => { this.input.enabled = true; });
 
     if (DEBUG_COLLISION) {
       this.dbg = this.add.graphics().setDepth(50);
@@ -155,6 +160,17 @@ export default class InteriorScene extends Phaser.Scene {
   }
 
   private playerName(): string { return (this.registry.get("playerName") as string) ?? "너"; }
+
+  // 인게임 메뉴 열기(오버레이) — WorldScene.openMenu와 동일 패턴. 이 씬을 멈추고 MenuScene을 띄운다.
+  private openMenu(): void {
+    if (this.busy || this.moving) return;
+    // 저장 위치 기록 — 실내는 방(roomKey) 단위로 복원(정밀 타일 아님).
+    this.registry.set("saveLoc", { scene: "InteriorScene", room: this.roomKey });
+    this.input.enabled = false;
+    this.cameras.main.resetFX();
+    this.scene.pause();
+    this.scene.launch("MenuScene", { from: "InteriorScene" });
+  }
 
   private makeWalkAnims(tex: string, prefix: string): void {
     const mk = (dir: string, f: number[]) => {

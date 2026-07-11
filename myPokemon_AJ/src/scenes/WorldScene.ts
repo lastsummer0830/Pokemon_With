@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { Gender } from "../data/Player";
-import { Pokemon } from "../data/Pokemon";
+import { Pokemon, createFromSpecies } from "../data/Pokemon";
 import { playBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 
@@ -53,6 +53,8 @@ export default class WorldScene extends Phaser.Scene {
     preloadCommonAudio(this);
     const file = this.gender === "girl" ? "assets/characters/trainer_DAWN.png" : "assets/characters/trainer_RED.png";
     this.load.spritesheet(this.texKey, file, { frameWidth: 32, frameHeight: 48 });
+    // 라이벌(네모) 오버월드 스프라이트 — 스타터 선택 직후 첫 배틀 연출용.
+    this.load.spritesheet("nemona_ow", "assets/characters/trainer_NEMONA.png", { frameWidth: 32, frameHeight: 48 });
   }
 
   create(): void {
@@ -97,6 +99,9 @@ export default class WorldScene extends Phaser.Scene {
     // 디버그 '인게임 메뉴' 바로가기로 진입 시: 마을을 먼저 그린 뒤 그 위에 메뉴 오버레이를 연다
     //  (예전엔 MenuScene을 단독 start해 뒤에 아무것도 없어 '검은 배경 위 메뉴'로 보였다).
     if (this.autoMenu) this.time.delayedCall(80, () => this.openMenu());
+
+    // 연구소에서 스타터를 고르고 나왔다면: 밖에서 기다리던 네모가 다가와 첫 라이벌 배틀을 건다.
+    this.time.delayedCall(450, () => this.maybeStartRivalBattle());
   }
 
   private cx(tx: number): number { return (tx + 0.5) * this.tile; }
@@ -137,6 +142,8 @@ export default class WorldScene extends Phaser.Scene {
   // 인게임 메뉴 열기: 이 씬을 멈추고 입력을 끈 뒤 MenuScene을 오버레이로 띄운다.
   private openMenu(): void {
     if (this.busy || this.moving) return;
+    // 저장 위치 기록(메뉴 '저장'이 이 값을 직렬화한다). 월드는 정확한 타일·방향까지 저장.
+    this.registry.set("saveLoc", { scene: "WorldScene", tx: this.tx, ty: this.ty, facing: this.facing });
     this.input.enabled = false;
     this.cameras.main.resetFX();  // 진행 중이던 fadeIn(400ms)이 pause로 얼어 월드가 어둑하게 멈추는 것 방지
     this.scene.pause();
@@ -149,6 +156,38 @@ export default class WorldScene extends Phaser.Scene {
     const party = this.registry.get("playerParty") as Pokemon[] | undefined;
     const ally = party && party.length ? party[0] : undefined;
     this.scene.start("BattleScene", { ally, wild: true, returnPos: [this.tx, this.ty], returnFacing: this.facing });
+  }
+
+  // 스타터 선택 후 연구소에서 나오면: 밖에서 기다리던 네모가 플레이어에게 다가와 라이벌 배틀을 건다.
+  //  (LabScene이 registry에 rivalBattlePending/ rivalEnemySpecies를 예약해 둔다.)
+  private maybeStartRivalBattle(): void {
+    if (!this.registry.get("rivalBattlePending")) return;
+    // (F1) 예약은 여기서 소비하지 않는다 — 배틀에서 '이겼을 때만' BattleScene이 소비한다(지면 재대결).
+    this.busy = true;
+    this.input.enabled = false;
+    // 네모가 위쪽(연구소 방향)에서 걸어와 플레이어 한 칸 앞에 서는 짧은 연출.
+    //  (컷신 스프라이트라 충돌격자와 무관 — 배틀 전환 때 씬이 교체되며 사라진다.)
+    const nem = this.add.sprite(this.cx(this.tx), this.cy(this.ty) - this.tile * 2.4, "nemona_ow", 0)
+      .setOrigin(0.5, 1).setScale(SCALE).setDepth(6);
+    playSfx(this, SFX.exclaim, 0.5);
+    this.tweens.add({
+      targets: nem, y: this.cy(this.ty) - this.tile, duration: 380, ease: "Sine.inOut",
+      onComplete: () => this.time.delayedCall(220, () => this.startRivalBattle()),
+    });
+  }
+
+  // 라이벌 트레이너 배틀 시작: 상대 = 예약된 카운터 스타터(Lv.5), wild:false(도망 불가·트레이너 인트로).
+  private startRivalBattle(): void {
+    const party = this.registry.get("playerParty") as Pokemon[] | undefined;
+    const ally = party && party.length ? party[0] : undefined;
+    const enemyKey = (this.registry.get("rivalEnemySpecies") as string) ?? "CHARMANDER";
+    const enemy = createFromSpecies(enemyKey, 5);
+    this.cameras.main.fadeOut(300, 0, 0, 0);
+    this.time.delayedCall(320, () =>
+      this.scene.start("BattleScene", {
+        ally, enemy, wild: false, trainer: "네모",
+        returnPos: [this.tx, this.ty], returnFacing: this.facing,
+      }));
   }
 
   private handleWarp(): void {

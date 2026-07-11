@@ -21,6 +21,7 @@ export interface Pokemon {
   types: string[];       // 속성 1~2개 (예: ["FIRE","FLYING"])
   type: string;          // (기존 호환) 대표 속성 = types[0]
   level: number;
+  exp: number;           // 누적 경험치(레벨업 판정용). 생성 시 level³(medium-fast 곡선 기준값).
 
   // 실제 스탯 (종족값 + 레벨에서 계산)
   maxHp: number;
@@ -73,7 +74,7 @@ export function createFromSpecies(speciesId: string, level = 5): Pokemon {
   if (!sp) {
     // 폴백: 데이터 없을 때도 게임이 멈추지 않게 기본치.
     return {
-      speciesId: key, id: 0, name: key, types: ["NORMAL"], type: "NORMAL", level,
+      speciesId: key, id: 0, name: key, types: ["NORMAL"], type: "NORMAL", level, exp: level * level * level,
       maxHp: 20, currentHp: 20, attack: 10, defense: 10, spAttack: 10, spDefense: 10, speed: 10,
       moves: [{ id: "TACKLE", pp: 35, maxPp: 35 }], status: null, heldItem: null, condition: 0,
       gender: Math.random() < 0.5 ? "male" : "female",
@@ -88,6 +89,7 @@ export function createFromSpecies(speciesId: string, level = 5): Pokemon {
     types: sp.types.length ? sp.types : ["NORMAL"],
     type: sp.types[0] ?? "NORMAL",
     level,
+    exp: level * level * level,
     maxHp,
     currentHp: maxHp,
     attack: calcStat(b.ATTACK, level),
@@ -103,11 +105,27 @@ export function createFromSpecies(speciesId: string, level = 5): Pokemon {
   };
 }
 
+// 레벨이 바뀐 뒤 종족값 기준으로 6스탯을 다시 계산한다(createFromSpecies와 같은 공식 재사용).
+//  maxHp 증가분만큼 currentHp도 올려 준다(레벨업 시 소소한 회복 — 정식과 동일 감성).
+export function recomputeStats(p: Pokemon): void {
+  const sp = getSpecies(p.speciesId);
+  if (!sp) return;
+  const b = sp.baseStats;
+  const oldMax = p.maxHp;
+  p.maxHp = calcHp(b.HP, p.level);
+  p.attack = calcStat(b.ATTACK, p.level);
+  p.defense = calcStat(b.DEFENSE, p.level);
+  p.spAttack = calcStat(b.SPECIAL_ATTACK, p.level);
+  p.spDefense = calcStat(b.SPECIAL_DEFENSE, p.level);
+  p.speed = calcStat(b.SPEED, p.level);
+  p.currentHp = Math.min(p.maxHp, p.currentHp + Math.max(0, p.maxHp - oldMax));
+}
+
 // (기존 호환) 이름·속성만으로 간단히 만드는 함수 — 옛 호출부가 아직 쓴다.
 //  가능하면 createFromSpecies를 쓰고, 이건 데이터 없을 때의 임시용.
 export function createPokemon(name: string, type: string): Pokemon {
   return {
-    speciesId: name.toUpperCase(), id: 0, name, types: [type], type, level: 5,
+    speciesId: name.toUpperCase(), id: 0, name, types: [type], type, level: 5, exp: 125,
     maxHp: 30, currentHp: 30, attack: 10, defense: 10, spAttack: 10, spDefense: 10, speed: 10,
     moves: [{ id: "TACKLE", pp: 35, maxPp: 35 }], status: null,
     heldItem: null, condition: 0, gender: null,

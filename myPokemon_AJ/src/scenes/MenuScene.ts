@@ -3,6 +3,7 @@ import { Pokemon, MoveSlot, displayName } from "../data/Pokemon";
 import { getMove } from "../data/ar";
 import { iconPath, makePartyIcon } from "../game/pokemonSprite";
 import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
+import { saveGame } from "../systems/save";
 
 // 인게임 스타트 메뉴 (오버레이). 필드(WorldScene 등)에서 Enter/X로 연다.
 //  상태: main(포켓몬/가방/저장/닫기) → party(파티 목록) → detail(한 마리 상세).
@@ -149,7 +150,7 @@ export default class MenuScene extends Phaser.Scene {
       if (item === "포켓몬") { if (!this.party.length) { this.toast("아직 포켓몬이 없어."); return; } this.state = "party"; this.idx = 0; this.renderState(); }
       else if (item === "도감") { this.toast("도감은 준비 중이야."); }
       else if (item === "가방") { this.toast("가방은 준비 중이야."); }
-      else if (item === "저장") { this.toast("저장은 준비 중이야."); }
+      else if (item === "저장") { saveGame(this.registry); this.toast("저장했다!"); }
       else if (item === "설정") { this.toast("설정은 준비 중이야."); }
     } else if (this.state === "party") {
       if (!this.party.length) return;

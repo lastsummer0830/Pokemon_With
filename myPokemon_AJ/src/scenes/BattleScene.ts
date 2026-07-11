@@ -3,6 +3,7 @@ import { frontPath, backPath, makeStillFront } from "../game/pokemonSprite";
 import { Pokemon, MoveSlot, createFromSpecies, displayName } from "../data/Pokemon";
 import { loadArDb, getMove } from "../data/ar";
 import { performMove, movesFirst, isFainted, effectivenessText } from "../systems/battle";
+import { battleExpYield, gainExp } from "../systems/exp";
 import DialogBox from "../ui/DialogBox";
 import { playBgm, stopBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
@@ -19,6 +20,7 @@ export interface BattleInit {
   ally?: Pokemon;
   enemy?: Pokemon;
   wild?: boolean;   // 야생 여부(도망 가능)
+  trainer?: string; // 트레이너 배틀이면 상대 트레이너 이름(예: "네모"). 있으면 wild 취급 안 함.
   returnPos?: [number, number]; // 배틀 끝나고 돌아갈 월드 좌표(승리/도망 시)
   returnFacing?: "down" | "left" | "right" | "up";
 }
@@ -87,6 +89,7 @@ export default class BattleScene extends Phaser.Scene {
 
   private pendingAlly: Pokemon | null = null;
   private pendingEnemy: Pokemon | null = null;
+  private trainer: string | null = null;   // 트레이너 배틀 상대 이름(야생이면 null)
   private allySpecies = "charmander";
   private enemySpecies = "pidgey";
   private outcome: "win" | "lose" | "run" = "win";  // 배틀 결과
@@ -99,7 +102,9 @@ export default class BattleScene extends Phaser.Scene {
     // 데이터가 있으면 그걸, 없으면 데모(파이리 vs 구구) — 실제 스탯은 create에서 채운다.
     this.pendingAlly = data?.ally ?? null;
     this.pendingEnemy = data?.enemy ?? null;
-    this.wild = data?.wild ?? true;
+    this.trainer = data?.trainer ?? null;
+    // 트레이너 배틀이면 무조건 야생 아님(도망 불가). 아니면 넘어온 wild 값(기본 야생).
+    this.wild = this.trainer ? false : (data?.wild ?? true);
     this.allySpecies = (data?.ally?.speciesId ?? "CHARMANDER").toLowerCase();
     this.enemySpecies = (data?.enemy?.speciesId ?? "PIDGEY").toLowerCase();
     this.returnPos = data?.returnPos;
@@ -108,6 +113,12 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   preload(): void {
+    // Phaser 텍스처는 Game 전역에 캐시된다 → 이전 배틀의 스프라이트 키가 남아 있으면
+    //  종족이 달라도 옛 그림을 재사용해 버린다(적이 안 바뀌는 버그). 매 배틀 새로 받도록 먼저 비운다.
+    //  (makeStillFront가 만드는 "__still" 파생 텍스처까지 제거.)
+    for (const k of ["battle_ally", "battle_enemy", "battle_ally__still", "battle_enemy__still"]) {
+      if (this.textures.exists(k)) this.textures.remove(k);
+    }
     this.load.image("battle_ally", backPath(this.allySpecies));   // 내 포켓몬 = 뒷모습
     this.load.image("battle_enemy", frontPath(this.enemySpecies)); // 상대 = 앞모습
     preloadCommonAudio(this);
@@ -166,9 +177,14 @@ export default class BattleScene extends Phaser.Scene {
 
   // ── 배틀 진행(상태머신) ──────────────────────────────────
   private async runBattle(): Promise<void> {
-    const foe = this.wild ? `야생 ${displayName(this.enemy)}` : displayName(this.enemy);
     playSfx(this, SFX.exclaim, 0.5); // 조우 "!"
-    await this.dlg.say(`앗! ${foe}이(가) 나타났다!`);
+    if (this.trainer) {
+      // 트레이너 배틀 인트로 — 승부를 걸고 포켓몬을 내보낸다.
+      await this.dlg.say(`${this.trainer}이(가) 승부를 걸어왔다!`);
+      await this.dlg.say(`${this.trainer}은(는) ${displayName(this.enemy)}을(를) 내보냈다!`);
+    } else {
+      await this.dlg.say(`앗! 야생 ${displayName(this.enemy)}이(가) 나타났다!`);
+    }
 
     while (true) {
       const choice = await this.selectCommand();
@@ -244,6 +260,22 @@ export default class BattleScene extends Phaser.Scene {
     this.outcome = "win";
     this.fadeOutSprite(this.enemySprite);
     await this.dlg.say(`상대 ${displayName(this.enemy)}을(를) 쓰러뜨렸다!`);
+    // 트레이너 배틀이면 승부 마무리 대사 + F1: 라이벌(트레이너)전 예약은 '이겼을 때만' 소비(지면 재대결 가능).
+    if (this.trainer) {
+      await this.dlg.say(`${this.trainer}와(과)의 승부에서 이겼다!`);
+      this.registry.set("rivalBattlePending", false);
+    }
+    // 경험치 지급(승리 시에만). this.ally는 registry 파티 선두와 동일 참조라 레벨업이 파티에 그대로 반영된다.
+    const up = gainExp(this.ally, battleExpYield(this.enemy));
+    await this.dlg.say(`${displayName(this.ally)}은(는) ${up.gained} 경험치를 얻었다!`);
+    for (const lv of up.levels) {
+      playSfx(this, SFX.decision, 0.4);
+      await this.dlg.say(`${displayName(this.ally)}은(는) Lv.${lv}(으)로 올랐다!`);
+    }
+    if (up.levels.length) await this.allyBox.animateTo(); // 레벨업으로 바뀐 HP/Lv 표시 갱신
+    for (const l of up.learned) {
+      await this.dlg.say(`${displayName(this.ally)}은(는) 새로운 기술 ${l.move}을(를) 배웠다!`);
+    }
   }
   private async lose(): Promise<void> {
     this.outcome = "lose";

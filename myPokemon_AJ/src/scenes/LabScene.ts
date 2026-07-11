@@ -29,6 +29,17 @@ const STARTERS: StarterDef[] = [
 
 const OAK_TILE: [number, number] = [8, 3];      // 스타팅 탁자 바로 뒤(중앙)
 const NEMONA_TILE: [number, number] = [11, 3];
+
+// 라이벌(네모)은 내 스타터가 상성상 유리한 스타터를 고른다(SV 네모 방식 — 첫 배틀은 플레이어 우세).
+//  풀(나오하) > 물(개구마르) > 불꽃(파이리) > 풀 …  즉 내가 고른 타입에 '약한' 스타터를 네모가 가진다.
+function rivalCounter(myKey: string): string {
+  const map: Record<string, string> = {
+    SPRIGATITO: "FROAKIE",    // 내가 풀 → 네모는 물(내가 유리)
+    CHARMANDER: "SPRIGATITO", // 내가 불꽃 → 네모는 풀
+    FROAKIE: "CHARMANDER",    // 내가 물 → 네모는 불꽃
+  };
+  return map[myKey.toUpperCase()] ?? "CHARMANDER";
+}
 // 초록 탁자 = 칸 (8,4)(9,4)(10,4). 그 위에 포켓볼 3개를 올림. 플레이어는 (8,5)(9,5)(10,5)에서 위 보고 선택.
 const BALL_TILES: [number, number][] = [[8, 4], [9, 4], [10, 4]];
 const BALL_TOP = 0.62;   // 포켓볼 발 위치(칸 세로비율) — 초록 상판에 얹히도록
@@ -269,10 +280,19 @@ export default class LabScene extends Phaser.Scene {
     const disp = nickname ?? pick.name;
     if (nickname) await this.dlg.say(`${nickname}! 좋은 이름이구나.`, "오박사");
     await this.dlg.say(`${disp}${this.josa(disp, "과와")} 함께 좋은 여행이 되길 바란다!`, "오박사");
+    // 오박사 — 이 게임의 색(포켓몬을 소중히 대하면 컨디션·유대가 배틀로 이어진다)의 떡밥.
+    await this.dlg.say(`한 가지만 기억하렴. ${disp}${this.josa(disp, "을를")} 진심으로 아껴주어야 한다.`, "오박사");
+    await this.dlg.say("요즘 포켓몬은... 예전 같지 않아. 트레이너의 마음을 느끼고, 그만큼 배틀에서 응답해준단다.", "오박사");
+    await this.dlg.say(`다행히 ${disp}${this.josa(disp, "은는")} 왠지 널 마음에 들어 하는 것 같구나. 좋은 인연이야.`, "오박사");
+    // 네모 — 즉시 라이벌 배틀 도발(사용자 지시). "밖에서 기다린다" → 마을로 나가면 WorldScene에서 배틀 발동.
     await this.dlg.say(`좋았어, 결정했구나! ${you}, 이제 우린 라이벌이야.`, "네모");
-    await this.dlg.say("언젠가 서로 전력을 다해 부딪히는 최고의 배틀 — 꼭 하자! 약속이야!", "네모");
+    await this.dlg.say("그 파트너가 얼마나 굉장한지 당장 보고 싶어! 지금 바로 한 판 어때?", "네모");
+    await this.dlg.say("밖에서 기다릴게 — 준비되면 마을로 나와!", "네모");
     this.dlg.hide();
-    this.hint.setText("아래 문으로 나가 마을로!").setVisible(true);
+    // 라이벌 배틀 예약: 상대는 내 스타터가 상성상 유리한 카운터 스타터(SV 네모 방식).
+    this.registry.set("rivalBattlePending", true);
+    this.registry.set("rivalEnemySpecies", rivalCounter(pick.key));
+    this.hint.setText("아래 문으로 나가면 네모가 기다린다!").setVisible(true);
     this.busy = false;
   }
 

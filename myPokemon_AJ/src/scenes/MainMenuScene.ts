@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
+import { hasSave, loadGame } from "../systems/save";
 
 // 메인 메뉴 화면 — 타이틀(로고+PRESS START)에서 엔터/클릭하면 이 화면이 뜬다.
 // 톤 = 화이트/블루. 밝은 하늘 그라데 배경 + 몬스터볼(우하단) + AR식 가로 메뉴 바.
@@ -122,7 +123,15 @@ export default class MainMenuScene extends Phaser.Scene {
       this.cameras.main.fadeOut(250, 0, 0, 0);
       this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("IntroScene"));
     } else if (action === "continue") {
-      this.showToast("저장된 게임이 없어요");   // TODO: 세이브 불러오기 연결
+      const data = hasSave() ? loadGame(this.registry) : null;
+      if (!data) { this.showToast("저장된 게임이 없어요"); return; }
+      // 저장 상태를 registry에 복원(loadGame이 처리) → 저장돼 있던 씬·위치로 이동.
+      const loc = data.loc;
+      this.cameras.main.fadeOut(250, 0, 0, 0);
+      this.cameras.main.once("camerafadeoutcomplete", () => {
+        if (loc.scene === "InteriorScene") this.scene.start("InteriorScene", { room: loc.room ?? "living", skipIntro: true });
+        else this.scene.start("WorldScene", { spawn: [loc.tx ?? 17, loc.ty ?? 8], face: loc.facing ?? "down" });
+      });
     } else if (action === "options") {
       this.showToast("옵션은 준비 중이에요");
     } else if (action === "quit") {
