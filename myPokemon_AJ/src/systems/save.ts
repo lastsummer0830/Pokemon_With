@@ -1,11 +1,14 @@
 import Phaser from "phaser";
 import { Pokemon } from "../data/Pokemon";
+import { HouseLayout } from "../data/HouseLayout";
+import { emptyHouse } from "./homeBonus";
 
 // 저장/불러오기 — 브라우저 localStorage.
 //  ⚠️ 실제 런타임 상태는 씬 registry에 있다(파티·이름·성별·라이벌 예약·집인트로 등).
 //     그래서 registry를 '단일 원천'으로 직렬화/복원한다. 위치(loc)는 메뉴를 연 씬이 미리 registry에 기록한다.
 const SAVE_KEY = "myPokemon.save";
-const SAVE_VERSION = 1;
+//  v2: houseLayout(집 꾸미기 배치) 추가. v1 저장은 빈 방으로 채워 그대로 이어할 수 있다.
+const SAVE_VERSION = 2;
 
 export interface SaveLoc {
   scene: string;                              // 복원할 씬 키
@@ -24,6 +27,7 @@ export interface SaveData {
   rivalBattlePending: boolean;
   rivalEnemySpecies: string | null;
   houseIntroDone: boolean;
+  houseLayout: HouseLayout;  // ★ 집 꾸미기 배치(컨디션 상한을 결정) — v2부터
   loc: SaveLoc;
   savedAt: number;   // 저장 시각(표시용)
 }
@@ -46,6 +50,7 @@ export function saveGame(reg: Reg): void {
     rivalBattlePending: !!reg.get("rivalBattlePending"),
     rivalEnemySpecies: (reg.get("rivalEnemySpecies") as string) ?? null,
     houseIntroDone: !!reg.get("houseIntroDone"),
+    houseLayout: (reg.get("houseLayout") as HouseLayout) ?? emptyHouse(),
     loc: (reg.get("saveLoc") as SaveLoc) ?? { scene: "WorldScene" },
     savedAt: Date.now(),
   };
@@ -66,6 +71,8 @@ export function loadGame(reg: Reg): SaveData | null {
   reg.set("rivalBattlePending", !!data.rivalBattlePending);
   reg.set("rivalEnemySpecies", data.rivalEnemySpecies ?? null);
   reg.set("houseIntroDone", !!data.houseIntroDone);
+  // v1 저장에는 houseLayout이 없다 → 빈 방으로 채워 그대로 이어하게 한다(마이그레이션).
+  reg.set("houseLayout", data.houseLayout ?? emptyHouse());
   reg.set("saveLoc", data.loc);
   return data;
 }

@@ -41,7 +41,8 @@ export default class DebugMenuScene extends Phaser.Scene {
       ["4. 시작 집 - 거실 바로가기", "InteriorScene", { room: "living", skipIntro: true }],
       ["5. 마을(World)", "WorldScene"],
       ["6. 배틀(Battle) - 야생 데모", "BattleScene", { wild: true }],
-      ["7. 집 꾸미기(House)", "HouseScene"],
+      // 집 꾸미기는 별도 화면이 아니라 '내 방(2F)에서 F키'로 한다 → 침실로 바로 보낸다(테스트 파티 포함).
+      ["7. 집 꾸미기(내 방 2F에서 F키)", "InteriorScene", { room: "bedroom", skipIntro: true, testParty: true }],
       ["8. 시작 집 - 침실 바로가기(skip)", "InteriorScene", { room: "bedroom", skipIntro: true }],
       ["9. 포켓몬 연구소(스타팅 선택)", "LabScene"],
       ["0. 인게임 메뉴(파티/가방/저장)", "__MENU__"],
@@ -50,6 +51,13 @@ export default class DebugMenuScene extends Phaser.Scene {
       // 테스트용 기본값 — 인트로를 건너뛰어도 씬이 동작하도록
       if (!this.registry.get("playerName")) this.registry.set("playerName", "테스트");
       this.registry.set("playerGender", this.gender);
+      // 집 꾸미기 확인용: 타입별 효과(불꽃/물/풀)를 바로 보려면 파티가 있어야 한다.
+      if ((data as { testParty?: boolean } | undefined)?.testParty) {
+        const party = (this.registry.get("playerParty") as Pokemon[]) ?? [];
+        if (!party.length) this.registry.set("playerParty", [
+          createFromSpecies("CHARMANDER", 5), createFromSpecies("SQUIRTLE", 5), createFromSpecies("BULBASAUR", 5),
+        ]);
+      }
       if (key === "__MENU__") {
         // 인게임 메뉴 확인용: 테스트 파티가 없으면 채워넣고 메뉴 오버레이를 띄운다.
         const party = (this.registry.get("playerParty") as Pokemon[]) ?? [];

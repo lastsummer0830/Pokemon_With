@@ -56,6 +56,7 @@
 ## F. 보조 무료 에셋 (프로토타입용 — 도트 아니면 인게임 금지)
 | 소스 | 용도 | 비고 |
 |---|---|---|
+| **itch.io 무료 pokemon 태그** (`https://itch.io/game-assets/free/tag-pokemon`) | 몬스터테이밍 픽셀팩·타일셋·배틀 VFX·SFX(Gen1~7 공격음 등) | ⚠️ **A~D(AGENTS §4 우선순위) 다 없을 때만.** 팬메이드 혼재 → **에셋마다 픽셀 여부·라이선스 개별 확인**(Royalty Free/개인·상업 표기 제각각), CORS 없음 → 다운로드 후 `public/assets/` |
 | **Kenney** (kenney.nl/assets) | 프로토타입 2D 에셋/UI | 라이선스 관대하나 페이지 확인 |
 | **OpenGameArt** (opengameart.org) | 오픈 에셋 | 에셋별 라이선스 천차만별, 반드시 확인 |
 | **Game-icons.net** | 스킬/아이템/상태 아이콘 | 출처 표기 조건 확인 |

@@ -1,7 +1,11 @@
 import Phaser from "phaser";
 import { Gender } from "../data/Player";
+import { Pokemon } from "../data/Pokemon";
 import { playBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
+import { FURNITURE, FurnitureDef } from "../data/furniture";
+import { HouseLayout, canPlace, furnitureAt } from "../data/HouseLayout";
+import { conditionCap, emptyHouse, sleepAtHome, furnitureHint, CONDITION_MAX } from "../systems/homeBonus";
 
 // ⚠️ 검증용 임시 오버레이 — 충돌(빨강)·워프(초록) 칸을 화면에 그린다. 확인 끝나면 false로.
 const DEBUG_COLLISION = false;
@@ -25,7 +29,8 @@ const DEBUG_COLLISION = false;
 // climb = 워프 칸 기준 오르는 경로. 한 칸이면 [dx,dy], 여러 칸이면 [[dx,dy],[dx,dy],...] (계단 발판을 따라).
 // climbFace = 계단을 오르는 동안 바라보는 방향(기본 "up" = 계단을 정면으로 바라봄).
 interface Warp { x: number; y: number; to: string; ax?: number; ay?: number; kind?: string; dir?: Dir; face?: Dir; climb?: number[] | number[][]; climbFace?: Dir }
-interface RoomDef { img: string; cols: number; rows: number; blocked: number[][]; start: [number, number]; warps: Warp[] }
+// bed = 침대 사각형 [x, y, w, h] — 앞에서 Space를 누르면 잠자기(컨디션 회복). 침실에만 있다.
+interface RoomDef { img: string; cols: number; rows: number; blocked: number[][]; start: [number, number]; warps: Warp[]; bed?: number[] }
 type Rooms = Record<string, RoomDef>;
 type Dir = "down" | "left" | "right" | "up";
 
@@ -72,6 +77,20 @@ export default class InteriorScene extends Phaser.Scene {
   private startRoom = "bedroom";
   private skipIntro = false;
 
+  // ── ★ 집 꾸미기(내 색) ──
+  //  배치는 registry "houseLayout"에 산다(저장은 systems/save.ts가 함께 직렬화).
+  //  놓인 가구 칸은 걸을 수 없고(walkable), 침대에서 자면 방 구성만큼 컨디션이 오른다(systems/homeBonus.ts).
+  private house!: HouseLayout;
+  private furnImgs: Phaser.GameObjects.Image[] = [];   // 화면에 그려둔 가구들
+  private decorating = false;                          // 꾸미기 모드인가
+  private selIdx = 0;                                  // 고른 가구(FURNITURE 인덱스)
+  private curX = 0;                                    // 꾸미기 커서 칸
+  private curY = 0;
+  private ghost?: Phaser.GameObjects.Image;            // 놓기 미리보기(반투명)
+  private cursorG?: Phaser.GameObjects.Graphics;       // 커서 사각형(초록=놓을 수 있음/빨강=불가)
+  private decoText?: Phaser.GameObjects.Text;          // 꾸미기 안내/설명 바
+  private keys!: Record<"space" | "f" | "r" | "q" | "e" | "esc", Phaser.Input.Keyboard.Key>;
+
   constructor() {
     super("InteriorScene");
   }
@@ -100,15 +119,22 @@ export default class InteriorScene extends Phaser.Scene {
     this.load.spritesheet(this.texKey, file, { frameWidth: 32, frameHeight: 48 });
     // 라이벌 네모(오버월드 걷기 시트, 32x48 4방향x4프레임)
     this.load.spritesheet("nemona", "assets/characters/trainer_NEMONA.png", { frameWidth: 32, frameHeight: 48 });
+    // 집 꾸미기 가구 그림 (카탈로그의 id 그대로 파일명). 방 그림과 같은 이유로 캐시버스터를 붙인다
+    // (가구 png를 교체했는데 브라우저가 옛 그림을 물어 "고쳐도 똑같다"가 되는 걸 막는다).
+    for (const f of FURNITURE) this.load.image(f.sprite, `assets/house/furniture/${f.id}.png` + v);
   }
 
   create(): void {
     this.rooms = this.cache.json.get("rooms") as Rooms;
 
     // 도트는 또렷하게(픽셀 보존) — 화질 개선의 핵심
-    for (const k of ["room_bedroom", "room_living", "stairs_living", "nemona", this.texKey]) {
-      this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    for (const k of ["room_bedroom", "room_living", "stairs_living", "nemona", this.texKey, ...FURNITURE.map(f => f.sprite)]) {
+      if (this.textures.exists(k)) this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
     }
+
+    // 집 배치 불러오기(저장에서 복원됐으면 그걸, 처음이면 빈 방)
+    this.house = (this.registry.get("houseLayout") as HouseLayout) ?? emptyHouse();
+    this.registry.set("houseLayout", this.house);
     this.cameras.main.roundPixels = true;   // 소수점 좌표로 인한 흐릿함 방지
 
     // 걷기 애니메이션(행0=아래,1=왼쪽,2=오른쪽,3=위, 각 4프레임)
@@ -123,6 +149,16 @@ export default class InteriorScene extends Phaser.Scene {
     this.player = this.add.sprite(0, 0, this.texKey, this.idleFrame.down).setOrigin(0.5, 1);
     // (가구 전경 오버레이 방식은 back wall/소품까지 캐릭터 머리를 가려 '대가리 잘림'이 생겨 폐기. 캐릭터를 그냥 앞에 그린다. AGENTS.md 참고.)
     this.cursors = this.input.keyboard!.createCursorKeys();
+    // 꾸미기·잠자기용 키. (대사창은 keydown 이벤트를 쓰므로, 여기선 update에서 JustDown으로만 읽어 충돌을 피한다)
+    const KC = Phaser.Input.Keyboard.KeyCodes;
+    this.keys = {
+      space: this.input.keyboard!.addKey(KC.SPACE),
+      f: this.input.keyboard!.addKey(KC.F),
+      r: this.input.keyboard!.addKey(KC.R),
+      q: this.input.keyboard!.addKey(KC.Q),
+      e: this.input.keyboard!.addKey(KC.E),
+      esc: this.input.keyboard!.addKey(KC.ESC),
+    };
     // 실내에서도 인게임 메뉴 열기(Enter/X). 대사·워프 중(busy)엔 열리지 않도록 openMenu가 가드.
     this.input.keyboard!.on("keydown-ENTER", () => this.openMenu());
     this.input.keyboard!.on("keydown-X", () => this.openMenu());
@@ -137,7 +173,7 @@ export default class InteriorScene extends Phaser.Scene {
 
     // 안내(컷신 동안엔 숨김)
     const name = this.playerName();
-    this.add.text(12, 12, `${name ? name + "  |  " : ""}방향키: 이동  |  계단: 위로↑ 올라가기  |  문: 마을로`, {
+    this.add.text(12, 12, `${name ? name + "  |  " : ""}방향키: 이동  |  침대 앞 Space: 잠자기  |  F: 방 꾸미기  |  문: 마을로`, {
       fontFamily: "Galmuri11, sans-serif", fontSize: "16px", color: "#ffffff",
       backgroundColor: "#00000077", padding: { x: 8, y: 4 },
     }).setName("hud").setScrollFactor(0).setDepth(100);
@@ -163,7 +199,7 @@ export default class InteriorScene extends Phaser.Scene {
 
   // 인게임 메뉴 열기(오버레이) — WorldScene.openMenu와 동일 패턴. 이 씬을 멈추고 MenuScene을 띄운다.
   private openMenu(): void {
-    if (this.busy || this.moving) return;
+    if (this.busy || this.moving || this.decorating) return;   // 꾸미는 중엔 메뉴가 끼어들지 않는다
     // 저장 위치 기록 — 실내는 방(roomKey) 단위로 복원(정밀 타일 아님).
     this.registry.set("saveLoc", { scene: "InteriorScene", room: this.roomKey });
     this.input.enabled = false;
@@ -192,7 +228,285 @@ export default class InteriorScene extends Phaser.Scene {
     this.player.stop();
     this.player.setFrame(this.idleFrame[face]);
     this.moving = false;
+    if (this.decorating) this.exitDecorate();   // 방을 옮기면 꾸미기 모드는 닫는다
+    this.renderFurniture();                     // 놓아둔 가구 다시 그리기(침실에서만 보인다)
     this.layout();
+  }
+
+  // ─────────────────────── ★ 집 꾸미기 (내 색) ───────────────────────
+  // 놓인 가구를 화면에 그린다. 캐릭터(depth 10)보다 아래에 그려서 '머리 잘림'이 없다(AGENTS.md).
+  //  가구 칸은 walkable()에서 막히므로 캐릭터가 가구 위에 겹칠 일도 없다.
+  private renderFurniture(): void {
+    this.furnImgs.forEach(i => i.destroy());
+    this.furnImgs = [];
+    if (this.roomKey !== "bedroom") return;     // 꾸미기는 내 방(2F)에서만
+    for (const p of this.house.furniture) {
+      const def = FURNITURE.find(f => f.id === p.itemId);
+      if (!def || !this.textures.exists(def.sprite)) continue;
+      // 러그(밟고 지나가는 것)는 바닥에 깔리고(depth 1), 덩치 가구는 그 위·주인공 아래(depth 5).
+      const img = this.add.image(0, 0, def.sprite).setOrigin(0, 0).setDepth(def.walkable ? 1 : 5);
+      img.setData("cell", { x: p.x, y: p.y, w: def.w, h: def.h });
+      this.furnImgs.push(img);
+    }
+    this.layoutFurniture();
+  }
+
+  // 가구 그림을 칸 좌표에 맞춰 배치(리사이즈 때도 다시 호출).
+  private layoutFurniture(): void {
+    for (const img of this.furnImgs) {
+      const c = img.getData("cell") as { x: number; y: number; w: number; h: number };
+      // 가구 그림이 차지 칸(w×h)에 딱 맞도록 스케일(그림이 32의 배수가 아니어도 안전).
+      img.setPosition(this.origin.x + c.x * this.tile, this.origin.y + c.y * this.tile);
+      img.setDisplaySize(c.w * this.tile, c.h * this.tile);
+    }
+  }
+
+  // (x,y)가 원래 방 바닥(가구를 놓을 수 있는 빈 칸)인가 — 벽·기존 가구·계단/문·주인공 발밑은 안 된다.
+  private isFloor = (x: number, y: number): boolean => {
+    if (x < 0 || y < 0 || x >= this.def.cols || y >= this.def.rows) return false;
+    if (this.def.blocked[y][x] === 1) return false;
+    if (this.warpAt(x, y)) return false;
+    // ⚠️ 계단/문 '앞칸'도 막는다 — 침실 계단은 진입로가 (11,3) 한 칸뿐이라, 거기 가구를 놓으면
+    //    계단으로 영영 못 가서 방에 갇힌다.
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (this.warpAt(x + dx, y + dy)) return false;
+    }
+    if (x === this.tx && y === this.ty) return false;   // 주인공이 선 칸에 놓으면 갇힌다
+    return true;
+  };
+
+  private toggleDecorate(): void {
+    if (this.decorating) { this.exitDecorate(); return; }
+    if (this.roomKey !== "bedroom") return;   // 내 방에서만 꾸민다
+    this.decorating = true;
+    // 커서는 주인공 앞칸에서 시작(없으면 주인공 옆)
+    const [dx, dy] = this.dirVec(this.facing);
+    this.curX = Phaser.Math.Clamp(this.tx + dx, 0, this.def.cols - 1);
+    this.curY = Phaser.Math.Clamp(this.ty + dy, 0, this.def.rows - 1);
+    this.cursorG = this.add.graphics().setDepth(20);
+    this.ghost = this.add.image(0, 0, FURNITURE[this.selIdx].sprite).setOrigin(0, 0).setDepth(19).setAlpha(0.6);
+    this.decoText = this.add.text(0, 0, "", {
+      fontFamily: this.FONT, fontSize: "16px", color: "#ffffff", align: "center",
+      backgroundColor: "#000000cc", padding: { x: 10, y: 6 },
+    }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(1000);
+    playSfx(this, SFX.decision, 0.5);
+    this.drawDecorate();
+  }
+
+  private exitDecorate(): void {
+    this.decorating = false;
+    this.cursorG?.destroy(); this.cursorG = undefined;
+    this.ghost?.destroy(); this.ghost = undefined;
+    this.decoText?.destroy(); this.decoText = undefined;
+  }
+
+  // 꾸미기 모드 입력 — 방향키: 커서, Q/E: 가구 바꾸기, Space: 놓기, R: 치우기, F/Esc: 끝내기
+  private updateDecorate(justSpace: boolean): void {
+    const JD = Phaser.Input.Keyboard.JustDown;
+    let moved = false;
+    if (JD(this.cursors.left)) { this.curX--; moved = true; }
+    else if (JD(this.cursors.right)) { this.curX++; moved = true; }
+    else if (JD(this.cursors.up)) { this.curY--; moved = true; }
+    else if (JD(this.cursors.down)) { this.curY++; moved = true; }
+    if (moved) {
+      this.curX = Phaser.Math.Clamp(this.curX, 0, this.def.cols - 1);
+      this.curY = Phaser.Math.Clamp(this.curY, 0, this.def.rows - 1);
+    }
+    if (JD(this.keys.q)) { this.selIdx = (this.selIdx - 1 + FURNITURE.length) % FURNITURE.length; playSfx(this, SFX.cursor, 0.4); }
+    if (JD(this.keys.e)) { this.selIdx = (this.selIdx + 1) % FURNITURE.length; playSfx(this, SFX.cursor, 0.4); }
+    if (justSpace) this.placeFurniture();
+    if (JD(this.keys.r)) this.removeFurniture();
+    this.drawDecorate();
+  }
+
+  // 이 가구를 놓아도 방이 막히지 않나 — 주인공이 계단(워프)과 침대 앞칸에 여전히 갈 수 있어야 한다.
+  //  ⚠️ 이게 없으면 통로 한가운데 큰 가구를 놓아 방이 두 조각으로 갈라지고, 계단도 침대도 못 가서 갇힌다.
+  //     (러그처럼 밟고 지나가는 가구는 길을 막지 않으므로 벽으로 치지 않는다.)
+  private keepsRoomConnected(def: FurnitureDef, px: number, py: number): boolean {
+    const solid = new Set<string>();
+    for (const p of this.house.furniture) {
+      const d = FURNITURE.find(f => f.id === p.itemId);
+      if (!d || d.walkable) continue;
+      for (let dy = 0; dy < d.h; dy++) for (let dx = 0; dx < d.w; dx++) solid.add(`${p.x + dx},${p.y + dy}`);
+    }
+    if (!def.walkable) {
+      for (let dy = 0; dy < def.h; dy++) for (let dx = 0; dx < def.w; dx++) solid.add(`${px + dx},${py + dy}`);
+    }
+
+    // 주인공 위치에서 걸어서 갈 수 있는 칸을 전부 모은다(BFS).
+    const seen = new Set<string>([`${this.tx},${this.ty}`]);
+    const queue: Array<[number, number]> = [[this.tx, this.ty]];
+    while (queue.length) {
+      const [x, y] = queue.shift()!;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        const key = `${nx},${ny}`;
+        if (seen.has(key)) continue;
+        if (nx < 0 || ny < 0 || nx >= this.def.cols || ny >= this.def.rows) continue;
+        if (this.def.blocked[ny][nx] === 1 && !this.warpAt(nx, ny)) continue;
+        if (solid.has(key)) continue;
+        seen.add(key); queue.push([nx, ny]);
+      }
+    }
+
+    // 계단/문은 전부 닿아야 한다.
+    for (const w of this.def.warps) if (!seen.has(`${w.x},${w.y}`)) return false;
+    // ⚠️ '지금 서 있는 자리'만 보면 안 된다 — 방에 다시 들어올 때 서는 자리(시작칸·계단 도착칸)가
+    //    가구로 둘러싸이면, 놓을 땐 멀쩡했다가 재입장 순간 갇힌다. 그 자리들도 전부 닿아야 한다.
+    const entries: Array<[number, number]> = [this.def.start];
+    for (const w of this.def.warps) {
+      const back = this.rooms[w.to];
+      if (back) for (const bw of back.warps) {
+        if (bw.to === this.roomKey && bw.ax !== undefined && bw.ay !== undefined) entries.push([bw.ax, bw.ay]);
+      }
+    }
+    for (const [ex, ey] of entries) if (!seen.has(`${ex},${ey}`)) return false;
+    // 침대도 최소 한 칸은 앞에서 마주볼 수 있어야 한다(잠자기가 막히면 안 되니까).
+    const bed = this.def.bed;
+    if (bed) {
+      const [bx, by, bw, bh] = bed;
+      const front: Array<[number, number]> = [];
+      for (let x = bx; x < bx + bw; x++) { front.push([x, by - 1]); front.push([x, by + bh]); }
+      for (let y = by; y < by + bh; y++) { front.push([bx - 1, y]); front.push([bx + bw, y]); }
+      if (!front.some(([x, y]) => seen.has(`${x},${y}`))) return false;
+    }
+    return true;
+  }
+
+  // 벽면 가구(벽난로·책장)는 '위쪽이 벽'인 자리에만 놓을 수 있다.
+  //  그림이 정면 각도라 벽에 등을 대지 않으면 공중에 뜬 것처럼 보이기 때문(사용자 지적).
+  //  → 가구 윗줄의 모든 칸 바로 위가 방 격자에서 막힌 칸(벽/기물)이어야 한다.
+  private againstWall(def: FurnitureDef, x: number, y: number): boolean {
+    if (!def.wallOnly) return true;
+    for (let dx = 0; dx < def.w; dx++) {
+      const ax = x + dx, ay = y - 1;
+      if (ay < 0) return false;
+      if (this.def.blocked[ay][ax] !== 1) return false;   // 위가 뚫려 있으면 벽이 아니다
+      if (this.warpAt(ax, ay)) return false;              // 계단/문은 벽이 아니다
+    }
+    return true;
+  }
+
+  private placeFurniture(): void {
+    const def = FURNITURE[this.selIdx];
+    if (!canPlace(this.house, def, this.curX, this.curY, this.isFloor)
+      || !this.againstWall(def, this.curX, this.curY)
+      || !this.keepsRoomConnected(def, this.curX, this.curY)) {
+      playSfx(this, SFX.bump, 0.4);
+      return;
+    }
+    this.house.furniture.push({ itemId: def.id, x: this.curX, y: this.curY });
+    this.registry.set("houseLayout", this.house);
+    playSfx(this, SFX.decision, 0.45);
+    this.renderFurniture();
+  }
+
+  private removeFurniture(): void {
+    const hit = furnitureAt(this.house, this.curX, this.curY);
+    if (!hit) { playSfx(this, SFX.bump, 0.4); return; }
+    this.house.furniture = this.house.furniture.filter(p => p !== hit);
+    this.registry.set("houseLayout", this.house);
+    playSfx(this, SFX.cancel, 0.5);
+    this.renderFurniture();
+  }
+
+  // 커서 사각형(초록/빨강) + 미리보기 + 하단 설명 바
+  private drawDecorate(): void {
+    if (!this.decorating || !this.cursorG || !this.ghost || !this.decoText) return;
+    const def = FURNITURE[this.selIdx];
+    // 놓을 수 있나 = 빈 칸이고(canPlace) + 벽면 가구면 벽에 붙었고(againstWall) + 길이 막히지 않는다
+    const ok = canPlace(this.house, def, this.curX, this.curY, this.isFloor)
+      && this.againstWall(def, this.curX, this.curY)
+      && this.keepsRoomConnected(def, this.curX, this.curY);
+    const onFurn = !!furnitureAt(this.house, this.curX, this.curY);
+
+    const x = this.origin.x + this.curX * this.tile;
+    const y = this.origin.y + this.curY * this.tile;
+    const w = def.w * this.tile;
+    const h = def.h * this.tile;
+
+    if (this.ghost.texture.key !== def.sprite && this.textures.exists(def.sprite)) this.ghost.setTexture(def.sprite);
+    this.ghost.setPosition(x, y).setDisplaySize(w, h).setVisible(this.textures.exists(def.sprite) && !onFurn);
+
+    const g = this.cursorG;
+    g.clear();
+    g.lineStyle(3, ok ? 0x53d769 : 0xff4d4d, 1);
+    g.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+
+    // 이 가구가 지금 파티에 무슨 의미인지 + 방 전체가 만드는 컨디션 상한을 함께 보여준다.
+    const party = (this.registry.get("playerParty") as Pokemon[]) ?? [];
+    const caps = party.map(p => `${p.name} ${conditionCap(p, this.house)}`).join(" / ");
+    const capLine = party.length
+      ? `이 방의 컨디션 상한 → ${caps}  (최대 ${CONDITION_MAX})`
+      : "포켓몬이 생기면 이 방의 효과가 나타난다.";
+    // 왜 못 놓는지 알려준다(빨간 커서만 보여주면 이유를 모른다).
+    //  ※ 는 Galmuri11에 있는 글자. ⚠ 같은 이모지·기호는 이 폰트에 없어 깨진 네모(▮)로 나온다.
+    const why = !ok && def.wallOnly && !this.againstWall(def, this.curX, this.curY)
+      ? "  ※ 벽에 등을 붙여야 놓을 수 있다" : "";
+    this.decoText
+      .setText(`[방 꾸미기]  ${def.name} — ${furnitureHint(def, party)}${why}\n${capLine}\n←↑↓→ 이동  Q/E 가구바꾸기  Space 놓기  R 치우기  F 끝내기`)
+      .setPosition(this.scale.width / 2, this.scale.height - 12);
+  }
+
+  // ─────────────────────── ★ 잠자기(컨디션 회복) ───────────────────────
+  // 침대를 바라보고 Space → 파티 전원이 쉰다. 얼마나 오르는지는 '방을 어떻게 꾸몄나'가 정한다.
+  private facingBed(): boolean {
+    const bed = this.def.bed;
+    if (!bed) return false;
+    const [dx, dy] = this.dirVec(this.facing);
+    const fx = this.tx + dx, fy = this.ty + dy;
+    const [bx, by, bw, bh] = bed;
+    return fx >= bx && fx < bx + bw && fy >= by && fy < by + bh;
+  }
+
+  private async sleepInBed(): Promise<void> {
+    this.busy = true;
+    const party = (this.registry.get("playerParty") as Pokemon[]) ?? [];
+    await this.say("포근한 침대다. 한숨 잘까?");
+    const yes = await this.askYesNo();
+    if (!yes) {
+      this.setDialogVisible(false);
+      this.endBusySoon();
+      return;
+    }
+
+    // 화면을 어둡게 → 밝게(밤이 지나가는 연출)
+    this.setDialogVisible(false);
+    this.cameras.main.fadeOut(500, 0, 0, 0);
+    await this.wait(700);
+    this.cameras.main.fadeIn(600, 0, 0, 0);
+    await this.wait(300);
+
+    if (party.length === 0) {
+      await this.say("푹 잤다! …하지만 아직 함께 잘 포켓몬이 없다.");
+      this.setDialogVisible(false);
+      this.endBusySoon();
+      return;
+    }
+
+    const results = sleepAtHome(party, this.house);
+    this.registry.set("playerParty", party);
+    await this.say("푹 잤다! 포켓몬들도 기운을 되찾았다.");
+    for (const r of results) {
+      const p = r.pokemon;
+      if (r.after > r.before) {
+        await this.say(`${p.name}의 컨디션이 올랐다!  ${r.before} → ${r.after}  (이 방의 한계 ${r.cap})`);
+      } else {
+        await this.say(`${p.name}은(는) 이 방에서 낼 수 있는 최상의 컨디션이다.  ${r.after} / ${r.cap}`);
+      }
+    }
+    // 방이 허전하면 힌트(집 꾸미기 → 배틀 고리를 플레이어가 알아채게)
+    const bestCap = Math.max(...results.map(r => r.cap));
+    if (bestCap < CONDITION_MAX) {
+      await this.say("방을 더 꾸미면 포켓몬이 더 좋은 컨디션까지 갈 수 있을 것 같다. (F: 방 꾸미기)");
+    }
+    this.setDialogVisible(false);
+    this.endBusySoon();
+  }
+
+  // 대사가 끝난 직후의 Space가 다시 잠자기를 부르지 않도록 잠깐 뒤에 입력을 푼다.
+  private endBusySoon(): void {
+    this.time.delayedCall(200, () => { this.busy = false; });
   }
 
   // 방 이미지를 화면 중앙에 비율 유지로 배치 + 칸 크기 계산 + 주인공 위치 갱신
@@ -210,6 +524,8 @@ export default class InteriorScene extends Phaser.Scene {
     this.snapPlayer();
     if (this.nemona) this.nemona.setScale(this.zoom * 0.92);
     this.updateStairsDeco();
+    this.layoutFurniture();
+    this.drawDecorate();
     this.drawDebug();
     this.layoutDialog();
   }
@@ -252,6 +568,14 @@ export default class InteriorScene extends Phaser.Scene {
     if (tx < 0 || ty < 0 || tx >= this.def.cols || ty >= this.def.rows) return false;
     const w = this.warpAt(tx, ty);
     if (w) return w.dir ? w.dir === dir : true;
+    // 내가 놓은 가구도 벽처럼 막는다 — 단 러그·카펫(walkable)은 밟고 지나간다.
+    if (this.roomKey === "bedroom") {
+      const p = furnitureAt(this.house, tx, ty);
+      if (p) {
+        const def = FURNITURE.find(f => f.id === p.itemId);
+        if (!def?.walkable) return false;
+      }
+    }
     return this.def.blocked[ty][tx] === 0;
   }
 
@@ -264,7 +588,24 @@ export default class InteriorScene extends Phaser.Scene {
       const t = this.children.getByName("dbgpos") as Phaser.GameObjects.Text | null;
       t?.setText(`room=${this.roomKey} tile=(${this.tx},${this.ty}) face=${this.facing}`);
     }
+    // 키는 매 프레임 '눌린 순간'을 소비한다 — 대사창(keydown 이벤트)이 끝난 직후의 키가
+    // 여기로 새어 들어와 잠자기/꾸미기가 또 발동하는 걸 막는다.
+    const JD = Phaser.Input.Keyboard.JustDown;
+    const justSpace = JD(this.keys.space);
+    const justF = JD(this.keys.f);
+    const justEsc = JD(this.keys.esc);
+
     if (this.busy || this.moving) return;
+
+    // ★ 꾸미기 모드 — 방향키는 커서 이동으로 쓰이고, 주인공은 안 움직인다.
+    if (this.decorating) {
+      if (justF || justEsc) { this.exitDecorate(); return; }
+      this.updateDecorate(justSpace);   // Space는 위에서 이미 소비했으므로 값으로 넘긴다
+      return;
+    }
+    if (justF) { this.toggleDecorate(); return; }
+    // ★ 침대를 바라보고 Space → 잠자기(파티 컨디션 회복)
+    if (justSpace && this.facingBed()) { void this.sleepInBed(); return; }
 
     let dx = 0, dy = 0;
     if (this.cursors.left.isDown) { dx = -1; this.facing = "left"; }
