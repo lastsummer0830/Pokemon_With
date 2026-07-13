@@ -38,7 +38,8 @@ export default class PokedexScene extends Phaser.Scene {
 
   init(data: DexInit): void {
     this.from = data?.from ?? "MenuScene";
-    this.look = data?.look ?? ((this.registry.get("uiLook") as DexLook) ?? "ar");
+    // 기본 = cream(흰 바탕 + 빨강 포인트, 선·면은 버터 크림) — 사용자 확정 look.
+    this.look = data?.look ?? ((this.registry.get("uiLook") as DexLook) ?? "cream");
     this.idx = 0; this.top = 0; this.detail = false;
   }
 

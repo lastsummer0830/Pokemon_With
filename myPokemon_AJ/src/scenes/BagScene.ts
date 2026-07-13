@@ -43,7 +43,8 @@ export default class BagScene extends Phaser.Scene {
 
   init(data: BagInit): void {
     this.from = data?.from ?? "MenuScene";
-    this.look = data?.look ?? ((this.registry.get("uiLook") as BagLook) ?? "ar");
+    // 기본 = cream(버터 크림 + 빨강 포인트) — 사용자 확정 look. 나머지 값은 시안 비교용(DebugMenu)으로만 남긴다.
+    this.look = data?.look ?? ((this.registry.get("uiLook") as BagLook) ?? "cream");
     this.pocketIdx = 0; this.idx = 0; this.top = 0;
     this.choosing = false; this.partyIdx = 0; this.msg = "";
   }

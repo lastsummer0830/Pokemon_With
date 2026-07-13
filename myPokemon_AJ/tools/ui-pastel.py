@@ -41,18 +41,33 @@ SKY_HUE = {
 
 # cream 변형에서 "통째로 빨강 포인트"로 남길 파일 (선택 커서·슬라이더는 눈에 띄어야 한다)
 CREAM_ALL_RED = {"cursor", "cursor_list", "icon_slider"}
-CREAM_HUE = 0.135          # 파스텔 옐로우 쪽 크림 (0.105=주황기 아이보리 → 0.135=노란기)
 RED_HUE = 0.005            # 어나더레드 특유의 빨강(살짝만 눌러 진하게 남긴다)
-# ⚠️ 회색기가 사라지지 않던 진짜 이유 = **어두운 픽셀(외곽선·격자선·그림자)이 무채색 회색으로 남아** 있었기 때문.
-#    아무리 밝은 면을 노랗게 해도 선이 회색이면 화면 전체가 회색으로 읽힌다.
-#    → cream 모드에선 어두운 선까지 '따뜻한 갈색'으로 물들인다(검정 대신 브라운 라인 = 파스텔의 기본).
-CREAM_SAT_LIGHT = 0.18     # 밝은 면(패널 안쪽) — 파스텔 옐로우
-CREAM_SAT_MID = 0.24       # 중간 밝기(격자선·음영)
-CREAM_SAT_DARK = 0.45      # 어두운 선(외곽선) → 갈색
-# ⚠️ 회색기가 계속 남던 이유(3번째 수정): 채도만 올리고 밝기를 '비율'로 올리면 원본의 중간 회색(하단 설명바·
-#    선반)이 v≈0.55 → 결과 v≈0.75 + 채도 0.36 = **카키/올리브**가 된다. 노란색이 아니라 '탁한 회녹색'으로 읽힘.
-#    → 밝기를 아예 위쪽 구간(0.74~1.0)으로 **압축**한다. 모든 면이 밝은 파스텔 옐로우가 되고 회색기가 사라진다.
-CREAM_LIFT = (0.26, 0.74)  # v2 = v*0.26 + 0.74
+
+# ⚠️⚠️ **겨자색(카키) 사고 — 반드시 읽을 것.**
+#   전에 쓴 값(SAT_LIGHT .18 / SAT_MID .24 / LIFT (0.26,0.74))은 밝기를 0.74~1.0으로만 올려서
+#   중간 면이 **#e1d6a6 (H49 S.24 V.88)** = 버터색이 아니라 **채도 낮은 겨자/카키 베이지**가 됐다.
+#   어두운 선도 #72623f = **올리브 브라운**. 화면 전체가 "회색 겨자"로 읽힌 진짜 원인이 이것.
+#
+#   ★ 버터색(파스텔 옐로우 크림)의 조건:
+#     ① **명도를 0.94~1.0으로** 밀어올린다 (V가 0.9 밑으로 내려가면 즉시 겨자·카키로 읽힌다).
+#        면의 깊이는 '어둡게'가 아니라 **채도 차이**로 준다.
+#     ② 채도는 오히려 **올린다**(0.20~0.35). 낮추면 노랑이 아니라 회색이 된다.
+#     ③ 어두운 선은 hue를 **27°(따뜻한 갈색)** 쪽으로. 41°(올리브)에 두면 선이 카키가 된다.
+#   목표색 예: 밝은 면 #fff5cb · 중간 면 #ffefb0 · 선 #735234
+CREAM_VARIANTS = {
+    # 이름: (hue, sat_light, sat_mid, lift(a,b) → v2 = v*a + b, brown_hue, brown_sat)
+    "butter":      (0.138, 0.20, 0.32, (0.09, 0.91), 0.075, 0.55),   # 기준 버터
+    "butter_soft": (0.135, 0.13, 0.22, (0.07, 0.93), 0.070, 0.48),   # 옅은 아이보리 버터
+    "butter_deep": (0.142, 0.29, 0.45, (0.08, 0.92), 0.078, 0.58),   # 진한 버터(샛노랑 쪽)
+}
+CREAM_NAME = os.environ.get("CREAM", "butter")     # 확정값 = butter. 다른 농도는 시안 비교용.
+if CREAM_NAME not in CREAM_VARIANTS:
+    raise SystemExit(f"CREAM='{CREAM_NAME}'는 없는 변형이다. 가능한 값: {', '.join(CREAM_VARIANTS)}")
+CREAM_HUE, CREAM_SAT_LIGHT, CREAM_SAT_MID, CREAM_LIFT, CREAM_DARK_HUE, CREAM_SAT_DARK = CREAM_VARIANTS[CREAM_NAME]
+
+# 굽을 변형. 크림만 재조정할 땐 `MODES=cream python3 tools/ui-pastel.py`로 나머지를 건너뛴다
+# (pastel·sky는 상수가 안 바뀌면 결과가 같아서 다시 굽는 게 순전한 낭비다).
+MODES = tuple(m.strip() for m in os.environ.get("MODES", "pastel,sky,cream").split(",") if m.strip())
 
 
 def is_reddish(hh: float) -> bool:
@@ -87,15 +102,20 @@ def recolor(im: Image.Image, mode: str, name: str, folder: str = "bag") -> Image
                     hh2, ss2, vv2 = BROWN_HUE, BROWN_SAT, min(1.0, vv * 0.85 + 0.16)
                 elif vv <= 0.35:
                     hh2, ss2, vv2 = hh, ss, vv
+                elif name in CREAM_ALL_RED:                      # 커서·슬라이더 = 파일 전체가 빨강 포인트
+                    #  ⚠️ 가방 쪽과 같은 순서 규칙 — 무채색 검사보다 **먼저** 와야 한다.
+                    #     뒤에 두면 회색 화살표·트랙이 아이보리로 먼저 칠해져 흰 바탕에 묻힌다.
+                    hh2, ss2, vv2 = RED_HUE, max(0.55, min(0.85, ss * 0.95)), vv
                 elif ss <= 0.12:                                 # 흰 면·격자 → 아주 옅은 아이보리(바탕은 흰색 유지)
                     hh2, ss2, vv2 = 0.11, min(DEX_CREAM_SAT, ss * 0.4 + 0.08), min(1.0, vv * 0.97 + 0.04)
-                elif is_reddish(hh) or name in CREAM_ALL_RED:    # 빨강 = AR 그대로, 전 화면 일관되게
+                elif is_reddish(hh):                             # 빨강 = AR 그대로, 전 화면 일관되게
                     hh2, ss2, vv2 = RED_HUE, min(0.85, ss * 0.95), vv
                 else:
                     hh2, ss2, vv2 = hh, ss, vv                   # 그 외(아이콘 등)는 원본 그대로
             elif vv <= 0.35 and mode == "cream" and name != "icon_pocket" and ss <= 0.25:
                 # 어두운 무채색 선(외곽선·격자·그림자) → 회색으로 두면 화면이 회색으로 읽힌다. 따뜻한 갈색으로.
-                hh2, ss2, vv2 = CREAM_HUE - 0.02, CREAM_SAT_DARK, min(1.0, vv * 0.8 + 0.22)
+                #  ⚠️ hue는 CREAM_HUE(49°=노랑)가 아니라 **27° 갈색**을 쓴다. 노란 hue로 어둡게 하면 그게 올리브다.
+                hh2, ss2, vv2 = CREAM_DARK_HUE, CREAM_SAT_DARK, min(1.0, vv * 0.5 + 0.28)
             elif vv <= 0.35:
                 # 어두운 외곽선 — 완전 검정 대신 살짝 띄운 슬레이트로(파스텔은 검정 대비가 강하면 튄다)
                 hh2, ss2, vv2 = hh, ss * 0.35, min(1.0, vv * 0.9 + 0.14)
@@ -106,18 +126,26 @@ def recolor(im: Image.Image, mode: str, name: str, folder: str = "bag") -> Image
                 #    포켓 탭 아이콘이 대표) = 정보다. 크림으로 칠하면 아이콘이 배경에 묻혀 사라진다.
                 #  - 나머지 따뜻한 면(주황·분홍 배경 등) → 크림으로 갈아끼운다.
                 #  - 회색/흰색(패널 안쪽·격자)은 살짝 따뜻하게만.
-                if ss <= 0.12:      # 무채색(패널 안쪽 흰 면·격자·회색 띠) → 밝은 아이보리로
+                if name in CREAM_ALL_RED:
+                    # 커서·슬라이더는 **파일 전체가 빨강 포인트**다. 이 검사가 무채색 검사보다 먼저 와야 한다.
+                    #  ⚠️ 순서가 반대면: 회색 슬라이더 화살표가 아이보리로 먼저 칠해져 **크림 배경에 묻혀 사라진다.**
+                    hh2, ss2, vv2 = RED_HUE, max(0.55, min(0.78, ss * 0.85)), min(1.0, vv * 0.9 + 0.07)
+                elif ss <= 0.12:    # 무채색(패널 안쪽 흰 면·격자·회색 띠) → 밝은 아이보리로
                     hh2 = CREAM_HUE
                     ss2 = CREAM_SAT_LIGHT if vv > 0.80 else CREAM_SAT_MID
                     vv2 = min(1.0, vv * CREAM_LIFT[0] + CREAM_LIFT[1])
-                elif name in CREAM_ALL_RED or is_reddish(hh):   # 빨강 = 포인트. 파스텔이라도 이건 살려야 인상이 남는다
+                elif is_reddish(hh):   # 빨강 = 포인트. 파스텔이라도 이건 살려야 인상이 남는다
                     hh2, ss2, vv2 = RED_HUE, min(0.78, ss * 0.85), min(1.0, vv * 0.9 + 0.07)
                 elif 0.35 < hh < 0.75 and ss > 0.35:         # '진짜' 파란 아이콘(포켓 탭 등)만 색상 유지 = 정보
                     hh2, ss2, vv2 = hh, ss * 0.75, min(1.0, vv * 0.9 + 0.06)
                     # ⚠️ 예전엔 채도 조건이 없어서 회청색(슬라이더 화살표 같은 '거의 회색')까지 파랑으로 남았다.
                     #    그게 크림 화면에서 회끼로 읽혔다. 채도 낮은 차가운 색은 아래 크림 분기로 내려간다.
                 else:                                        # 따뜻한 면(주황·분홍 배경) → 크림
-                    hh2, ss2, vv2 = CREAM_HUE, min(0.30, ss * 0.3 + 0.14), min(1.0, vv * 0.45 + 0.50)
+                    #  ⚠️ 여기가 겨자색의 진원지였다. vv*0.45+0.50은 중간 밝기 면을 V≈0.6~0.9에 남겨
+                    #     채도 0.3짜리 카키로 만든다. 다른 면과 **같은 LIFT로 0.94~1.0까지** 끌어올린다.
+                    hh2 = CREAM_HUE
+                    ss2 = CREAM_SAT_MID if vv <= 0.80 else CREAM_SAT_LIGHT
+                    vv2 = min(1.0, vv * CREAM_LIFT[0] + CREAM_LIFT[1])
             else:
                 ss2 = ss * 0.42                       # 채도 확 낮춤 = 파스텔의 핵심
                 vv2 = min(1.0, vv * 0.72 + 0.30)      # 밝기 올림
@@ -130,7 +158,7 @@ def recolor(im: Image.Image, mode: str, name: str, folder: str = "bag") -> Image
 
 def run(folder: str, files: list[str]) -> None:
     src_dir = os.path.join(ROOT, folder)
-    for mode in ("pastel", "sky", "cream"):
+    for mode in MODES:
         out_dir = os.path.join(src_dir, mode)
         os.makedirs(out_dir, exist_ok=True)
         for name in files:
