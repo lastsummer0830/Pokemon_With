@@ -15,21 +15,18 @@ import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
 //      목록 7줄 · 줄높이 32 · 커서(184, 8+j*32) · 이름(200, 32+j*32) · 개수 우측정렬 x=450
 //      선택 아이템 아이콘 중심(48,336) · 설명문 (88,311) 폭 384
 //
-// look — 그림(구조·프레임·질감)은 셋 다 AR 원본 그대로고, 색만 다르다(tools/ui-pastel.py 가 리컬러한 에셋):
-//   "ar"     = 원본 색(DS 정품 채도)
-//   "pastel" = 원본 색상 유지 + 채도↓·밝기↑ (살구/로즈 톤)
-//   "sky"    = 타이틀 화면 톤(연하늘 + 커서만 연분홍)
+// 색(look) = 버터 크림 + 빨강 포인트 — 사용자 확정. 그림(구조·프레임·질감)은 AR 원본 그대로이고
+// 색만 tools/ui-pastel.py 가 리컬러한 것이다(에셋: assets/ui/bag/cream/).
 const FONT = "Galmuri11";
 const VW = 512, VH = 384;      // 원본 가상 해상도
 const ROWS = 7;                // 한 화면 목록 줄 수 (원본 ITEMSVISIBLE)
 const ROW_H = 32;
+const DIR = "assets/ui/bag/cream";
 
-export type BagLook = "ar" | "pastel" | "sky" | "cream";
-interface BagInit { from?: string; look?: BagLook }
+interface BagInit { from?: string }
 
 export default class BagScene extends Phaser.Scene {
   private from = "MenuScene";
-  private look: BagLook = "ar";
   private pocketIdx = 0;        // POCKETS 배열 인덱스(회복약 → 볼 → 일반)
   private idx = 0;              // 현재 포켓 안에서 고른 줄
   private top = 0;              // 스크롤(맨 위에 보이는 줄)
@@ -43,27 +40,22 @@ export default class BagScene extends Phaser.Scene {
 
   init(data: BagInit): void {
     this.from = data?.from ?? "MenuScene";
-    // 기본 = cream(버터 크림 + 빨강 포인트) — 사용자 확정 look. 나머지 값은 시안 비교용(DebugMenu)으로만 남긴다.
-    this.look = data?.look ?? ((this.registry.get("uiLook") as BagLook) ?? "cream");
     this.pocketIdx = 0; this.idx = 0; this.top = 0;
     this.choosing = false; this.partyIdx = 0; this.msg = "";
   }
 
   preload(): void {
     preloadCommonAudio(this);
-    // 색이 바뀌는 것(배경·커서·탭·슬라이더)은 look 폴더에서, 색을 안 바꾼 것(가방 그림·화살표)은 원본에서 읽는다.
-    //  ⚠️ 텍스처 키에 look을 넣는다 — 안 넣으면 A안을 본 뒤 B안을 열 때 캐시된 A안 그림이 그대로 나온다.
-    const dir = this.look === "ar" ? "assets/ui/bag" : `assets/ui/bag/${this.look}`;
-    const L = this.look;
+    // 색이 바뀌는 것(배경·커서·탭·슬라이더)은 크림 폴더에서, 색을 안 바꾼 것(가방 그림·화살표)은 원본에서 읽는다.
     for (const p of POCKETS) {
-      this.loadImg(`bag_${L}_bg_${p}`, `${dir}/bg_${p}.png`);
-      // 가방 그림은 리컬러하지 않는다(원본 그대로) — 색을 바꾸면 이상해진다.
+      this.loadImg(`bag_bg_${p}`, `${DIR}/bg_${p}.png`);
+      // 가방 그림은 리컬러하지 않는다(원본 그대로) — 색을 바꾸면 배경에 묻히거나 탁해진다.
       this.loadImg(`bag_img_${p}`, `assets/ui/bag/bag_${p}.png`);
       this.loadImg(`bag_img_${p}_f`, `assets/ui/bag/bag_${p}_f.png`);
     }
-    this.loadImg(`bag_${L}_cursor`, `${dir}/cursor.png`);
-    this.loadImg(`bag_${L}_pocketicons`, `${dir}/icon_pocket.png`);
-    this.loadImg(`bag_${L}_slider`, `${dir}/icon_slider.png`);
+    this.loadImg("bag_cursor", `${DIR}/cursor.png`);
+    this.loadImg("bag_pocketicons", `${DIR}/icon_pocket.png`);
+    this.loadImg("bag_slider", `${DIR}/icon_slider.png`);
     this.loadImg("ui_left_arrow", "assets/ui/left_arrow.png");
     this.loadImg("ui_right_arrow", "assets/ui/right_arrow.png");
     // 갖고 있는 아이템 아이콘
@@ -228,15 +220,15 @@ export default class BagScene extends Phaser.Scene {
     // 화면 여백(가상 해상도 비율이 안 맞는 부분)은 어둡게
     this.layer.add(this.add.rectangle(0, 0, width, height, 0x0b0f18).setOrigin(0));
 
-    this.img(`bag_${this.look}_bg_${this.pocket}`, 0, 0);   // 배경 = AR 원본(또는 그걸 리컬러한 것)
+    this.img(`bag_bg_${this.pocket}`, 0, 0);   // 배경 = AR 원본을 크림으로 리컬러한 것
     this.drawLeft();
     this.drawList();
     this.drawBottom();
   }
 
-  // 목록/포켓이름처럼 패널 위에 얹는 글자색. 크림 룩은 패널이 아이보리라 원본 회색 글씨가 탁하다 → 갈색조로.
+  // 목록/포켓이름처럼 패널 위에 얹는 글자색. 패널이 아이보리라 원본 회색 글씨는 탁하다 → 갈색조로.
   private get panelText(): [string, string] {
-    return this.look === "cream" ? ["#6b5a44", "#fff3da"] : ["#585850", "#a8b8b8"];
+    return ["#6b5a44", "#fff3da"];
   }
 
   // 왼쪽: 가방 그림 + 선택된 포켓 탭 + 포켓 이름 + 좌우 화살표
@@ -248,7 +240,7 @@ export default class BagScene extends Phaser.Scene {
 
     // 포켓 탭 — 원본은 배경(bg_<포켓>)에 8칸이 이미 구워져 있고, 선택된 것 하나만 컬러 아이콘을 덧그린다.
     //  icon_pocket 시트 위쪽 행에서 (p-1)*28 을 잘라 (2+(p-1)*22, 226)에.
-    this.img(`bag_${this.look}_pocketicons`, 2 + (this.pocket - 1) * 22, 226,
+    this.img("bag_pocketicons", 2 + (this.pocket - 1) * 22, 226,
       new Phaser.Geom.Rectangle((this.pocket - 1) * 28, 0, 28, 28));
 
     // 포켓 이름 (94,186 중앙정렬)
@@ -287,14 +279,14 @@ export default class BagScene extends Phaser.Scene {
 
   // 선택 커서 — 원본 cursor.png(282x68, 위 12px는 투명)를 통째로 얹는다(원본과 같은 방식).
   private drawCursor(j: number): void {
-    this.img(`bag_${this.look}_cursor`, 184, 8 + j * ROW_H);
+    this.img("bag_cursor", 184, 8 + j * ROW_H);
   }
 
   // 스크롤 슬라이더(원본 계산식 그대로) — 목록이 7줄을 넘을 때만.
   private drawSlider(): void {
     const rowMax = this.lines;
     if (rowMax <= ROWS) return;
-    const K = `bag_${this.look}_slider`;
+    const K = "bag_slider";
     if (this.top > 0) this.img(K, 470, 16, new Phaser.Geom.Rectangle(0, 0, 36, 38));
     if (this.top + ROWS < rowMax) this.img(K, 470, 228, new Phaser.Geom.Rectangle(0, 38, 36, 38));
     const trackH = 174;
@@ -321,11 +313,10 @@ export default class BagScene extends Phaser.Scene {
     const text = this.msg || (sel ? sel.desc : "가방을 닫는다.");
     const long = text.length > 47;
     const y = long ? 296 : 311;
-    // 원본 하단 바는 진회색이라 흰 글씨(원본 색). 파스텔 리컬러는 바가 밝아져서 흰 글씨가 안 보인다 → 짙은 글씨로.
-    //  ⚠️ 크림 룩에서 회색(#4a4a55) 글씨를 쓰면 화면이 회색으로 읽힌다 → 따뜻한 갈색으로.
-    const light = this.look !== "ar";
-    const color = this.look === "cream" ? "#6b5a44" : light ? "#4a4a55" : "#f8f8f8";
-    const shadow = this.look === "cream" ? "#fff6e0" : light ? "#ffffff" : "#000000";
+    // 원본 하단 바는 진회색이라 흰 글씨였지만, 크림은 바가 밝아 흰 글씨가 안 보인다 → 짙은 글씨로.
+    //  ⚠️ 여기서 회색(#4a4a55) 글씨를 쓰면 화면 전체가 회색으로 읽힌다 → 반드시 따뜻한 갈색.
+    const color = "#6b5a44";
+    const shadow = "#fff6e0";
     const t = this.add.text(this.X(88), this.Y(y), text, {
       fontFamily: FONT, fontSize: `${Math.round(18 * this.s)}px`, color,
       wordWrap: { width: 384 * this.s },

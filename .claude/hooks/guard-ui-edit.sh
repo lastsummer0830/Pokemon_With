@@ -18,6 +18,8 @@ pats = [
 ]
 if not any(fnmatch.fnmatch(fp, p) for p in pats):
     sys.exit(0)
+if fp.endswith("DebugMenuScene.ts"):
+    sys.exit(0)  # 디버그 진입 메뉴 — 포켓몬 UI 아님(오탐 방지)
 reason = (
     "⛔ 포켓몬 UI(파티/박스/가방/메뉴/상세) 만들기 전 확인:\n"
     "1) AR 실제 UI 에셋을 봤나? — /mnt/d/Pokemon Another Red_PWT_250829/Graphics/UI/ (이 경로는 학원PC 기준. 다른 PC면 myPokemon_AJ/AGENTS.md §4C의 PC별 경로 확인)"

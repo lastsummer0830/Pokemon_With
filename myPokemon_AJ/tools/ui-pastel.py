@@ -65,9 +65,11 @@ if CREAM_NAME not in CREAM_VARIANTS:
     raise SystemExit(f"CREAM='{CREAM_NAME}'는 없는 변형이다. 가능한 값: {', '.join(CREAM_VARIANTS)}")
 CREAM_HUE, CREAM_SAT_LIGHT, CREAM_SAT_MID, CREAM_LIFT, CREAM_DARK_HUE, CREAM_SAT_DARK = CREAM_VARIANTS[CREAM_NAME]
 
-# 굽을 변형. 크림만 재조정할 땐 `MODES=cream python3 tools/ui-pastel.py`로 나머지를 건너뛴다
-# (pastel·sky는 상수가 안 바뀌면 결과가 같아서 다시 굽는 게 순전한 낭비다).
-MODES = tuple(m.strip() for m in os.environ.get("MODES", "pastel,sky,cream").split(",") if m.strip())
+# 굽을 변형. 기본이 cream 하나인 이유: 사용자가 크림으로 확정해 pastel·sky 에셋은 리포에서 지웠다.
+# 그 둘의 코드는 남겨뒀지만(나중에 다른 톤을 다시 비교할 수도 있어) 기본으로 굽지는 않는다 —
+# 기본값에 넣어두면 스크립트를 한 번 돌릴 때마다 안 쓰는 폴더가 되살아난다.
+# 다시 시안 비교가 필요하면 `MODES=pastel,sky,cream python3 tools/ui-pastel.py`.
+MODES = tuple(m.strip() for m in os.environ.get("MODES", "cream").split(",") if m.strip())
 
 
 def is_reddish(hh: float) -> bool:

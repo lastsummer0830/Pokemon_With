@@ -48,15 +48,9 @@ export default class DebugMenuScene extends Phaser.Scene {
       ["8. 시작 집 - 침실 바로가기(skip)", "InteriorScene", { room: "bedroom", skipIntro: true }],
       ["9. 포켓몬 연구소(스타팅 선택)", "LabScene"],
       ["0. 인게임 메뉴(파티/가방/저장)", "__MENU__"],
-      // 시안 비교용(클릭) — 그림은 셋 다 AR 원본, 색만 다르다. ar=원본색 / pastel=파스텔 / sky=타이틀 하늘톤
-      ["가방 — A(원본색)", "BagScene", { look: "ar", testParty: true }],
-      ["가방 — B(파스텔)", "BagScene", { look: "pastel", testParty: true }],
-      ["가방 — C(하늘톤)", "BagScene", { look: "sky", testParty: true }],
-      ["가방 — D(크림+빨강)", "BagScene", { look: "cream", testParty: true }],
-      ["도감 — A(원본색)", "PokedexScene", { look: "ar", testParty: true }],
-      ["도감 — B(파스텔)", "PokedexScene", { look: "pastel", testParty: true }],
-      ["도감 — C(하늘톤)", "PokedexScene", { look: "sky", testParty: true }],
-      ["도감 — D(크림+빨강)", "PokedexScene", { look: "cream", testParty: true }],
+      // 바로가기(클릭) — 색(look)은 버터 크림으로 확정됐다(시안 A~C 분기는 제거).
+      ["가방", "BagScene", { testParty: true }],
+      ["도감", "PokedexScene", { testParty: true }],
     ];
     const go = (key: string, data?: object) => {
       // 테스트용 기본값 — 인트로를 건너뛰어도 씬이 동작하도록

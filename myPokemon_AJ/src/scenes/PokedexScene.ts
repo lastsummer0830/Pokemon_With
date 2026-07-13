@@ -19,14 +19,14 @@ const VW = 512, VH = 384;
 const ROWS = 10;         // 목록 한 화면 줄 수 (원본: (364-32)/32)
 const ROW_H = 32;
 
-// look — 그림은 셋 다 AR 원본(구조·프레임·격자 그대로), 색만 다르다(tools/ui-pastel.py 리컬러).
-//   "ar" = 원본 색 / "pastel" = 채도↓·밝기↑(로즈) / "sky" = 타이틀 톤(연하늘 + 커서 연분홍)
-export type DexLook = "ar" | "pastel" | "sky" | "cream";
-interface DexInit { from?: string; look?: DexLook }
+// 색(look) = 흰 바탕 + 빨강 포인트, 선·면은 버터 크림 — 사용자 확정. 그림은 AR 원본(구조·프레임·격자
+// 그대로)이고 색만 tools/ui-pastel.py 가 리컬러한 것이다(에셋: assets/ui/pokedex/cream/).
+const DIR = "assets/ui/pokedex/cream";   // BagScene의 DIR과 같은 규칙(끝에 / 없음)
+
+interface DexInit { from?: string }
 
 export default class PokedexScene extends Phaser.Scene {
   private from = "MenuScene";
-  private look: DexLook = "ar";
   private entries: DexEntry[] = [];
   private idx = 0;
   private top = 0;
@@ -38,20 +38,16 @@ export default class PokedexScene extends Phaser.Scene {
 
   init(data: DexInit): void {
     this.from = data?.from ?? "MenuScene";
-    // 기본 = cream(흰 바탕 + 빨강 포인트, 선·면은 버터 크림) — 사용자 확정 look.
-    this.look = data?.look ?? ((this.registry.get("uiLook") as DexLook) ?? "cream");
     this.idx = 0; this.top = 0; this.detail = false;
   }
 
   preload(): void {
     preloadCommonAudio(this);
     this.entries = dexEntries(this.registry);
-    // 색이 바뀌는 것(배경·커서·슬라이더)은 look 폴더에서, 아이콘류(seen/own/타입)는 원본 그대로.
-    //  ⚠️ 텍스처 키에 look을 넣는다 — 안 넣으면 다른 look을 열 때 앞서 캐시된 그림이 나온다.
+    // 색이 바뀌는 것(배경·커서·슬라이더)은 크림 폴더에서, 아이콘류(seen/own/타입)는 원본 그대로.
     const P = "assets/ui/pokedex/";
-    const dir = this.look === "ar" ? P : `${P}${this.look}/`;
     for (const f of ["bg_list", "bg_info", "cursor_list", "icon_slider"])
-      if (!this.textures.exists(`dex_${this.look}_${f}`)) this.load.image(`dex_${this.look}_${f}`, dir + f + ".png?v=1");
+      if (!this.textures.exists("dex_" + f)) this.load.image("dex_" + f, `${DIR}/${f}.png?v=1`);
     for (const f of ["icon_seen", "icon_own", "icon_types"])
       if (!this.textures.exists("dex_" + f)) this.load.image("dex_" + f, P + f + ".png?v=1");
     // 본 적 있는 포켓몬의 스프라이트·발자국만 미리 로드(151마리 전부 받으면 무겁다).
@@ -132,14 +128,13 @@ export default class PokedexScene extends Phaser.Scene {
     this.layer.add(t);
   }
 
-  // 패널 위 글자색 — 원본은 회색 계열. 크림 룩은 패널이 아이보리라 회색 글씨가 탁해 보인다 → 따뜻한 갈색조로.
+  // 패널 위 글자색 — 패널이 아이보리라 원본의 회색 글씨는 탁해 보인다 → 따뜻한 갈색조로.
   private get colors(): [string, string] {
-    return this.look === "cream" ? ["#6b5a44", "#fff3da"] : ["#585850", "#a8b8b8"];
+    return ["#6b5a44", "#fff3da"];
   }
-  // 컬러 띠(도감 상단 헤더) 위 글자색 — 띠가 진한 색(원본 빨강·크림안의 벽돌빨강)이면 흰 글씨,
-  //  연한 색(파스텔·하늘)으로 리컬러됐으면 짙은 글씨라야 읽힌다.
+  // 컬러 띠(도감 상단 헤더) 위 글자색 — 띠가 진한 벽돌빨강이라 흰 글씨.
   private get onHeader(): [string, string] {
-    return this.look === "ar" || this.look === "cream" ? ["#f8f8f8", "#000000"] : ["#4a4a55", "#ffffff"];
+    return ["#f8f8f8", "#000000"];
   }
 
   // 포켓몬 스프라이트(AR Front 시트의 첫 프레임)를 원하는 높이(가상px)에 맞춰 놓는다.
@@ -168,7 +163,7 @@ export default class PokedexScene extends Phaser.Scene {
   // ── 목록 ──────────────────────────────────────────────
   private renderList(): void {
     const [base, shadow] = this.colors;
-    this.img(`dex_${this.look}_bg_list`, 0, 0);
+    this.img("dex_bg_list", 0, 0);
 
     // 상단 타이틀(원본 (256,12) 중앙) — 빨간 띠 위
     const [hb, hs] = this.onHeader;
@@ -204,14 +199,14 @@ export default class PokedexScene extends Phaser.Scene {
   }
 
   private drawCursor(j: number): void {
-    this.img(`dex_${this.look}_cursor_list`, 222, 46 + j * ROW_H);
+    this.img("dex_cursor_list", 222, 46 + j * ROW_H);
   }
 
   // 원본 슬라이더 계산식 그대로 (x=468 고정, 트랙 78~346)
   private drawSlider(): void {
     const rowMax = this.entries.length;
     if (rowMax <= ROWS) return;
-    const K = `dex_${this.look}_icon_slider`;
+    const K = "dex_icon_slider";
     if (this.top > 0) this.img(K, 468, 48, new Phaser.Geom.Rectangle(0, 0, 40, 30));
     if (this.top + ROWS < rowMax) this.img(K, 468, 346, new Phaser.Geom.Rectangle(0, 30, 40, 30));
     const trackH = 268;
@@ -231,7 +226,7 @@ export default class PokedexScene extends Phaser.Scene {
   private renderDetail(): void {
     const e = this.entries[this.idx];
     const [base, shadow] = this.colors;
-    this.img(`dex_${this.look}_bg_info`, 0, 0);
+    this.img("dex_bg_info", 0, 0);
 
     // 스프라이트 (중심 104,136)
     this.drawMon(e.speciesId, 104, 136, 140);
