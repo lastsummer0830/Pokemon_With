@@ -65,11 +65,26 @@ export interface MoveData {
   description: string;   // 한글 설명
 }
 
+// 아이템 (tools/ar-data/extract-items.py — 세로 슬라이스에 쓰는 10종만 뽑는다)
+export interface ItemData {
+  id: string;
+  name: string;          // 한글명 (예: "몬스터볼")
+  nameEn: string;
+  pocket: number;        // 1=일반 2=회복약 3=몬스터볼 (AR 포켓 번호)
+  price: number;
+  desc: string;          // 한글 설명
+  fieldUse: number;      // 0이 아니면 필드에서 쓸 수 있다
+  battleUse: number;     // 0이 아니면 배틀에서 쓸 수 있다
+  consumable: boolean;
+}
+
 // ── 캐시 & 로더 ──────────────────────────────────────────────
 const DB = {
   types: {} as Record<string, TypeData>,
   species: {} as Record<string, SpeciesData>,
   moves: {} as Record<string, MoveData>,
+  items: {} as Record<string, ItemData>,
+  dexKanto: [] as string[],   // 칸토 도감 순서(151종). 배열 인덱스+1 = 도감번호.
 };
 let loaded = false;
 let loading: Promise<void> | null = null;
@@ -83,10 +98,14 @@ export function loadArDb(): Promise<void> {
     fetch(`${base}/types.json`).then((r) => r.json()),
     fetch(`${base}/species.json`).then((r) => r.json()),
     fetch(`${base}/moves.json`).then((r) => r.json()),
-  ]).then(([t, s, m]) => {
+    fetch(`${base}/items.json`).then((r) => r.json()),
+    fetch(`${base}/dex_kanto.json`).then((r) => r.json()),
+  ]).then(([t, s, m, i, d]) => {
     DB.types = t;
     DB.species = s;
     DB.moves = m;
+    DB.items = i;
+    DB.dexKanto = d;
     loaded = true;
   });
   return loading;
@@ -104,6 +123,16 @@ export function getMove(id: string): MoveData | undefined {
 }
 export function getType(id: string): TypeData | undefined {
   return DB.types[id.toUpperCase()];
+}
+export function getItem(id: string): ItemData | undefined {
+  return DB.items[id.toUpperCase()];
+}
+export function allItems(): ItemData[] {
+  return Object.values(DB.items);
+}
+// 칸토 도감 순서(151종). 도감 화면이 번호순으로 훑는 데 쓴다.
+export function dexKanto(): string[] {
+  return DB.dexKanto;
 }
 
 // 공격 타입 atkType이 방어측 타입들(defTypes)에 주는 최종 배율(곱).

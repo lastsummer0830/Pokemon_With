@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { Gender } from "../data/Player";
 import { createFromSpecies, Pokemon } from "../data/Pokemon";
 import { loadArDb } from "../data/ar";
+import { markOwn } from "../data/Pokedex";
 import DialogBox from "../ui/DialogBox";
 import { playBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
@@ -271,6 +272,7 @@ export default class LabScene extends Phaser.Scene {
     if (nickname) mon.nickname = nickname;
     const party = (this.registry.get("playerParty") as Pokemon[]) ?? [];
     party.push(mon); this.registry.set("playerParty", party); this.registry.set("starterChosen", pick.key);
+    markOwn(this.registry, pick.key);   // 첫 포켓몬 → 도감에 '잡음'으로 등록
     this.chosen = true;
     playSfx(this, SFX.pkmnGet, 0.6); // 포켓몬 획득 팡파레
     // 고른 포켓볼은 탁자에서 사라짐(플레이어가 가져감)

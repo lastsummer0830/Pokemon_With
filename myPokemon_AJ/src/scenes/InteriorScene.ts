@@ -261,6 +261,13 @@ export default class InteriorScene extends Phaser.Scene {
     }
   }
 
+  // (x,y)가 방 그림의 '바닥' 칸인가 — 꾸미기 커서가 돌아다닐 수 있는 범위.
+  //  isFloor 와 달리 가구가 놓인 칸도 true 다(그 위에서 R로 치워야 하니까).
+  private onRoomFloor(x: number, y: number): boolean {
+    if (x < 0 || y < 0 || x >= this.def.cols || y >= this.def.rows) return false;
+    return this.def.blocked[y][x] === 0;
+  }
+
   // (x,y)가 원래 방 바닥(가구를 놓을 수 있는 빈 칸)인가 — 벽·기존 가구·계단/문·주인공 발밑은 안 된다.
   private isFloor = (x: number, y: number): boolean => {
     if (x < 0 || y < 0 || x >= this.def.cols || y >= this.def.rows) return false;
@@ -304,14 +311,16 @@ export default class InteriorScene extends Phaser.Scene {
   private updateDecorate(justSpace: boolean): void {
     const JD = Phaser.Input.Keyboard.JustDown;
     let moved = false;
-    if (JD(this.cursors.left)) { this.curX--; moved = true; }
-    else if (JD(this.cursors.right)) { this.curX++; moved = true; }
-    else if (JD(this.cursors.up)) { this.curY--; moved = true; }
-    else if (JD(this.cursors.down)) { this.curY++; moved = true; }
-    if (moved) {
-      this.curX = Phaser.Math.Clamp(this.curX, 0, this.def.cols - 1);
-      this.curY = Phaser.Math.Clamp(this.curY, 0, this.def.rows - 1);
-    }
+    // 커서는 '방 바닥' 위에서만 움직인다.
+    //  ⚠️ 예전엔 격자 전체(0~19, 0~14)로 Clamp해서, 바닥이 x=3~12뿐인 이 방에선
+    //     커서가 벽을 넘어 집 밖(검은 공간)까지 나갔다. 바닥이 아닌 칸으론 아예 이동하지 않는다.
+    let nx = this.curX;
+    let ny = this.curY;
+    if (JD(this.cursors.left)) { nx--; moved = true; }
+    else if (JD(this.cursors.right)) { nx++; moved = true; }
+    else if (JD(this.cursors.up)) { ny--; moved = true; }
+    else if (JD(this.cursors.down)) { ny++; moved = true; }
+    if (moved && this.onRoomFloor(nx, ny)) { this.curX = nx; this.curY = ny; }
     if (JD(this.keys.q)) { this.selIdx = (this.selIdx - 1 + FURNITURE.length) % FURNITURE.length; playSfx(this, SFX.cursor, 0.4); }
     if (JD(this.keys.e)) { this.selIdx = (this.selIdx + 1) % FURNITURE.length; playSfx(this, SFX.cursor, 0.4); }
     if (justSpace) this.placeFurniture();

@@ -80,13 +80,148 @@ AR 타일셋에서 추출(칸 수 = 그림 크기/32):
 - 벽난로 놓을 수 있는 자리는 방 구조상 **(3,4)~(6,4) + 계단 밑 (9,5)** 뿐(원본 AR 방 위쪽이 이미 가구로 꽉 참).
 - playwright는 **python 모듈이 없고 node 쪽에만 있다**(`myPokemon_AJ/node_modules`). 검증 스크립트는 `.mjs`로 짜고, **리포 밖(scratchpad)에 둘 것**(0711에 임시 테스트가 실수로 커밋된 전례).
 
-## 다음 이어서 할 스텝
-1. **커밋** (아직 안 함 — 승인 대기). `tsc` 훅 통과 상태, `/code-review` 완료.
-2. **가구 세트 최종 확정** (Pick 보고 교체할지).
-3. 메뉴 나머지: 가방/도감 화면(look 변형 스샷 → 사용자 선택 필요), 설정·지도 항목.
-4. 야생 인카운터 + 1번도로(AR 추출).
-5. (선택) `HouseScene.ts` 삭제 + `main.ts` 등록 제거.
+## 다음 이어서 할 스텝 (오전 세션 기준 — **아래 "세션 2"에서 갱신됨**)
+1. ~~커밋~~ → **완료**(`c6b1558`).
+2. 가구 세트 최종 확정 → **세션 2에서 문제 가구 3종 제거함. 대체 가구 재선정은 보류(사용자: "나중에").**
+3. 메뉴 나머지(가방/도감) → **세션 2에서 착수. STEP1 완료.**
+4. 야생 인카운터 + 1번도로 → 세션 2 계획의 STEP 5.
 
-## 새 지침/skills/memory 요지
-- 새 훅·규칙 추가 없음. skills 변경 = `pokemon-asset-pipeline` 소스 카탈로그에 itch.io 1줄 추가.
-- **memory `starter-lab-flow` 갱신 필요**(집꾸미기 링크 완성 반영) — PC-로컬이라 git 동기화 안 됨. 다른 PC는 이 문서로 대체 가능.
+---
+
+# ▣ 세션 2 (같은 날, `/clear` 이후) — 가구 버그 정리 + **전체 설계 확정** + 데이터 계층(STEP 1)
+
+> **다음 세션은 이 섹션만 읽으면 이어받을 수 있다.** (계획 원본은 `~/.claude/plans/fizzy-napping-flask.md`에 있으나 **PC-로컬이라 git 동기화 안 됨** → 그래서 계획 전문을 아래에 박아둔다.)
+
+## A. 사용자 지적으로 고친 것 (가구)
+
+사용자가 스샷과 함께 지적: "맵 밖 벗어난다 / 벽난로는 위쪽 벽에만 붙는데 놓을 데가 없다 / 두 개 마주 붙은 소파는 포켓몬센터 같다 / 이 화분은 건물 밖에 두는 것".
+→ **가구 PNG를 6배 확대해 직접 확인한 결과 지적이 전부 사실. 어제 내가 이름을 잘못 붙였다:**
+
+| 파일 | 어제 붙인 이름 | **실제 그림** | 조치 |
+|---|---|---|---|
+| `aquarium.png` | 수조(WATER) | **길가 화단/플랜터** (파란 상자 + 나무 3그루, 야외 조경물) | **제거** |
+| `bookshelf.png` | 책장 | **등받이 맞댄 파란 소파 2인석** (포켓몬센터 대기의자) | **제거** |
+| `fireplace.png` | 벽난로(FIRE) | 합성 벽난로. 정면 각도 → 위쪽 벽 전용인데 이 방엔 그런 자리가 사실상 없음(회전 불가) | **제거** |
+| `plant.png` | 관엽식물(GRASS) | 야자수 화분 | **유지**(사용자 판단) |
+
+- **"맵 밖 벗어남"의 진짜 원인**: 꾸미기 커서가 `Clamp(0, cols-1)` 즉 **격자 전체(0~19, 0~14)를 돌아다녔다**. 이 방의 실제 바닥은 **x=3~12, y=3~10뿐**(나머지는 벽·집 밖)이라 커서가 검은 공간까지 나갔다.
+  → `InteriorScene.onRoomFloor(x,y)` 신설(= `blocked==0`). 바닥이 아닌 칸으론 **아예 이동하지 않는다**. (가구 놓인 칸은 true — 그 위에서 R로 치워야 하니까.)
+- **세이브 안전장치**: 카탈로그에서 뺀 가구가 옛 저장에 남아 있으면 그림 없이 칸만 막는 **'보이지 않는 벽'**이 된다(`cellsOf`가 1×1 폴백) → `save.ts` 로드 시 `findFurniture`로 **필터**.
+- ⚠️ **남은 문제**: 속성 가구가 **풀(GRASS)뿐**이다. 불꽃·물 포켓몬은 지금 comfort 보너스만 받는다. 대체 실내 가구를 AR에서 다시 뽑아 Pick에 올려야 함(사용자가 "나중에"로 보류). 안 쓰는 png 3장(`fireplace/aquarium/bookshelf`)은 **삭제 안 하고 그대로 둠**(삭제는 승인 필요).
+
+## B. ★ 전체 설계 확정 (사용자 결정 3건)
+
+조사로 드러난 현실:
+- 배틀 시스템(데미지·타입상성·급소·경험치·레벨업 기술)은 **거의 완성인데 놀고 있다** — 정상 플레이 중 배틀 진입로가 라이벌전 1회와 디버그 B키뿐. **야생 인카운터 0**.
+- 메뉴 5항목 중 **동작하는 건 포켓몬·저장 2개뿐**. 도감·가방·설정은 "준비 중" 토스트. 가방·도감은 **데이터 계층부터 전무**였다.
+- **차별점이 이름뿐**: 컨디션 100을 다 채워도 데미지 **+10%**(`battle.ts:56`) — 체감 불가.
+
+**사용자 결정:**
+1. **스코프 = 세로 슬라이스** — 첫 체육관 뱃지까지 한 바퀴 도는 최소 완성품.
+2. **첫 체육관 = AR 순서 그대로 상록체육관(관장 그린)**. ⚠️ **AR은 원작과 순서가 다르다** — AR에서 첫 뱃지는 회색(웅)이 아니라 **상록(그린, Lv10~13)**. 회색(웅)은 **8번째 뱃지(Lv53~56)**, 상록숲은 **Lv50대 지역**. 원작 순서를 고집하면 맵 6개+레벨 전면 재설계.
+3. **컨디션 강도 재설계 = 보류**("나중에 결정"). 단 새로 만드는 것이 이 고리를 죽이면 안 됨.
+4. **UI look을 먼저 확정한다**(사용자 지시) — "가방 디자인도 안 정해졌는데 그런 걸 먼저 해야 하는 거 아니냐". 포획하려면 몬스터볼(가방)이 필요하므로 **가방이 인카운터보다 앞**이 맞다.
+5. **레벨 = AR 레벨 스케일링 이식 + 난이도 5단계** / **관장 팀 3버전 = 원본처럼 랜덤** (아래 B-2 참조).
+
+## B-2. ★★ AR 난이도 시스템 — **내가 처음에 틀리게 보고했던 것 정정** (사용자가 지적해서 재조사)
+
+> 처음에 "그린 팀 3버전 = **스타터 선택**에 따라 갈린다"고 보고했는데 **틀렸다.** 사용자가 "AR은 난이도가 여러 개인데 어떻게 가져올 거냐"고 물어 재조사한 결과:
+
+### (1) `trainers.dat`의 version(1/2/3) = **난이도도 스타터도 아닌 "랜덤 파티 변형"**
+- 증거: `Data/Map194.rxdata`(상록체육관) 이벤트 커맨드 31~33 — `[122] [100,100,0,2,1,3]` = **`var100 = random(1..3)`** → 그 값으로 `TrainerBattle.start("LEADER_Green","그린", N)` 분기. `var100`의 이름은 System.rxdata에서 **`랜덤파티`**.
+- 전수조사: `TrainerBattle.start` 호출 428건 중 version이 0이 아닌 것을 감싸는 조건분기 변수는 **오직 100(65회)과 99(5회)**. **난이도 변수(51)나 스타터로 분기하는 케이스는 0건.**
+- 보강: 그린 v1/v2/v3 **전부 L10~13**, 웅 v1/v2/v3 **전부 L53~56** — 레벨대는 같고 종 구성만 완전히 다르다(난이도 티어면 레벨이 달라야 함).
+- **결정: 원본처럼 배틀 진입 시 1~3 균등 랜덤. 3버전 데이터를 전부 보관한다.**
+
+### (2) AR 난이도가 실제로 바꾸는 것 = **상대 트레이너 레벨뿐**
+- 플러그인 **"Automatic Level Scaling"**(`Data/PluginScripts.rxdata` idx 27). 난이도 값 = **`$game_variables[51]`**(System.rxdata 변수명 `TRAINERLV`).
+- **게임 시작 인트로(`Data/Map072.rxdata` EV001)에서 5단계 중 1회 선택 → 이후 변경 불가.** 게임 대사: *"한 번 설정하면 인게임 내에서 바꿀 수 없는 설정들입니다."*
+
+| 난이도 | fixed | random |
+|---|---|---|
+| 이지 | −4 | 0 |
+| 노말 | −3 | +0~2 |
+| 하드 | 0 | 0 |
+| 익스트림 | +1 | +0~2 |
+| 인새인 | +3 | +0~2 |
+
+- ⚠️ **트레이너 레벨은 고정값이 아니다.** `trainers.dat`의 Lv10·Lv13 같은 값은 **'팀 평균 대비 오프셋'으로만** 쓰인다. 실제 레벨:
+  `실제 = (내 파티의 균형평균) − 2 + 난이도보정 + (관장 +3 / 챔피언 +5) + (그 포켓몬 원본레벨 − 원본팀 평균)`
+  → **초반에 파티가 약하면 상대도 약해진다.** (연구소 NPC 크리스 대사로도 확인: *"트레이너 파티의 평균 레벨을 계산해 상대 트레이너의 레벨이 자동으로 계산돼!"*)
+  → **우리가 trainers.dat의 절대 레벨을 그대로 박으면 원본과 다른 밸런스가 된다.**
+- **야생 포켓몬은 난이도 무관** (AR이 `var53`을 항상 1로 고정 = 항상 같은 스케일).
+- **난이도로 안 바뀌는 것**: 트레이너 팀 구성·기술(`update_moves: false`)·아이템 / 야생 인카운터 테이블(`encounters.dat` 키가 전부 `_0`) / 경험치·상금·AI·레벨캡.
+- ✅ **따라서 `species.json`·`moves.json`·`types.json`은 난이도 중립** — STEP1에서 뽑은 데이터 **그대로 유효, 재추출 불필요.**
+- ⚠️ **memory `ar-extraction`의 "트레이너레벨 고정"은 틀린 기록** → 정정함.
+
+**결정: AR 레벨 스케일링을 그대로 이식 + 난이도 5단계.** 구현은 공식 하나라 부담이 작고, 레벨 노가다로 체육관을 뭉개는 일이 없어진다. 난이도 선택 화면은 인트로에 추가(STEP 2~3 사이).
+- 지금 넣어둔 것: `src/systems/difficulty.ts`(5단계 테이블 + 공식 주석), `SaveData.difficulty`(v3에 포함), 인트로에서 기본값 `normal` 세팅. **선택 화면과 실제 스케일링 계산은 아직 미구현.**
+- ⚠️ 스케일링 구현 시 Essentials `pbBalancedLevel()`의 정확한 정의를 먼저 조사할 것(파티 평균을 어떻게 '균형' 잡는지 — 크리스 대사에 *"너무 레벨이 동떨어지게 낮은 포켓몬은 예외로 계산되지 않는다"*는 힌트가 있다).
+
+### 목표 루프
+`태초마을 → 1번도로(야생·트레이너 2명) → 상록시티(포켓몬센터·마트) → 상록체육관(그린) → 첫 뱃지`
+포획·가방·도감·집꾸미기가 전부 한 번씩 물린다. 이게 돌면 그 뒤는 맵·체육관 복제.
+
+### 실행 계획 (STEP 1 완료 / **다음 = STEP 2**)
+- **STEP 1 — 데이터 계층 + 세이브 v3** ✅ **완료** (아래 C)
+- **STEP 2 — 가방·도감 UI: 시안 → 사용자 선택 → 구현** ← **여기부터 시작**
+  - AR `Graphics/UI/Bag/`·`UI/Pokedex/`에 **512×384 풀세트가 이미 있다**(가방: 9포켓 배경·탭 시트 `icon_pocket.png` 224×48·커서·슬라이더 / 도감: `bg_list`·`bg_info`·`icon_seen`·`icon_own` 28×28·`icon_types.png` 96×640=20타입).
+  - **UI 지어내기 금지**(`.claude/rules/game-ui.md`) → AR 에셋을 `public/assets/ui/`로 import(`node tools/import-from-anotherred.mjs "<AR경로>" ui`)해 그 위에 한글 텍스트만 얹는다.
+  - **시안 2~3안**을 playwright 실스샷으로 `01_Resources/Pick/12_가방도감UI/_미리보기/`에 비교 몽타주 → **사용자가 고른 뒤 구현**(사용자가 "시안 2~3개 만들어 비교" 선택함).
+    - A안: AR 원본 에셋 그대로 / B안: 기존 메뉴·파티창과 같은 남색+크림 HGSS 톤
+  - 구현: `src/scenes/BagScene.ts`, `src/scenes/PokedexScene.ts` 신설 → `MenuScene.ts:151-152`의 "준비 중" 토스트를 `scene.launch`로 교체 + `main.ts` 등록 + `DebugMenuScene` 바로가기.
+  - **범위**: 가방=3포켓(회복약·볼·일반)+필드 회복약 사용. 도감=목록+상세 2뷰. (판매·정렬·TM·서식지·검색 없음)
+  - **메뉴 접근 — 조사로 확정**: AR은 **`Z`키**로 메뉴, **화면 상시 HUD 없음**, 안내는 연구소 조수 NPC(크리스)에게 말 걸고 선택지를 골라야만 나오는 **옵트인**(지나치면 알 방법 없음). 본가도 GB/GBA는 START 버튼 하나에 안내 없음, DS(HGSS)만 하단 터치스크린 상시 메뉴(화면 2개라 가능). → **우리 결정: Enter/X 유지 + 상시 HUD 없음**(PC 단일화면이라 상시 바는 화면을 잡아먹음). 단 **초반 필수 동선의 기존 대사(엄마/오박사)에 조작 안내 한 줄을 추가**한다. ⚠️ `AGENTS.md` §1.5 — **사용자가 설정한 기존 멘트는 수정 금지, 새 문장 추가만.**
+- **STEP 3 — 배틀 확장**: 커맨드 2개 → **4개**(싸운다/가방/포켓몬/도망). 상대 팀(복수)·교체·포획. `systems/capture.ts`(3세대 공식 — `species.json`에 `catchRate` **이미 있음**). 6마리 꽉 차면 거절(**박스 안 만듦**).
+  - ⚠️ 함정: 교체 시 `HpBox`에 `destroy()`가 없어 재생성 필요. 스프라이트 텍스처는 `preload()`에서만 로드되므로 **런타임 `load.image` + `textures.remove()`** 경로 필요(안 하면 "포켓몬 바뀌었는데 그림 그대로").
+  - `battle.ts`/`exp.ts`/`homeBonus.ts`는 **불가침**.
+- **STEP 4 — 맵 추출 일반화**: `tools/ar-map/extract.py`가 **집PC 절대경로 하드코딩 + 집 맵 전용**이라 `rooms.json`을 덮어씀 → `--map <id> --out <name>` CLI로. **terrain tag 파싱 추가**(AR 태그 **2=풀숲**, Route1에 178칸) → 맵 json 스키마 `{cols,rows,blocked}` → `{cols,rows,blocked,grass?}` **선택 필드 확장**(기존 `pallet_town.json`·`oak_lab.json` 재추출 불필요).
+  - 추출 대상: **Route1=Map10(52×40) / 상록시티=Map56(52×40) / 상록체육관=Map194 / 상록PC=158 / 마트=159**.
+- **STEP 5 — 다중맵 WorldScene + 야생 인카운터**: 맵 전환은 **이어붙여 스크롤**(암전 없음). 세 맵 모두 폭 52, `map_connections.dat` 오프셋 0 → **정확히 수직 스택(52×100)**. 큰 PNG 새로 굽지 말고 **PNG 3장을 오프셋 배치**, blocked/grass는 런타임 오프셋 조회.
+  - `region.json`(맵3+워프) 신설. **씬 키 `WorldScene`은 유지**(세이브·DebugMenu·BattleScene 복귀가 전부 이 키 참조).
+  - 인카운터: Route1 = **100보당 21%**, 14종 L2~4(피죤·꼬렛·캐터피…·이브이 2%). 배틀 배경: `map_metadata`의 `@battle_background`(마을=town/도로=route/체육관=gym) → `node tools/import-from-anotherred.mjs "<AR>" battlebacks`.
+- **STEP 6 — 트레이너 + 상록시티 + 체육관**: Route1 트레이너 2명(`YOUNGSTER 한주`@(25,13), `LASS 유정`@(33,6)). `BuildingScene.ts`로 PC·마트·체육관 데이터 구동(LabScene 패턴 일반화).
+  - ⚠️ **포켓몬센터는 HP/PP/상태만 회복 — 컨디션은 건드리지 말 것**(여기서 컨디션까지 회복시키면 집 잠자기의 존재 이유가 사라진다 = 차별점 사망).
+  - ⚠️ 체육관 그린 팀은 `starterChosen`에 따라 3버전 → **DebugMenu 직행 시 null이므로 v1 폴백 필수.**
+
+## C. STEP 1 완료 — 데이터 계층 + 세이브 v3 (화면 변화 없음)
+
+**새 파일**
+- `tools/ar-data/extract-items.py` — AR `items.dat`(842개) + `messages_kor_*.dat` → **화이트리스트 10종만** `public/assets/data/ar/items.json` + 아이콘 `public/assets/items/<ID>.png` 10장. (⚠️ 아이콘 792장 전부 복사 금지 — 리포 오염. 아이템 추가하려면 스크립트의 `WHITELIST`에 id 한 줄 넣고 재실행.)
+  - 뽑힌 것: 몬스터볼(200)·슈퍼볼(600)·상처약(200)·좋은상처약(700)·해독제·마비치료제·잠깨는약·화상치료제·얼음상태치료제·기력의조각(2000). **한글명·설명·가격·포켓 전부 정상.**
+- `tools/ar-data/extract-dex.py` — `regional_dexes.dat` → `dex_kanto.json`(칸토 **151종**, 1=BULBASAUR … 151=MEW).
+- `src/data/Bag.ts` — `BagEntry{itemId,count}`, `addItem`/`removeItem`/`countItem`/`itemsByPocket`/`getMoney`/`addMoney`. 포켓: **2=회복약 3=몬스터볼 1=일반**(탭 순서 `POCKETS`).
+- `src/data/Pokedex.ts` — `markSeen`/`markOwn`/`isSeen`/`isOwn`/`dexEntries`(151칸 번호순)/`dexCounts`.
+- ⚠️ Bag·Pokedex 둘 다 **registry를 단일 원천**으로 쓴다(파티·이름과 같은 방식). 저장은 `save.ts`가 registry를 통째로 직렬화.
+
+**바꾼 파일**
+- `src/data/ar/index.ts` — **별도 로더를 새로 만들지 않고 기존 `loadArDb()`를 확장**(items.json·dex_kanto.json 추가). `ItemData` 인터페이스 + `getItem`/`allItems`/`dexKanto` 추가.
+- `src/systems/difficulty.ts` **(신규)** — AR 난이도 5단계 테이블(이지 −4 / 노말 −3+r2 / 하드 0 / 익스트림 +1+r2 / 인새인 +3+r2) + 레벨 스케일링 공식을 주석으로 기록. **선택 화면·계산은 아직 미구현**(다음 스텝).
+- `src/systems/save.ts` — **SAVE_VERSION 2 → 3**. `SaveData`에 `difficulty·money·bag·dexSeen·dexOwn·badges·trainersDefeated` 추가, `SaveLoc`에 `map?` 추가. `START_MONEY=3000`, `START_BAG=[몬스터볼×5, 상처약×3]` export.
+  - **v2→v3 마이그레이션**: 없는 필드는 기본값. 도감이 없던 저장은 **현재 파티를 '잡은 것'으로 인정**. `loc.map`이 없으면 `"pallet"` 부여(**v2의 tx,ty는 이미 태초마을 로컬 좌표라 그대로 유효** — 그래서 world 단일좌표로 안 바꿨다. 바꿨으면 옛 세이브 전부 깨짐).
+- `src/scenes/IntroScene.ts` — 새 게임 시작 시 money·bag·dex·badges 초기화.
+- `src/scenes/LabScene.ts` — 스타터 수령 시 `markOwn`.
+- `src/scenes/BattleScene.ts` — 배틀 시작 시 상대 종족 `markSeen`.
+
+**검증 (playwright 실주행 — 전부 통과, 콘솔 에러 0)**
+- **옛 v2 세이브를 심고 로드**: money 3000 / bag=[볼5, 상처약3] / dexSeen·Own=[CHARMANDER](파티) / badges=[] / `loc.map="pallet"` 자동 부여 → **크래시 없이 이어하기 성공**.
+- **제거한 가구가 옛 세이브에서 걸러짐**: `houseLayout.furniture`에 `fireplace`를 넣어둔 v2 세이브 → 로드 후 `rug`만 남음(**보이지 않는 벽 예방 확인**).
+- AR DB: `getItem("POKEBALL")` → 몬스터볼/pocket3/200원. `dexKanto()` → 151종.
+- 가방 조작: 볼 5+2=**7**, 상처약 3−1=**2**. 저장 → **version 3**.
+- `tsc --noEmit` 통과.
+
+## D. 함정 / 주의 (다음 세션 필독)
+- ⚠️ **새 public 폴더(`assets/items/`)를 만들면 dev 서버 재시작 필수.** 안 하면 png·json이 **`text/html`로 응답**한다(이번에도 그대로 걸림). `curl -s -o /dev/null -w "%{content_type}" http://localhost:5180/assets/items/POKEBALL.png` → `image/png` 나와야 정상.
+- ⚠️ **playwright는 python 쪽에 없고 node 쪽(`myPokemon_AJ/node_modules`)에만 있다.** 검증 스크립트는 `.mjs`로 짜되 **`import { chromium } from "/mnt/d/dev/Pokemon_With/myPokemon_AJ/node_modules/playwright/index.mjs"`처럼 절대경로 import**해야 하고, **리포 밖(스크래치패드)에 둔다**(0711에 임시 테스트가 실수로 커밋된 전례).
+- ⚠️ `pkill -f vite` 후 같은 명령줄에서 `nohup npm run dev &`로 재기동하면 **같이 죽는다.** 백그라운드 실행 도구로 따로 띄울 것.
+- AR 원본 경로(이 PC) = **`/mnt/d/Pokemon Another Red_PWT_250829`**. 추출 스크립트들은 인자·`AR_PATH`·자동탐색 순으로 찾으므로 인자 없이 그냥 실행하면 된다.
+- 이 방(red_room_2f) **실제 바닥 = x 3~12, y 3~10**. 그 밖은 벽·집 밖.
+
+## E. 다음 세션 시작 지점
+1. **커밋 안 함** (승인 대기). 지금 워킹트리: `furniture.ts`·`InteriorScene.ts`·`save.ts`·`ar/index.ts`·`IntroScene.ts`·`LabScene.ts`·`BattleScene.ts` 수정 + `Bag.ts`·`Pokedex.ts`·`extract-items.py`·`extract-dex.py`·`items.json`·`dex_kanto.json`·`assets/items/` 신규. **tsc 통과 상태.**
+2. **STEP 2 착수** = AR UI 에셋 import → **가방·도감 시안 2~3안 실스샷 → `01_Resources/Pick/12_가방도감UI/`에 몽타주 → 사용자에게 고르라고 제시.** (사용자가 고르기 전엔 구현 확정 금지 — `AGENTS.md` §6.5)
+3. UI 씬을 고치면 **`.claude/.verify/*.png` 캡쳐 증거 없이는 Stop 훅이 턴을 막는다**(`.claude/rules/game-ui.md` 5번).
+
+## 새 지침/skills/memory 요지 (세션 2)
+- 새 훅·규칙·skill 추가 없음.
+- **memory `starter-lab-flow` 갱신 필요**(세로 슬라이스 계획 + STEP1 완료 반영) — PC-로컬이라 git 동기화 안 됨. **다른 PC는 이 문서(§B~E)로 대체 가능.**

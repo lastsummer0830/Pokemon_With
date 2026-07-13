@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { frontPath, backPath, makeStillFront } from "../game/pokemonSprite";
 import { Pokemon, MoveSlot, createFromSpecies, displayName } from "../data/Pokemon";
 import { loadArDb, getMove } from "../data/ar";
+import { markSeen } from "../data/Pokedex";
 import { performMove, movesFirst, isFainted, effectivenessText } from "../systems/battle";
 import { battleExpYield, gainExp } from "../systems/exp";
 import DialogBox from "../ui/DialogBox";
@@ -129,6 +130,7 @@ export default class BattleScene extends Phaser.Scene {
     await loadArDb(); // 종족·기술·상성 데이터 확보
     this.ally = this.pendingAlly ?? createFromSpecies(this.allySpecies, 5);
     this.enemy = this.pendingEnemy ?? createFromSpecies(this.enemySpecies, 3);
+    markSeen(this.registry, this.enemy.speciesId);   // 마주친 종족 → 도감 '본 적 있음'
 
     this.buildBackground();
     this.buildSprites();

@@ -26,17 +26,13 @@ export const TYPE_NAME_KO: Record<string, string> = {
 
 // 놓을 수 있는 가구 목록 (여기에 한 줄씩 늘려가면 된다)
 //  칸 수(w·h)는 실제 그림 크기와 반드시 같아야 한다(32px = 1칸).
+// ⚠️ 2026-07-13: 벽난로·수조·책장 3종을 뺐다(사용자 지적 — 그림이 방에 안 맞는다).
+//   - fireplace: 정면 각도라 위쪽 벽에만 붙는데, 이 방엔 그런 자리가 사실상 없다(회전 불가).
+//   - aquarium:  실제 그림은 수조가 아니라 '길가 화단'(야외 조경물) — 가정집 방에 둘 물건이 아니다.
+//   - bookshelf: 실제 그림은 책장이 아니라 '등받이 맞댄 소파 2인석'(포켓몬센터 대기의자).
+//   → 대체할 실내 가구는 AR 타일셋에서 다시 골라 Pick에 올린 뒤 사용자가 고른다.
+//     그 전까지 속성 가구는 풀(GRASS)뿐이라 불꽃·물 포켓몬은 comfort 보너스만 받는다.
 export const FURNITURE: FurnitureDef[] = [
-  {
-    id: "fireplace", name: "벽난로", sprite: "furn_fireplace", w: 2, h: 2, walkable: false, wallOnly: true,
-    comfort: 5, affinity: "FIRE", affinityBonus: 25,
-    desc: "타닥타닥 불이 탄다. 불꽃 포켓몬이 특히 좋아한다. (벽에 붙여야 함)",
-  },
-  {
-    id: "aquarium", name: "수조", sprite: "furn_aquarium", w: 2, h: 2, walkable: false, wallOnly: false,
-    comfort: 5, affinity: "WATER", affinityBonus: 25,
-    desc: "맑은 물이 찰랑인다. 물 포켓몬이 특히 좋아한다.",
-  },
   {
     id: "plant", name: "관엽식물", sprite: "furn_plant", w: 1, h: 2, walkable: false, wallOnly: false,
     comfort: 5, affinity: "GRASS", affinityBonus: 25,
@@ -51,11 +47,6 @@ export const FURNITURE: FurnitureDef[] = [
     id: "cushion", name: "쿠션", sprite: "furn_cushion", w: 1, h: 1, walkable: false, wallOnly: false,
     comfort: 8, affinity: null, affinityBonus: 0,
     desc: "포켓몬이 몸을 파묻고 자기 좋다.",
-  },
-  {
-    id: "bookshelf", name: "책장", sprite: "furn_bookshelf", w: 2, h: 3, walkable: false, wallOnly: true,
-    comfort: 6, affinity: null, affinityBonus: 0,
-    desc: "조용한 분위기를 만든다. (벽에 붙여야 함)",
   },
 ];
 
