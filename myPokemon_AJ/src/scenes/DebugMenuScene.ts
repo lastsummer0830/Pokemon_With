@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import { Gender } from "../data/Player";
 import { createFromSpecies, Pokemon } from "../data/Pokemon";
+import { markOwn, markSeen } from "../data/Pokedex";
+import { START_BAG, START_MONEY } from "../systems/save";
 
 // 개발용 — 씬 바로가기 메뉴. 타이틀에서 D 키로 진입.
 // 매번 처음부터(타이틀→인트로→…) 안 거치고 원하는 화면을 바로 확인하기 위함.
@@ -46,6 +48,15 @@ export default class DebugMenuScene extends Phaser.Scene {
       ["8. 시작 집 - 침실 바로가기(skip)", "InteriorScene", { room: "bedroom", skipIntro: true }],
       ["9. 포켓몬 연구소(스타팅 선택)", "LabScene"],
       ["0. 인게임 메뉴(파티/가방/저장)", "__MENU__"],
+      // 시안 비교용(클릭) — 그림은 셋 다 AR 원본, 색만 다르다. ar=원본색 / pastel=파스텔 / sky=타이틀 하늘톤
+      ["가방 — A(원본색)", "BagScene", { look: "ar", testParty: true }],
+      ["가방 — B(파스텔)", "BagScene", { look: "pastel", testParty: true }],
+      ["가방 — C(하늘톤)", "BagScene", { look: "sky", testParty: true }],
+      ["가방 — D(크림+빨강)", "BagScene", { look: "cream", testParty: true }],
+      ["도감 — A(원본색)", "PokedexScene", { look: "ar", testParty: true }],
+      ["도감 — B(파스텔)", "PokedexScene", { look: "pastel", testParty: true }],
+      ["도감 — C(하늘톤)", "PokedexScene", { look: "sky", testParty: true }],
+      ["도감 — D(크림+빨강)", "PokedexScene", { look: "cream", testParty: true }],
     ];
     const go = (key: string, data?: object) => {
       // 테스트용 기본값 — 인트로를 건너뛰어도 씬이 동작하도록
@@ -57,6 +68,18 @@ export default class DebugMenuScene extends Phaser.Scene {
         if (!party.length) this.registry.set("playerParty", [
           createFromSpecies("CHARMANDER", 5), createFromSpecies("SQUIRTLE", 5), createFromSpecies("BULBASAUR", 5),
         ]);
+      }
+      // 가방·도감을 바로 볼 땐 가방 내용물·소지금·도감 기록이 있어야 화면이 채워진다.
+      if (key === "BagScene" || key === "PokedexScene") {
+        if (!this.registry.get("money")) this.registry.set("money", START_MONEY);
+        if (!(this.registry.get("bag") as unknown[])?.length)
+          this.registry.set("bag", [...START_BAG, { itemId: "SUPERPOTION", count: 2 }, { itemId: "ANTIDOTE", count: 1 },
+            { itemId: "GREATBALL", count: 3 }, { itemId: "REVIVE", count: 1 }]);
+        if (!(this.registry.get("dexSeen") as unknown[])?.length) {
+          // 초반 진행 느낌으로: 스타터 3종은 잡았고, 1번도로 야생 몇 종은 본 상태
+          for (const id of ["CHARMANDER", "SQUIRTLE", "BULBASAUR"]) markOwn(this.registry, id);
+          for (const id of ["PIDGEY", "RATTATA", "CATERPIE", "WEEDLE", "SPEAROW"]) markSeen(this.registry, id);
+        }
       }
       if (key === "__MENU__") {
         // 인게임 메뉴 확인용: 테스트 파티가 없으면 채워넣고 메뉴 오버레이를 띄운다.

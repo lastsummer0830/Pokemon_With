@@ -148,8 +148,9 @@ export default class MenuScene extends Phaser.Scene {
     if (this.state === "main") {
       const item = this.MAIN_ITEMS[this.idx];
       if (item === "포켓몬") { if (!this.party.length) { this.toast("아직 포켓몬이 없어."); return; } this.state = "party"; this.idx = 0; this.renderState(); }
-      else if (item === "도감") { this.toast("도감은 준비 중이야."); }
-      else if (item === "가방") { this.toast("가방은 준비 중이야."); }
+      // 도감·가방은 별도 씬(오버레이). 메뉴는 멈춰 두고, 돌아오면 다시 살아난다.
+      else if (item === "도감") { this.scene.pause(); this.scene.launch("PokedexScene", { from: "MenuScene" }); }
+      else if (item === "가방") { this.scene.pause(); this.scene.launch("BagScene", { from: "MenuScene" }); }
       else if (item === "저장") { saveGame(this.registry); this.toast("저장했다!"); }
       else if (item === "설정") { this.toast("설정은 준비 중이야."); }
     } else if (this.state === "party") {

@@ -30,6 +30,9 @@ export interface SpeciesData {
   name: string;          // 한글 종족명 (없으면 영문)
   nameEn: string;
   kind: string | null;   // 분류 (예: "씨앗")
+  height: number;        // m (도감 표시용)
+  weight: number;        // kg
+  dexEntry: string;      // 도감 설명문(한글)
   types: string[];       // 1~2개
   baseStats: BaseStats;
   abilities: string[];

@@ -177,6 +177,10 @@ def extract_species():
             "name": ko("species", en, en),          # 한글명(없으면 영문)
             "nameEn": en,
             "kind": ko("kind", txt(a.get("@real_category"))),   # 분류(예: 씨앗)
+            # 도감 화면용. 원본 단위는 정수(@height=7 → 0.7m, @weight=69 → 6.9kg).
+            "height": (a.get("@height") or 0) / 10.0,
+            "weight": (a.get("@weight") or 0) / 10.0,
+            "dexEntry": ko("dex", txt(a.get("@real_pokedex_entry")), ""),   # 한글 도감 설명(없으면 영문)
             "types": syms(a.get("@types")),
             "baseStats": stat_dict(a.get("@base_stats")),
             "abilities": syms(a.get("@abilities")),
