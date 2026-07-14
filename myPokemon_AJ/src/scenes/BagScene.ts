@@ -53,6 +53,8 @@ export default class BagScene extends Phaser.Scene {
   private partyIdx = 0;
   private msg = "";             // 하단 설명문(아이템 설명 또는 안내문)
   private layer!: Phaser.GameObjects.Container;
+  // 좌우 화살표(애니). render()가 layer를 통째로 갈아엎어도 살아남아야 애니가 안 끊긴다.
+  private arrows: Phaser.GameObjects.Sprite[] = [];
   private s = 1; private offX = 0; private offY = 0;
 
   constructor() { super("BagScene"); }
@@ -63,6 +65,8 @@ export default class BagScene extends Phaser.Scene {
     this.onResult = data?.onResult;
     this.pocketIdx = 0; this.idx = 0; this.top = 0;
     this.choosing = false; this.closing = false; this.partyIdx = 0; this.msg = "";
+    // Phaser는 씬 인스턴스를 재사용한다 → 지난번 화살표 스프라이트는 이미 파괴됐으니 참조를 비운다.
+    this.arrows = [];
   }
 
   preload(): void {
@@ -77,8 +81,15 @@ export default class BagScene extends Phaser.Scene {
     this.loadImg("bag_cursor", `${DIR}/cursor.png`);
     this.loadImg("bag_pocketicons", `${DIR}/icon_pocket.png`);
     this.loadImg("bag_slider", `${DIR}/icon_slider.png`);
-    this.loadImg("ui_left_arrow", "assets/ui/left_arrow.png");
-    this.loadImg("ui_right_arrow", "assets/ui/right_arrow.png");
+    // 좌우 화살표 = 40x28 프레임 8장이 세로로 쌓인 애니 시트(40x224). 정지컷이 아니라 계속 움직인다.
+    //  AR 원본: AnimatedSprite("left_arrow", 8프레임, 40x28, frameskip 2) — frameskip은 1/20초 단위라
+    //  프레임당 2/20초 = 100ms = 10fps 무한반복.
+    for (const [key, path] of [
+      ["ui_left_arrow", "assets/ui/left_arrow.png"],
+      ["ui_right_arrow", "assets/ui/right_arrow.png"],
+    ] as const) {
+      if (!this.textures.exists(key)) this.load.spritesheet(key, path, { frameWidth: 40, frameHeight: 28 });
+    }
     // 갖고 있는 아이템 아이콘
     for (const p of POCKETS)
       for (const { def } of itemsByPocket(this.registry, p))
@@ -94,6 +105,17 @@ export default class BagScene extends Phaser.Scene {
     for (const k of this.textures.getTextureKeys())
       if (k.startsWith("bag_") || k.startsWith("item_") || k.startsWith("ui_"))
         this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
+
+    // 화살표 애니(10fps 무한반복) — 텍스처와 달리 애니는 Game 전역에 남으므로 한 번만 만든다.
+    for (const k of ["ui_left_arrow", "ui_right_arrow"]) {
+      if (this.textures.exists(k) && !this.anims.exists(`${k}_anim`)) {
+        this.anims.create({
+          key: `${k}_anim`,
+          frames: this.anims.generateFrameNumbers(k, { start: 0, end: 7 }),
+          frameRate: 10, repeat: -1,
+        });
+      }
+    }
 
     const kb = this.input.keyboard!;
     kb.on("keydown-UP", () => this.move(-1));
@@ -245,7 +267,12 @@ export default class BagScene extends Phaser.Scene {
   }
 
   private render(): void {
-    if (this.layer) this.layer.destroy();
+    if (this.layer) {
+      // 화살표는 살려서 꺼낸다 — 같이 destroy되면 다시 만들 때 애니가 0프레임부터 시작해서,
+      //  키를 누르는 동안(=render가 계속 도는 동안) 화살표가 첫 프레임에 얼어붙는다.
+      this.arrows.forEach((sp) => this.layer.remove(sp));
+      this.layer.destroy();
+    }
     this.layer = this.add.container(0, 0).setDepth(10);
     const { width, height } = this.scale;
     this.s = Math.min(width / VW, height / VH);
@@ -282,12 +309,21 @@ export default class BagScene extends Phaser.Scene {
     const [base, shadow] = this.panelText;
     this.txt(94, 186, POCKET_NAME[this.pocket] ?? "", 20, base, shadow, "center");
 
-    // 좌우 화살표(8프레임 시트의 첫 프레임만) — 원본 (-4,76) / (150,76)
+    // 좌우 화살표 — 원본 (-4,76) / (150,76). 8프레임 애니를 그대로 재생한다(정지컷 아님).
     //  원본도 넘길 포켓이 2개 이상일 때만 화살표를 그린다(배틀=회복약 하나뿐이면 안 나온다).
-    if (this.pockets.length > 1) {
-      this.img("ui_left_arrow", -4, 76, new Phaser.Geom.Rectangle(0, 0, 40, 28));
-      this.img("ui_right_arrow", 150, 76, new Phaser.Geom.Rectangle(0, 0, 40, 28));
-    }
+    const show = this.pockets.length > 1;
+    ([["ui_left_arrow", -4, 76], ["ui_right_arrow", 150, 76]] as const).forEach(([key, vx, vy], i) => {
+      if (!this.textures.exists(key)) return;
+      // 스프라이트는 한 번만 만들고 재사용한다(render마다 새로 만들면 애니가 다시 처음부터 돈다).
+      let sp = this.arrows[i];
+      if (!sp) {
+        sp = this.add.sprite(0, 0, key).setOrigin(0);
+        sp.play(`${key}_anim`);
+        this.arrows[i] = sp;
+      }
+      sp.setVisible(show).setPosition(this.X(vx), this.Y(vy)).setScale(this.s);
+      this.layer.add(sp);   // 그리는 순서(배경 다음, 목록 앞)는 원래대로 유지
+    });
   }
 
   // 오른쪽 목록 — 아이템(또는 포켓몬 선택 중이면 파티)

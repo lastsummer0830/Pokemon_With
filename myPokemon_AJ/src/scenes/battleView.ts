@@ -41,69 +41,97 @@ export const CMD_SLOTS = [
   { row: 3, vx: 378, vy: 336 },   // 도망
 ];
 
-// 화면 채우기 방식 — 시안 2안.
-//  cover  = 배경을 화면 가득(잘림 허용), UI는 원본 비율로 가운데 4:3 영역에 (검은 여백 없음)
-//  contain= 화면 전체를 원본 4:3 비율로 (좌우 검은 여백)
-export type Fit = "cover" | "contain";
+// ── 기술 선택(FIGHT) 메뉴 — AR FightMenu 좌표 그대로 ─────────
+//  배경 overlay_fight(512x96) → (0,288). ★ 커맨드창과 반대로 "왼쪽이 어두운 버튼칸 / 오른쪽이 흰 정보칸".
+//  버튼 시트 cursor_fight(384x874) = 192x46 버튼 × 19행.
+//    행   = 기술 타입의 iconPosition(types.json — 타입 키 순서로 추정하면 틀린다)
+//    좌열(x=0)=기본(흰 바탕+타입색 테두리) / 우열(x=192)=선택(타입색 채움)
+export const FIGHT_BTN_W = 192, FIGHT_BTN_H = 46;
+export const FIGHT_SLOTS = [
+  { vx: 4,   vy: 294 },   // 기술1 (좌상)
+  { vx: 192, vy: 294 },   // 기술2 (우상)
+  { vx: 4,   vy: 336 },   // 기술3 (좌하)
+  { vx: 192, vy: 336 },   // 기술4 (우하)
+];
+export const TYPE_ICON_W = 64, TYPE_ICON_H = 28;   // Graphics/UI/types.png (64x560 = 28px × 20행)
 
+// ⚠️ 타입 아이콘 시트는 20행인데 기술 버튼 시트는 19행뿐이다(스텔라 = iconPosition 19 → 버튼 그림이 없다).
+//   그대로 자르면 시트 바깥을 잘라 버튼이 통째로 안 보인다 → 버튼 행만 노말(0)로 떨군다.
+const FIGHT_ROWS = 19;
+export function fightRow(iconPosition: number): number {
+  return iconPosition >= 0 && iconPosition < FIGHT_ROWS ? iconPosition : 0;
+}
+
+// 선택한 기술의 PP 글자색 — AR FightMenu::PP_COLORS. 남은 PP 비율 4단계.
+//  단계 = min(ceil(4 * pp / maxPp), 3)  → 0:PP0(빨강) 1:1/4이하(주황) 2:1/2이하(노랑) 3:그 이상(기본색)
+export const PP_COLORS: [string, string][] = [
+  ["#f84848", "#883030"],
+  ["#f88820", "#904818"],
+  ["#f8c000", "#906800"],
+  ["#505058", "#a0a0a8"],
+];
+export function ppStage(pp: number, maxPp: number): number {
+  if (maxPp <= 0) return 3;
+  return Math.min(Math.ceil((4 * pp) / maxPp), 3);
+}
+
+// 기술명 글자색 = 그 버튼 그림의 "타입 테두리색"을 그대로 뽑아 쓴다(AR과 같은 발상 — 지어낸 색표 없음).
+//  ⚠️ AR 원본은 (10, row*46+34)를 샘플하지만, 이 버튼 그림은 왼쪽 모서리가 사선이라 그 점이 투명이다.
+//     같은 테두리가 지나가는 버튼 세로중앙 (12, row*46+23)에서 뽑는다(색은 동일).
+//  getPixel은 호출할 때마다 시트(384x874) 전체를 캔버스에 다시 그린다 → 행마다 한 번만 뽑아 캐시한다.
+const nameColors = new Map<number, string>();
+export function moveNameColor(scene: Phaser.Scene, sheetKey: string, row: number): string {
+  const hit = nameColors.get(row);
+  if (hit) return hit;
+  const c = scene.textures.getPixel(12, row * FIGHT_BTN_H + 23, sheetKey);
+  if (!c) return MSG_COLOR;                      // 텍스처가 아직 없으면 캐시하지 않는다
+  const hex = `#${c.color.toString(16).padStart(6, "0")}`;
+  nameColors.set(row, hex);
+  return hex;
+}
+
+// 화면 채우기 = cover (사용자 확정 2026-07-14, 시안 A안).
+//  배경을 화면 가득 채우고(비율 유지, 넘치는 부분만 잘림) 검은 여백을 남기지 않는다.
+//  UI는 원본 비율 그대로 두되 "화면 가장자리"에 붙인다(아래 XL/XR).
 export class BattleView {
-  s = 1; offX = 0; offY = 0;   // 가상좌표 → 화면 변환
+  s = 1; offY = 0;   // 가상좌표 → 화면 변환
 
-  constructor(private scene: Phaser.Scene, private fit: Fit) { this.measure(); }
+  constructor(private scene: Phaser.Scene) { this.measure(); }
 
   measure(): void {
-    const { width, height } = this.scene.scale;
-    if (this.fit === "contain") {
-      // 원본 4:3을 통째로 화면 안에 (좌우 검은 여백)
-      this.s = Math.min(width / VW, height / VH);
-      this.offX = Math.round((width - VW * this.s) / 2);
-      this.offY = Math.round((height - VH * this.s) / 2);
-    } else {
-      // 와이드: 세로를 화면에 맞추고, 가로는 "화면 가장자리 기준"으로 배치한다(아래 XL/XR).
-      //  ⚠️ AR 레이아웃은 화면이 딱 512px인 걸 전제로 HP박스를 화면 밖으로 살짝 흘려보낸다
-      //     (상대 x=-16, 내 것은 오른쪽으로 넘침). 512짜리 판을 화면 한가운데 띄우면
-      //     그 '흘림'이 허공에서 잘려 보인다 → 반드시 화면 좌우 끝에 붙여야 원본처럼 보인다.
-      this.s = height / VH;
-      this.offX = 0;
-      this.offY = 0;
-    }
+    // 세로를 화면에 맞추고, 가로는 "화면 가장자리 기준"으로 배치한다(아래 XL/XR).
+    //  ⚠️ AR 레이아웃은 화면이 딱 512px인 걸 전제로 HP박스를 화면 밖으로 살짝 흘려보낸다
+    //     (상대 x=-16, 내 것은 오른쪽으로 넘침). 512짜리 판을 화면 한가운데 띄우면
+    //     그 '흘림'이 허공에서 잘려 보인다 → 반드시 화면 좌우 끝에 붙여야 원본처럼 보인다.
+    this.s = this.scene.scale.height / VH;
+    this.offY = 0;
   }
 
   private get W(): number { return this.scene.scale.width; }
 
   // 가로 좌표 3종 — 어디에 붙일지에 따라 다르다.
-  XL(vx: number): number {   // 화면 왼쪽 기준 (상대 HP박스, 대사 글자)
-    return this.fit === "contain" ? this.offX + vx * this.s : vx * this.s;
-  }
-  XR(vx: number): number {   // 화면 오른쪽 기준 (내 HP박스, 커맨드 버튼) — 원본에서 오른쪽 끝까지의 거리를 유지
-    return this.fit === "contain" ? this.offX + vx * this.s : this.W - (VW - vx) * this.s;
-  }
-  XC(vx: number): number {   // 화면 비율 기준 (포켓몬 스프라이트 — 배경 발판 위치를 따라간다)
-    return this.fit === "contain" ? this.offX + vx * this.s : this.W * (vx / VW);
-  }
+  XL(vx: number): number { return vx * this.s; }                      // 화면 왼쪽 기준 (상대 HP박스, 대사 글자)
+  XR(vx: number): number { return this.W - (VW - vx) * this.s; }      // 화면 오른쪽 기준 (내 HP박스, 커맨드 버튼)
+  XC(vx: number): number { return this.W * (vx / VW); }               // 화면 비율 기준 (포켓몬 스프라이트 — 배경 발판을 따라간다)
   X(vx: number): number { return this.XL(vx); }
   Y(vy: number): number { return this.offY + vy * this.s; }
-  get barW(): number { return this.fit === "contain" ? VW * this.s : this.W; }   // 하단 바 = 화면 폭 전체
+  get barW(): number { return this.W; }   // 하단 바 = 화면 폭 전체
 
   // 배경: AR 배틀백(bg 512x288 + message 512x96). 아무것도 그리지 않는다 — 원본 PNG 그대로.
   drawBackdrop(into: Phaser.GameObjects.Container, bgKey: string, msgKey: string): void {
     const { width, height } = this.scene.scale;
-    if (this.fit === "cover") {
-      // 배경은 화면을 가득(비율 유지, 넘치는 부분만 잘림) → 검은 여백 없음.
-      const bs = Math.max(width / VW, height / 288);
-      into.add(this.scene.add.image(width / 2, (288 / 2) * this.s, bgKey).setOrigin(0.5).setScale(bs));
-    } else {
-      into.add(this.scene.add.image(this.X(0), this.Y(0), bgKey).setOrigin(0).setScale(this.s));
-    }
+    // 배경은 화면을 가득(비율 유지, 넘치는 부분만 잘림) → 검은 여백 없음.
+    const bs = Math.max(width / VW, height / 288);
+    into.add(this.scene.add.image(width / 2, (288 / 2) * this.s, bgKey).setOrigin(0.5).setScale(bs));
     // 하단 바 — 화면 폭을 꽉 채운다(세로는 원본 비율 96px).
-    const bar = this.scene.add.image(this.fit === "contain" ? this.offX : 0, this.Y(288), msgKey).setOrigin(0);
+    const bar = this.scene.add.image(0, this.Y(288), msgKey).setOrigin(0);
     bar.setDisplaySize(this.barW, 96 * this.s);
     into.add(bar);
   }
 
   // 하단 바에 얹는 오버레이(대사창·커맨드창)도 화면 폭을 채운다.
   bottomOverlay(into: Phaser.GameObjects.Container, key: string): void {
-    const im = this.scene.add.image(this.fit === "contain" ? this.offX : 0, this.Y(288), key).setOrigin(0);
+    const im = this.scene.add.image(0, this.Y(288), key).setOrigin(0);
     im.setDisplaySize(this.barW, 96 * this.s);
     into.add(im);
   }

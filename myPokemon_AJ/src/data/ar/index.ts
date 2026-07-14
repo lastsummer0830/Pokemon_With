@@ -6,6 +6,9 @@
 export interface TypeData {
   id: string;
   name: string;           // 한글 타입명 (예: "불꽃")
+  // 타입 아이콘·기술버튼 시트의 '행 번호'(AR 원본값). types.png(28px 행) · cursor_fight.png(46px 행).
+  //  ⚠️ 타입 키 순서로 추정하면 틀린다(키 20개 vs cursor_fight 19행) — 반드시 이 값을 쓸 것.
+  iconPosition: number;
   special: boolean;
   pseudo: boolean;        // ??? 같은 실제 아닌 타입
   weaknesses: string[];   // 이 타입이 '받을 때' 2배인 공격 타입들

@@ -119,6 +119,10 @@ def extract_types():
         out[tid] = {
             "id": tid,
             "name": txt(a.get("@real_name")),          # 한글명
+            # ★ 타입 아이콘·기술버튼의 '행 번호'. AR 배틀 UI가 이 값으로 시트를 자른다:
+            #   Graphics/UI/types.png(28px 행) · Battle/cursor_fight.png(46px 행).
+            #   ⚠️ 타입 키 순서로 추정하면 틀린다(키 20개 vs cursor_fight 19행) — 반드시 이 값을 쓸 것.
+            "iconPosition": a.get("@icon_position") or 0,
             "special": bool(a.get("@special_type")),    # (구세대 물리/특수 구분 흔적)
             "pseudo": bool(a.get("@pseudo_type")),      # ??? 같은 실제 아닌 타입
             # 방어 기준: 이 타입이 '받을 때'의 배율. 공격타입 A → 이 타입 D:

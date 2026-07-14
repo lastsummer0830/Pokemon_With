@@ -1,20 +1,18 @@
 import Phaser from "phaser";
 import { frontPath, backPath, makeStillFront } from "../game/pokemonSprite";
 import { Pokemon, MoveSlot, createFromSpecies, displayName } from "../data/Pokemon";
-import { loadArDb, getMove } from "../data/ar";
+import { loadArDb, getMove, getType } from "../data/ar";
 import { markSeen } from "../data/Pokedex";
 import { performMove, movesFirst, isFainted, effectivenessText } from "../systems/battle";
 import { battleExpYield, gainExp } from "../systems/exp";
 import type { BagResult } from "./BagScene";
-import { BattleView, DataBox, CMD_SLOTS, josa, type Fit } from "./battleView";
+import {
+  BattleView, DataBox, CMD_SLOTS, josa,
+  FIGHT_SLOTS, FIGHT_BTN_W, FIGHT_BTN_H, TYPE_ICON_W, TYPE_ICON_H, PP_COLORS, ppStage, moveNameColor, fightRow,
+} from "./battleView";
 import { playBgm, stopBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 
-// HGSS 감성 색 (DialogBox와 통일)
-const CREAM = 0xf6efd8;
-const NAVY = 0x21314f;
-const BLUE = 0x4a6aa5;
-const GOLD = "#ffe27a";
 const FONT = "Galmuri11";
 const SPRITE_ZOOM = 2;   // AR 배틀 스프라이트 확대 배율(원본 프레임 44~48px)
 
@@ -34,7 +32,6 @@ export interface BattleInit {
   returnPos?: [number, number]; // 배틀 끝나고 돌아갈 월드 좌표(승리/도망 시)
   returnFacing?: "down" | "left" | "right" | "up";
   backdrop?: "town" | "route";  // 배틀 배경(AR battleback). 마을=town, 1번도로=route.
-  fit?: Fit;                    // 화면 채우기 방식(시안 비교용) — 사용자 결정 전 임시 옵션
 }
 
 export default class BattleScene extends Phaser.Scene {
@@ -48,7 +45,6 @@ export default class BattleScene extends Phaser.Scene {
   private allySprite!: Phaser.GameObjects.Image;
   private enemySprite!: Phaser.GameObjects.Image;
   private backdrop: "town" | "route" = "town";
-  private fit: Fit = "cover";
 
   private pendingAlly: Pokemon | null = null;
   private pendingEnemy: Pokemon | null = null;
@@ -74,7 +70,6 @@ export default class BattleScene extends Phaser.Scene {
     this.returnFacing = data?.returnFacing ?? "down";
     // 배경은 "어디서 싸우느냐"가 정한다(AR도 맵 메타데이터의 battle_background). 마을=town, 도로·풀숲=route.
     this.backdrop = data?.backdrop ?? "route";
-    this.fit = data?.fit ?? "cover";
     this.outcome = "win";
   }
 
@@ -84,9 +79,11 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image("bb_bg", `assets/battlebacks/${this.backdrop}_bg.png`);
     this.load.image("bb_msg", `assets/battlebacks/${this.backdrop}_message.png`);
     for (const k of ["databox_normal", "databox_normal_foe", "overlay_command", "cursor_command",
-                     "overlay_message", "overlay_hp", "overlay_lv", "icon_numbers"]) {
+                     "overlay_message", "overlay_fight", "cursor_fight", "overlay_hp", "overlay_lv", "icon_numbers"]) {
       if (!this.textures.exists(`bt_${k}`)) this.load.image(`bt_${k}`, `assets/ui/battle/${k}.png`);
     }
+    // 타입 아이콘 시트(기술 선택 화면 오른쪽) — 배틀 UI가 아니라 공용 UI 폴더에 있다.
+    if (!this.textures.exists("bt_types")) this.load.image("bt_types", "assets/ui/types.png");
     // Phaser 텍스처는 Game 전역에 캐시된다 → 이전 배틀의 스프라이트 키가 남아 있으면
     //  종족이 달라도 옛 그림을 재사용해 버린다(적이 안 바뀌는 버그). 매 배틀 새로 받도록 먼저 비운다.
     //  (makeStillFront가 만드는 "__still" 파생 텍스처까지 제거.)
@@ -110,7 +107,7 @@ export default class BattleScene extends Phaser.Scene {
       if (k.startsWith("bt_") || k.startsWith("bb_"))
         this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
 
-    this.view = new BattleView(this, this.fit);
+    this.view = new BattleView(this);
     this.buildBackground();
     this.buildSprites();
     this.buildHud();
@@ -383,58 +380,81 @@ export default class BattleScene extends Phaser.Scene {
     });
   }
 
-  private async selectMove(): Promise<number> {
-    const labels = this.ally.moves.map((m) => {
-      const md = getMove(m.id);
-      return `${md?.name ?? m.id}  ${m.pp}/${m.maxPp}`;
-    });
-    while (labels.length < 4) labels.push("-");
-    return this.menu(labels, true, this.ally.moves.length);
-  }
-
-  // 공용 메뉴: 대화박스 자리에 2열 패널. ↑↓←→ + Enter/Z 선택, X/ESC 취소(취소가능일 때 -1).
-  private menu(labels: string[], cancelable: boolean, activeCount = labels.length): Promise<number> {
-    const { width, height } = this.scale;
-    const w = Math.min(width * 0.92, 1100);
-    const h = Math.max(height * 0.22, 130);
-    const x = (width - w) / 2;
-    const y = height - h - Math.max(height * 0.04, 18);
-    const g = this.add.graphics().setDepth(1100);
-    g.fillStyle(0x000000, 0.35); g.fillRoundedRect(x + 4, y + 6, w, h, 18);
-    g.fillStyle(CREAM, 1); g.fillRoundedRect(x, y, w, h, 18);
-    g.fillStyle(NAVY, 1); g.fillRoundedRect(x + 5, y + 5, w - 10, h - 10, 14);
-    g.lineStyle(2, BLUE, 0.8); g.strokeRoundedRect(x + 9, y + 9, w - 18, h - 18, 11);
-
-    const cols = 2;
-    const fs = Math.max(18, Math.round(h * 0.17));
-    const pad = Math.round(h * 0.22);
-    const cellW = (w - pad * 2) / cols;
-    const rowH = Math.round((h - pad * 1.4) / 2);
-    const texts = labels.map((t, i) => {
-      const c = i % cols, r = Math.floor(i / cols);
-      return this.add.text(x + pad + c * cellW + 28, y + pad * 0.6 + r * rowH, t,
-        { fontFamily: FONT, fontSize: `${fs}px`, color: "#ffffff" }).setDepth(1101);
-    });
-    const cursor = this.add.text(0, 0, "▶", { fontFamily: FONT, fontSize: `${fs}px`, color: GOLD }).setDepth(1101);
-    let idx = 0;
-    const place = () => cursor.setPosition(texts[idx].x - 26, texts[idx].y);
-    place();
-
+  // 기술 선택 — AR 원본 overlay_fight + cursor_fight(타입별 버튼 시트). 직접 그리는 도형 없음.
+  //  ★ 버튼 행 = 그 기술 타입의 iconPosition(types.json). 좌열=기본 / 우열=선택.
+  //  ★ 기술명 글자색 = 그 버튼 그림에서 뽑은 타입 테두리색(battleView.moveNameColor).
+  //  오른쪽 흰 칸 = 선택한 기술의 타입 아이콘(types.png) + 남은 PP(색이 PP 비율에 따라 변한다).
+  //  반환: 고른 기술 인덱스, X/ESC로 취소하면 -1(커맨드로 뒤로가기).
+  private selectMove(): Promise<number> {
     return new Promise((resolve) => {
+      const v = this.view;
+      const layer = this.add.container(0, 0).setDepth(200);
+      v.bottomOverlay(layer, "bt_overlay_fight");
+
+      const slots = this.ally.moves.slice(0, 4);
+      // 타입의 iconPosition — 타입 아이콘 시트(20행)는 이 값을 그대로,
+      //  버튼 시트(19행)는 스텔라가 없으므로 fightRow()로 걸러 쓴다.
+      const rows = slots.map((m) => getType(getMove(m.id)?.type ?? "NORMAL")?.iconPosition ?? 0);
+      const btnRows = rows.map(fightRow);
+
+      // 기술 버튼 + 기술명
+      const btns = slots.map((_, i) => {
+        const im = this.add.image(v.XL(FIGHT_SLOTS[i].vx), v.Y(FIGHT_SLOTS[i].vy), "bt_cursor_fight")
+          .setOrigin(0).setScale(v.s);
+        layer.add(im);
+        return im;
+      });
+      slots.forEach((m, i) => {
+        const md = getMove(m.id);
+        const t = this.add.text(v.XL(FIGHT_SLOTS[i].vx + FIGHT_BTN_W / 2), v.Y(FIGHT_SLOTS[i].vy + 14),
+          md?.name ?? m.id, {
+            fontFamily: FONT, fontSize: `${Math.round(18 * v.s)}px`,
+            color: moveNameColor(this, "bt_cursor_fight", btnRows[i]),
+          }).setOrigin(0.5, 0);
+        t.setShadow(Math.max(1, v.s), Math.max(1, v.s), "#a0a0a8", 0, false, true);
+        layer.add(t);
+      });
+
+      // 오른쪽 흰 칸: 선택한 기술의 타입 아이콘 + PP
+      const typeIcon = this.add.image(v.XR(416), v.Y(308), "bt_types").setOrigin(0).setScale(v.s);
+      layer.add(typeIcon);
+      const ppText = this.add.text(v.XR(448), v.Y(344), "", {
+        fontFamily: FONT, fontSize: `${Math.round(18 * v.s)}px`,
+      }).setOrigin(0.5, 0);
+      layer.add(ppText);
+
+      let idx = 0;
+      const paint = () => {
+        slots.forEach((_, i) => {
+          const sx = i === idx ? FIGHT_BTN_W : 0;              // 우열 = 선택된 모습
+          btns[i].setCrop(sx, btnRows[i] * FIGHT_BTN_H, FIGHT_BTN_W, FIGHT_BTN_H);
+          btns[i].setPosition(v.XL(FIGHT_SLOTS[i].vx) - sx * v.s,
+                              v.Y(FIGHT_SLOTS[i].vy) - btnRows[i] * FIGHT_BTN_H * v.s);
+        });
+        // 타입 아이콘(시트에서 그 타입 행만 잘라 쓴다)
+        typeIcon.setCrop(0, rows[idx] * TYPE_ICON_H, TYPE_ICON_W, TYPE_ICON_H);
+        typeIcon.setPosition(v.XR(416), v.Y(308) - rows[idx] * TYPE_ICON_H * v.s);
+        // PP
+        const m = slots[idx];
+        const [base, shadow] = PP_COLORS[ppStage(m.pp, m.maxPp)];
+        ppText.setText(`PP: ${m.pp}/${m.maxPp}`).setColor(base);
+        ppText.setShadow(Math.max(1, v.s), Math.max(1, v.s), shadow, 0, false, true);
+      };
+      paint();
+
       const kb = this.input.keyboard!;
-      const clamp = (n: number) => (n + activeCount) % activeCount;
-      const move = (d: number) => { idx = clamp(idx + d); place(); playSfx(this, SFX.cursor, 0.4); };
-      const onLeft = () => move(-1); const onRight = () => move(1);
-      const onUp = () => move(-cols); const onDown = () => move(cols);
+      const n = slots.length;
+      const move = (d: number) => { idx = (idx + d + n) % n; playSfx(this, SFX.cursor, 0.4); paint(); };
+      const onLeft = () => move(-1), onRight = () => move(1), onUp = () => move(-2), onDown = () => move(2);
       const cleanup = () => {
         kb.off("keydown-LEFT", onLeft); kb.off("keydown-RIGHT", onRight);
         kb.off("keydown-UP", onUp); kb.off("keydown-DOWN", onDown);
         kb.off("keydown-ENTER", onConfirm); kb.off("keydown-Z", onConfirm); kb.off("keydown-SPACE", onConfirm);
         kb.off("keydown-X", onCancel); kb.off("keydown-ESC", onCancel);
-        g.destroy(); texts.forEach((t) => t.destroy()); cursor.destroy();
+        layer.destroy();
       };
       const onConfirm = () => { playSfx(this, SFX.decision, 0.4); const r = idx; cleanup(); resolve(r); };
-      const onCancel = () => { if (!cancelable) return; playSfx(this, SFX.cancel, 0.4); cleanup(); resolve(-1); };
+      const onCancel = () => { playSfx(this, SFX.cancel, 0.4); cleanup(); resolve(-1); };
       kb.on("keydown-LEFT", onLeft); kb.on("keydown-RIGHT", onRight);
       kb.on("keydown-UP", onUp); kb.on("keydown-DOWN", onDown);
       kb.on("keydown-ENTER", onConfirm); kb.on("keydown-Z", onConfirm); kb.on("keydown-SPACE", onConfirm);
