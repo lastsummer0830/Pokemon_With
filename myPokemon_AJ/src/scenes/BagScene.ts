@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { Pokemon, displayName } from "../data/Pokemon";
+import { josa } from "../data/josa";
 import { itemsByPocket, POCKETS, POCKET_NAME, removeItem } from "../data/Bag";
 import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
 
@@ -176,10 +177,10 @@ export default class BagScene extends Phaser.Scene {
     if (this.idx >= list.length) { this.close(); return; }        // "닫는다" 줄
     const def = list[this.idx].def;
     // 필드에서 쓸 수 있는 건 회복약(포켓 2)뿐. 볼·일반 아이템은 여기서 쓸 수 없다.
-    if (def.pocket !== 2) { this.msg = `${def.name}은(는) 지금 쓸 수 없다.`; this.render(); return; }
+    if (def.pocket !== 2) { this.msg = `${def.name}${josa(def.name, "은는")} 지금 쓸 수 없다.`; this.render(); return; }
     if (!this.party.length) { this.msg = "포켓몬이 없다."; this.render(); return; }
     this.choosing = true; this.partyIdx = 0;
-    this.msg = `${def.name}을(를) 누구에게 쓸까?`;
+    this.msg = `${def.name}${josa(def.name, "을를")} 누구에게 쓸까?`;
     this.render();
   }
 
@@ -203,12 +204,12 @@ export default class BagScene extends Phaser.Scene {
     };
     if (def.id === "POTION" || def.id === "SUPERPOTION") {
       const amount = def.id === "POTION" ? 20 : 60;
-      if (p.currentHp <= 0) text = `${displayName(p)}은(는) 기절해 있다!`;
+      if (p.currentHp <= 0) text = `${displayName(p)}${josa(displayName(p), "은는")} 기절해 있다!`;
       else if (p.currentHp >= p.maxHp) text = `${displayName(p)}의 HP는 가득 차 있다.`;
       else { const g = heal(amount); ok = true; text = `${displayName(p)}의 HP가 ${g} 회복됐다!`; }
     } else if (def.id === "REVIVE") {
-      if (p.currentHp > 0) text = `${displayName(p)}은(는) 기절하지 않았다.`;
-      else { p.currentHp = Math.floor(p.maxHp / 2); p.status = null; ok = true; text = `${displayName(p)}이(가) 기운을 되찾았다!`; }
+      if (p.currentHp > 0) text = `${displayName(p)}${josa(displayName(p), "은는")} 기절하지 않았다.`;
+      else { p.currentHp = Math.floor(p.maxHp / 2); p.status = null; ok = true; text = `${displayName(p)}${josa(displayName(p), "이가")} 기운을 되찾았다!`; }
     } else {
       // 상태이상 치료제 — 아이템 id → 낫는 상태
       const cure: Record<string, Pokemon["status"]> = {

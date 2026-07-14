@@ -1,13 +1,14 @@
 import Phaser from "phaser";
 import { frontPath, backPath, makeStillFront } from "../game/pokemonSprite";
 import { Pokemon, MoveSlot, createFromSpecies, displayName } from "../data/Pokemon";
+import { josa } from "../data/josa";
 import { loadArDb, getMove, getType } from "../data/ar";
 import { markSeen } from "../data/Pokedex";
 import { performMove, movesFirst, isFainted, effectivenessText } from "../systems/battle";
 import { battleExpYield, gainExp } from "../systems/exp";
 import type { BagResult } from "./BagScene";
 import {
-  BattleView, DataBox, CMD_SLOTS, josa,
+  BattleView, DataBox, CMD_SLOTS,
   FIGHT_SLOTS, FIGHT_BTN_W, FIGHT_BTN_H, TYPE_ICON_W, TYPE_ICON_H, PP_COLORS, ppStage, moveNameColor, fightRow,
 } from "./battleView";
 import { playBgm, stopBgm } from "../game/bgm";
@@ -149,10 +150,12 @@ export default class BattleScene extends Phaser.Scene {
     playSfx(this, SFX.exclaim, 0.5); // 조우 "!"
     if (this.trainer) {
       // 트레이너 배틀 인트로 — 승부를 걸고 포켓몬을 내보낸다.
-      await this.say(`${this.trainer}이(가) 승부를 걸어왔다!`);
-      await this.say(`${this.trainer}은(는) ${displayName(this.enemy)}을(를) 내보냈다!`);
+      const t = this.trainer, e = displayName(this.enemy);
+      await this.say(`${t}${josa(t, "이가")} 승부를 걸어왔다!`);
+      await this.say(`${t}${josa(t, "은는")} ${e}${josa(e, "을를")} 내보냈다!`);
     } else {
-      await this.say(`앗! 야생 ${displayName(this.enemy)}이(가) 나타났다!`);
+      const e = displayName(this.enemy);
+      await this.say(`앗! 야생 ${e}${josa(e, "이가")} 나타났다!`);
     }
 
     while (true) {
@@ -227,7 +230,7 @@ export default class BattleScene extends Phaser.Scene {
     const who = isAlly ? displayName(attacker) : `상대 ${displayName(attacker)}`;
     const res = performMove(attacker, defender, slot);
 
-    if (res.noPp) { await this.say(`${who}은(는) 기술을 쓸 수 없다!`); return; }
+    if (res.noPp) { await this.say(`${who}${josa(who, "은는")} 기술을 쓸 수 없다!`); return; }
     await this.say(`${who}의 ${res.moveName}!`);
 
     if (res.missed) { await this.say("하지만 빗나갔다!"); return; }
@@ -247,28 +250,32 @@ export default class BattleScene extends Phaser.Scene {
   private async win(): Promise<void> {
     this.outcome = "win";
     this.fadeOutSprite(this.enemySprite);
-    await this.say(`상대 ${displayName(this.enemy)}을(를) 쓰러뜨렸다!`);
+    const foe = displayName(this.enemy);
+    await this.say(`상대 ${foe}${josa(foe, "을를")} 쓰러뜨렸다!`);
     // 트레이너 배틀이면 승부 마무리 대사 + F1: 라이벌(트레이너)전 예약은 '이겼을 때만' 소비(지면 재대결 가능).
     if (this.trainer) {
-      await this.say(`${this.trainer}와(과)의 승부에서 이겼다!`);
+      const t = this.trainer;
+      await this.say(`${t}${josa(t, "과와")}의 승부에서 이겼다!`);
       this.registry.set("rivalBattlePending", false);
     }
     // 경험치 지급(승리 시에만). this.ally는 registry 파티 선두와 동일 참조라 레벨업이 파티에 그대로 반영된다.
     const up = gainExp(this.ally, battleExpYield(this.enemy));
-    await this.say(`${displayName(this.ally)}은(는) ${up.gained} 경험치를 얻었다!`);
+    const me = displayName(this.ally);
+    await this.say(`${me}${josa(me, "은는")} ${up.gained} 경험치를 얻었다!`);
     for (const lv of up.levels) {
       playSfx(this, SFX.decision, 0.4);
-      await this.say(`${displayName(this.ally)}은(는) Lv.${lv}(으)로 올랐다!`);
+      await this.say(`${me}${josa(me, "은는")} Lv.${lv}${josa(String(lv), "로")} 올랐다!`);
     }
     if (up.levels.length) await this.allyBox.animateTo(); // 레벨업으로 바뀐 HP/Lv 표시 갱신
     for (const l of up.learned) {
-      await this.say(`${displayName(this.ally)}은(는) 새로운 기술 ${l.move}을(를) 배웠다!`);
+      await this.say(`${me}${josa(me, "은는")} 새로운 기술 ${l.move}${josa(l.move, "을를")} 배웠다!`);
     }
   }
   private async lose(): Promise<void> {
     this.outcome = "lose";
     this.fadeOutSprite(this.allySprite);
-    await this.say(`${displayName(this.ally)}은(는) 쓰러졌다...`);
+    const me = displayName(this.ally);
+    await this.say(`${me}${josa(me, "은는")} 쓰러졌다...`);
   }
 
   // 적 AI: PP 있는 기술 중 무작위(없으면 첫 기술)

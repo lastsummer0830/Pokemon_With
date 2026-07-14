@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { Gender } from "../data/Player";
 import { Pokemon } from "../data/Pokemon";
+import { josa } from "../data/josa";
 import { playBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 import { FURNITURE, FurnitureDef } from "../data/furniture";
@@ -501,7 +502,7 @@ export default class InteriorScene extends Phaser.Scene {
       if (r.after > r.before) {
         await this.say(`${p.name}의 컨디션이 올랐다!  ${r.before} → ${r.after}  (이 방의 한계 ${r.cap})`);
       } else {
-        await this.say(`${p.name}은(는) 이 방에서 낼 수 있는 최상의 컨디션이다.  ${r.after} / ${r.cap}`);
+        await this.say(`${p.name}${josa(p.name, "은는")} 이 방에서 낼 수 있는 최상의 컨디션이다.  ${r.after} / ${r.cap}`);
       }
     }
     // 방이 허전하면 힌트(집 꾸미기 → 배틀 고리를 플레이어가 알아채게)
@@ -708,9 +709,9 @@ export default class InteriorScene extends Phaser.Scene {
     this.player.setFrame(this.idleFrame.down);
 
     await this.wait(600);
-    await this.say(`${name}은(는) 방에서 눈을 떴다.`);
+    await this.say(`${name}${josa(name, "은는")} 방에서 눈을 떴다.`);
     await this.say("띵— 동—");
-    await this.say(`어머, 왔니? ${name}은(는) 2층에 있단다.`, "엄마");
+    await this.say(`어머, 왔니? ${name}${josa(name, "은는")} 2층에 있단다.`, "엄마");
     // 네모가 계단으로 올라온다 — 걷는 동안 "터벅 터벅" 발소리만 띄운다(별도 나레이션 없음)
     this.nemona = this.add.sprite(this.cx(10), this.cy(3), "nemona", 0)
       .setOrigin(0.5, 1).setScale(this.zoom * 0.92).setDepth(10);

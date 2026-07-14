@@ -19,12 +19,6 @@ import { Pokemon, displayName } from "../data/Pokemon";
 
 export const VW = 512, VH = 384;          // AR 화면 해상도(가상 좌표계)
 
-// 한국어 조사 — 마지막 글자의 받침 유무로 고른다. (kind 문자열은 [받침있음, 받침없음] 순서!)
-export function josa(word: string, kind: "은는" | "이가" | "을를"): string {
-  const last = word.charCodeAt(word.length - 1);
-  const hasBatchim = last >= 0xac00 && last <= 0xd7a3 && (last - 0xac00) % 28 !== 0;
-  return hasBatchim ? kind[0] : kind[1];
-}
 const FONT = "Galmuri11";
 const NAME_COLOR = "#484848";             // AR: base (72,72,72)
 const NAME_SHADOW = "#b8b8b8";            // AR: shadow (184,184,184)

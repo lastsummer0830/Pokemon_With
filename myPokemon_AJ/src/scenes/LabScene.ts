@@ -3,6 +3,7 @@ import { Gender } from "../data/Player";
 import { createFromSpecies, Pokemon } from "../data/Pokemon";
 import { loadArDb } from "../data/ar";
 import { markOwn } from "../data/Pokedex";
+import { josa } from "../data/josa";
 import DialogBox from "../ui/DialogBox";
 import { playBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
@@ -236,16 +237,6 @@ export default class LabScene extends Phaser.Scene {
     }
   }
 
-  // 한국어 조사 자동선택: 마지막 글자 받침 유무로 고른다. kind 문자열은 [받침있음, 받침없음] 순서.
-  private josa(word: string, kind: "은는" | "이가" | "을를" | "과와" | "로"): string {
-    const ch = word.charCodeAt(word.length - 1);
-    if (ch < 0xac00 || ch > 0xd7a3) return kind === "로" ? "로" : kind[1];   // 한글 아니면 무난하게
-    const jong = (ch - 0xac00) % 28;
-    const hasJong = jong !== 0;
-    if (kind === "로") return !hasJong || jong === 8 ? "로" : "으로";          // 받침없음/ㄹ받침 → 로
-    return hasJong ? kind[0] : kind[1];
-  }
-
   // ── 선택 액자: 정지 스프라이트 + 프레임, 공식 도감 → 오박사 확인 → 별명 ──
   private async openWindow(i: number): Promise<void> {
     const pick = STARTERS[i];
@@ -259,7 +250,7 @@ export default class LabScene extends Phaser.Scene {
     await this.dlg.say(`${pick.name}. ${pick.type}타입, ${pick.category}.`);
     await this.dlg.say(pick.dex);
     // 2) 오박사 확인
-    await this.dlg.say(`오, ${you}${this.josa(you, "은는")} ${pick.name}${this.josa(pick.name, "이가")} 마음에 드는 거니?`, "오박사");
+    await this.dlg.say(`오, ${you}${josa(you, "은는")} ${pick.name}${josa(pick.name, "이가")} 마음에 드는 거니?`, "오박사");
     if (!(await this.dlg.askYesNo())) { await this.dlg.say("그래, 천천히 골라보렴.", "오박사"); this.closeWindow(); this.dlg.hide(); this.busy = false; return; }
     // 3) 별명 지어주기
     await this.dlg.say(`그래! 그럼 ${pick.name}에게 별명을 지어주겠니?`, "오박사");
@@ -281,11 +272,11 @@ export default class LabScene extends Phaser.Scene {
 
     const disp = nickname ?? pick.name;
     if (nickname) await this.dlg.say(`${nickname}! 좋은 이름이구나.`, "오박사");
-    await this.dlg.say(`${disp}${this.josa(disp, "과와")} 함께 좋은 여행이 되길 바란다!`, "오박사");
+    await this.dlg.say(`${disp}${josa(disp, "과와")} 함께 좋은 여행이 되길 바란다!`, "오박사");
     // 오박사 — 이 게임의 색(포켓몬을 소중히 대하면 컨디션·유대가 배틀로 이어진다)의 떡밥.
-    await this.dlg.say(`한 가지만 기억하렴. ${disp}${this.josa(disp, "을를")} 진심으로 아껴주어야 한다.`, "오박사");
+    await this.dlg.say(`한 가지만 기억하렴. ${disp}${josa(disp, "을를")} 진심으로 아껴주어야 한다.`, "오박사");
     await this.dlg.say("요즘 포켓몬은... 예전 같지 않아. 트레이너의 마음을 느끼고, 그만큼 배틀에서 응답해준단다.", "오박사");
-    await this.dlg.say(`다행히 ${disp}${this.josa(disp, "은는")} 왠지 널 마음에 들어 하는 것 같구나. 좋은 인연이야.`, "오박사");
+    await this.dlg.say(`다행히 ${disp}${josa(disp, "은는")} 왠지 널 마음에 들어 하는 것 같구나. 좋은 인연이야.`, "오박사");
     // 네모 — 즉시 라이벌 배틀 도발(사용자 지시). "밖에서 기다린다" → 마을로 나가면 WorldScene에서 배틀 발동.
     await this.dlg.say(`좋았어, 결정했구나! ${you}, 이제 우린 라이벌이야.`, "네모");
     await this.dlg.say("그 파트너가 얼마나 굉장한지 당장 보고 싶어! 지금 바로 한 판 어때?", "네모");
