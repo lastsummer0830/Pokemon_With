@@ -42,7 +42,8 @@ export default class DebugMenuScene extends Phaser.Scene {
       ["3. 시작 집 - 침실(인트로부터)", "InteriorScene"],
       ["4. 시작 집 - 거실 바로가기", "InteriorScene", { room: "living", skipIntro: true }],
       ["5. 마을(World)", "WorldScene"],
-      ["6. 배틀(Battle) - 야생 데모", "BattleScene", { wild: true }],
+      // 야생 데모 = 풀숲 조우 → 배경도 풀숲(route). 도시 배경(town)은 마을에서 싸울 때만.
+      ["6. 배틀(Battle) - 야생 데모", "BattleScene", { wild: true, testParty: true, backdrop: "route" }],
       // 집 꾸미기는 별도 화면이 아니라 '내 방(2F)에서 F키'로 한다 → 침실로 바로 보낸다(테스트 파티 포함).
       ["7. 집 꾸미기(내 방 2F에서 F키)", "InteriorScene", { room: "bedroom", skipIntro: true, testParty: true }],
       ["8. 시작 집 - 침실 바로가기(skip)", "InteriorScene", { room: "bedroom", skipIntro: true }],
@@ -63,8 +64,9 @@ export default class DebugMenuScene extends Phaser.Scene {
           createFromSpecies("CHARMANDER", 5), createFromSpecies("SQUIRTLE", 5), createFromSpecies("BULBASAUR", 5),
         ]);
       }
-      // 가방·도감을 바로 볼 땐 가방 내용물·소지금·도감 기록이 있어야 화면이 채워진다.
-      if (key === "BagScene" || key === "PokedexScene") {
+      // 가방·도감·배틀을 바로 볼 땐 가방 내용물·소지금·도감 기록이 있어야 화면이 채워진다.
+      //  (배틀에서 '가방'을 눌렀을 때 쓸 게 없어 "닫는다"만 뜨던 문제 — 실게임은 IntroScene이 START_BAG을 넣어준다.)
+      if (key === "BagScene" || key === "PokedexScene" || key === "BattleScene") {
         if (!this.registry.get("money")) this.registry.set("money", START_MONEY);
         if (!(this.registry.get("bag") as unknown[])?.length)
           this.registry.set("bag", [...START_BAG, { itemId: "SUPERPOTION", count: 2 }, { itemId: "ANTIDOTE", count: 1 },

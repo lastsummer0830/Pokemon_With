@@ -23,14 +23,33 @@ const ROWS = 7;                // 한 화면 목록 줄 수 (원본 ITEMSVISIBLE
 const ROW_H = 32;
 const DIR = "assets/ui/bag/cream";
 
-interface BagInit { from?: string }
+// 배틀 중에 열 수 있는 포켓 — AR/에센셜즈는 "배틀에서 쓸 수 있는 아이템"만 걸러 보여준다
+//  (pbItemMenu → PokemonBag_Scene을 choosing=true + battle_use 필터로 재사용).
+//  우리는 아이템 수가 적으니 포켓 단위로 단순화: 지금은 회복약만. (볼은 포획 붙일 때 3을 추가한다.)
+const BATTLE_POCKETS = [2];
+
+// 배틀이 가방에서 돌려받는 결과. used=false면 아무것도 안 쓰고 닫은 것 → 턴이 지나가지 않는다.
+export interface BagResult {
+  used: boolean;
+  text?: string;    // 배틀 텍스트박스에 띄울 문장("OO의 HP가 20 회복됐다!")
+  item?: string;    // 쓴 아이템 id
+}
+
+interface BagInit {
+  from?: string;
+  mode?: "field" | "battle";
+  onResult?: (r: BagResult) => void;   // 배틀에서 열었을 때 결과를 돌려줄 콜백
+}
 
 export default class BagScene extends Phaser.Scene {
   private from = "MenuScene";
-  private pocketIdx = 0;        // POCKETS 배열 인덱스(회복약 → 볼 → 일반)
+  private mode: "field" | "battle" = "field";
+  private onResult?: (r: BagResult) => void;
+  private pocketIdx = 0;        // pockets 배열 인덱스
   private idx = 0;              // 현재 포켓 안에서 고른 줄
   private top = 0;              // 스크롤(맨 위에 보이는 줄)
   private choosing = false;     // 회복약을 쓸 포켓몬을 고르는 중
+  private closing = false;      // 닫는 중(입력 잠금)
   private partyIdx = 0;
   private msg = "";             // 하단 설명문(아이템 설명 또는 안내문)
   private layer!: Phaser.GameObjects.Container;
@@ -40,8 +59,10 @@ export default class BagScene extends Phaser.Scene {
 
   init(data: BagInit): void {
     this.from = data?.from ?? "MenuScene";
+    this.mode = data?.mode ?? "field";
+    this.onResult = data?.onResult;
     this.pocketIdx = 0; this.idx = 0; this.top = 0;
-    this.choosing = false; this.partyIdx = 0; this.msg = "";
+    this.choosing = false; this.closing = false; this.partyIdx = 0; this.msg = "";
   }
 
   preload(): void {
@@ -91,7 +112,9 @@ export default class BagScene extends Phaser.Scene {
   }
 
   // ── 상태 ──────────────────────────────────────────────
-  private get pocket(): number { return POCKETS[this.pocketIdx]; }
+  // 배틀에선 쓸 수 있는 포켓만 탭에 나온다(필드는 전부).
+  private get pockets(): number[] { return this.mode === "battle" ? BATTLE_POCKETS : POCKETS; }
+  private get pocket(): number { return this.pockets[this.pocketIdx]; }
   private get items(): ReturnType<typeof itemsByPocket> { return itemsByPocket(this.registry, this.pocket); }
   private get party(): Pokemon[] { return (this.registry.get("playerParty") as Pokemon[]) ?? []; }
   // 목록 줄 수 = 아이템 + 맨 아래 "닫는다" 한 줄(원본 CLOSE BAG)
@@ -116,13 +139,15 @@ export default class BagScene extends Phaser.Scene {
 
   private switchPocket(d: number): void {
     if (this.choosing) return;
-    this.pocketIdx = (this.pocketIdx + d + POCKETS.length) % POCKETS.length;
+    if (this.pockets.length <= 1) return;   // 열 수 있는 포켓이 하나뿐(배틀)이면 좌우 이동 없음
+    this.pocketIdx = (this.pocketIdx + d + this.pockets.length) % this.pockets.length;
     this.idx = 0; this.top = 0; this.msg = "";
     playSfx(this, SFX.cursor, 0.4);
     this.render();
   }
 
   private confirm(): void {
+    if (this.closing) return;   // 닫는 중엔 무시 (Enter를 누르고 있으면 키 리피트로 한 번 더 들어온다)
     playSfx(this, SFX.decision, 0.4);
     if (this.choosing) { this.useOn(this.party[this.partyIdx]); return; }
     const list = this.items;
@@ -137,6 +162,7 @@ export default class BagScene extends Phaser.Scene {
   }
 
   private cancel(): void {
+    if (this.closing) return;
     playSfx(this, SFX.cancel, 0.4);
     if (this.choosing) { this.choosing = false; this.msg = ""; this.render(); return; }
     this.close();
@@ -175,15 +201,24 @@ export default class BagScene extends Phaser.Scene {
       this.registry.set("playerParty", [...this.party]);   // 파티 갱신 알림
       this.choosing = false;
       if (this.idx >= this.lines - 1) this.idx = Math.max(0, this.lines - 2);
+      // 배틀에선 아이템을 쓴 즉시 가방이 닫히고, 결과 문장은 배틀 텍스트박스가 말한다(본가와 같음).
+      if (this.mode === "battle") { this.close({ used: true, text, item: def.id }); return; }
     }
+    // 효과가 없었으면(HP 가득 등) 턴이 지나가지 않는다 → 가방에 그대로 머문다.
     this.msg = text;
     this.render();
   }
 
-  private close(): void {
+  private close(result?: BagResult): void {
+    // scene.stop()은 즉시가 아니라 다음 프레임에 처리된다 → 그 사이 키 리피트로 confirm/cancel이
+    //  또 들어오면 아이템이 한 번 더 소비될 수 있다. 그래서 닫는 순간 입력을 잠근다.
+    if (this.closing) return;
+    this.closing = true;
+    const cb = this.onResult;
     this.scene.stop();
     if (this.scene.isPaused(this.from)) this.scene.resume(this.from);
     else if (!this.scene.isActive(this.from)) this.scene.start(this.from);
+    cb?.(result ?? { used: false });   // 배틀이 이 결과를 기다리고 있다(아무것도 안 썼으면 used=false)
   }
 
   // ── 그리기 ────────────────────────────────────────────
@@ -248,8 +283,11 @@ export default class BagScene extends Phaser.Scene {
     this.txt(94, 186, POCKET_NAME[this.pocket] ?? "", 20, base, shadow, "center");
 
     // 좌우 화살표(8프레임 시트의 첫 프레임만) — 원본 (-4,76) / (150,76)
-    this.img("ui_left_arrow", -4, 76, new Phaser.Geom.Rectangle(0, 0, 40, 28));
-    this.img("ui_right_arrow", 150, 76, new Phaser.Geom.Rectangle(0, 0, 40, 28));
+    //  원본도 넘길 포켓이 2개 이상일 때만 화살표를 그린다(배틀=회복약 하나뿐이면 안 나온다).
+    if (this.pockets.length > 1) {
+      this.img("ui_left_arrow", -4, 76, new Phaser.Geom.Rectangle(0, 0, 40, 28));
+      this.img("ui_right_arrow", 150, 76, new Phaser.Geom.Rectangle(0, 0, 40, 28));
+    }
   }
 
   // 오른쪽 목록 — 아이템(또는 포켓몬 선택 중이면 파티)

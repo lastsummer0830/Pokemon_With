@@ -5,7 +5,8 @@ import { loadArDb, getMove } from "../data/ar";
 import { markSeen } from "../data/Pokedex";
 import { performMove, movesFirst, isFainted, effectivenessText } from "../systems/battle";
 import { battleExpYield, gainExp } from "../systems/exp";
-import DialogBox from "../ui/DialogBox";
+import type { BagResult } from "./BagScene";
+import { BattleView, DataBox, CMD_SLOTS, josa, type Fit } from "./battleView";
 import { playBgm, stopBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 
@@ -15,6 +16,14 @@ const NAVY = 0x21314f;
 const BLUE = 0x4a6aa5;
 const GOLD = "#ffe27a";
 const FONT = "Galmuri11";
+const SPRITE_ZOOM = 2;   // AR 배틀 스프라이트 확대 배율(원본 프레임 44~48px)
+
+// 이번 턴에 내가 고른 행동. (AR/본가의 커맨드 4개 = 싸운다·가방·포켓몬·도망)
+type Command =
+  | { kind: "move"; idx: number }   // 기술 사용
+  | { kind: "item" }                // 가방 열기
+  | { kind: "switch" }              // 포켓몬 교체
+  | { kind: "run" };                // 도망
 
 // 씬으로 넘길 수 있는 데이터: 내/적 포켓몬. 없으면 데모용 기본값.
 export interface BattleInit {
@@ -24,69 +33,22 @@ export interface BattleInit {
   trainer?: string; // 트레이너 배틀이면 상대 트레이너 이름(예: "네모"). 있으면 wild 취급 안 함.
   returnPos?: [number, number]; // 배틀 끝나고 돌아갈 월드 좌표(승리/도망 시)
   returnFacing?: "down" | "left" | "right" | "up";
-}
-
-// HP 박스 한 개(이름/레벨/HP바)를 그리고 갱신하는 작은 헬퍼.
-class HpBox {
-  private g: Phaser.GameObjects.Graphics;
-  private nameT: Phaser.GameObjects.Text;
-  private hpT: Phaser.GameObjects.Text | null;
-  private displayHp: number;
-  constructor(
-    private scene: Phaser.Scene,
-    private mon: Pokemon,
-    private x: number,
-    private y: number,
-    private w: number,
-    private showNumbers: boolean,
-  ) {
-    this.displayHp = mon.currentHp;
-    this.g = scene.add.graphics().setDepth(50);
-    const fs = Math.max(15, Math.round(w * 0.075));
-    this.nameT = scene.add.text(x + 14, y + 8, "", { fontFamily: FONT, fontSize: `${fs}px`, color: "#ffffff" }).setDepth(51);
-    this.hpT = showNumbers
-      ? scene.add.text(x + w - 14, y + w * 0.28, "", { fontFamily: FONT, fontSize: `${fs}px`, color: "#ffffff" }).setOrigin(1, 0.5).setDepth(51)
-      : null;
-    this.redraw();
-  }
-  private redraw(): void {
-    const { g, x, y, w, mon } = this;
-    const h = Math.round(w * 0.42);
-    g.clear();
-    // 패널 (크림 테두리 + 남색 본문)
-    g.fillStyle(0x000000, 0.3); g.fillRoundedRect(x + 3, y + 5, w, h, 12);
-    g.fillStyle(CREAM, 1); g.fillRoundedRect(x, y, w, h, 12);
-    g.fillStyle(NAVY, 1); g.fillRoundedRect(x + 4, y + 4, w - 8, h - 8, 9);
-    // HP 바
-    const barX = x + 16, barY = y + h - 20, barW = w - 32, barH = 10;
-    g.fillStyle(0x101820, 1); g.fillRoundedRect(barX - 2, barY - 2, barW + 4, barH + 4, 5);
-    const ratio = Math.max(0, this.displayHp / mon.maxHp);
-    const col = ratio > 0.5 ? 0x6ede6a : ratio > 0.2 ? 0xf2d24b : 0xe85b4b;
-    g.fillStyle(col, 1); g.fillRoundedRect(barX, barY, Math.max(0, barW * ratio), barH, 4);
-    this.nameT.setText(`${displayName(mon)}  Lv.${mon.level}`);
-    if (this.hpT) this.hpT.setText(`${Math.ceil(this.displayHp)}/${mon.maxHp}`);
-  }
-  // HP를 현재값까지 부드럽게 깎으며 갱신. 완료 시 resolve.
-  animateTo(): Promise<void> {
-    return new Promise((resolve) => {
-      this.scene.tweens.add({
-        targets: this, displayHp: this.mon.currentHp, duration: 500, ease: "Sine.inOut",
-        onUpdate: () => this.redraw(),
-        onComplete: () => { this.displayHp = this.mon.currentHp; this.redraw(); resolve(); },
-      });
-    });
-  }
+  backdrop?: "town" | "route";  // 배틀 배경(AR battleback). 마을=town, 1번도로=route.
+  fit?: Fit;                    // 화면 채우기 방식(시안 비교용) — 사용자 결정 전 임시 옵션
 }
 
 export default class BattleScene extends Phaser.Scene {
   private ally!: Pokemon;
   private enemy!: Pokemon;
   private wild = true;
-  private allyBox!: HpBox;
-  private enemyBox!: HpBox;
-  private dlg!: DialogBox;
+  private view!: BattleView;                 // AR 좌표계(512x384) → 화면 변환
+  private bgLayer!: Phaser.GameObjects.Container;
+  private allyBox!: DataBox;
+  private enemyBox!: DataBox;
   private allySprite!: Phaser.GameObjects.Image;
   private enemySprite!: Phaser.GameObjects.Image;
+  private backdrop: "town" | "route" = "town";
+  private fit: Fit = "cover";
 
   private pendingAlly: Pokemon | null = null;
   private pendingEnemy: Pokemon | null = null;
@@ -110,10 +72,21 @@ export default class BattleScene extends Phaser.Scene {
     this.enemySpecies = (data?.enemy?.speciesId ?? "PIDGEY").toLowerCase();
     this.returnPos = data?.returnPos;
     this.returnFacing = data?.returnFacing ?? "down";
+    // 배경은 "어디서 싸우느냐"가 정한다(AR도 맵 메타데이터의 battle_background). 마을=town, 도로·풀숲=route.
+    this.backdrop = data?.backdrop ?? "route";
+    this.fit = data?.fit ?? "cover";
     this.outcome = "win";
   }
 
   preload(): void {
+    // AR 원본 배틀 에셋 — 배경(배틀백)과 UI(HP박스·커맨드 버튼·대사창).
+    //  ⚠️ assets/battlebacks·assets/ui/battle 는 새 폴더 → dev 서버를 재시작해야 png가 제대로 응답한다.
+    this.load.image("bb_bg", `assets/battlebacks/${this.backdrop}_bg.png`);
+    this.load.image("bb_msg", `assets/battlebacks/${this.backdrop}_message.png`);
+    for (const k of ["databox_normal", "databox_normal_foe", "overlay_command", "cursor_command",
+                     "overlay_message", "overlay_hp", "overlay_lv", "icon_numbers"]) {
+      if (!this.textures.exists(`bt_${k}`)) this.load.image(`bt_${k}`, `assets/ui/battle/${k}.png`);
+    }
     // Phaser 텍스처는 Game 전역에 캐시된다 → 이전 배틀의 스프라이트 키가 남아 있으면
     //  종족이 달라도 옛 그림을 재사용해 버린다(적이 안 바뀌는 버그). 매 배틀 새로 받도록 먼저 비운다.
     //  (makeStillFront가 만드는 "__still" 파생 텍스처까지 제거.)
@@ -132,49 +105,46 @@ export default class BattleScene extends Phaser.Scene {
     this.enemy = this.pendingEnemy ?? createFromSpecies(this.enemySpecies, 3);
     markSeen(this.registry, this.enemy.speciesId);   // 마주친 종족 → 도감 '본 적 있음'
 
+    // 도트 에셋은 NEAREST(확대해도 또렷하게)
+    for (const k of this.textures.getTextureKeys())
+      if (k.startsWith("bt_") || k.startsWith("bb_"))
+        this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
+
+    this.view = new BattleView(this, this.fit);
     this.buildBackground();
     this.buildSprites();
     this.buildHud();
-    this.dlg = new DialogBox(this);
-    this.scale.on("resize", () => this.dlg.layout());
 
     playBgm(this, BGM.battle, 0.35); // 야생 배틀 BGM
     this.runBattle().catch((e) => console.error("[BattleScene] 진행 오류:", e));
   }
 
-  // ── 화면 구성 ────────────────────────────────────────────
+  // ── 화면 구성 (전부 AR 원본 에셋 — 직접 그리는 도형 없음) ──
   private buildBackground(): void {
-    const { width, height } = this.scale;
-    this.add.rectangle(0, 0, width, height, 0x9bd1e8).setOrigin(0);          // 하늘
-    this.add.rectangle(0, height * 0.6, width, height * 0.4, 0xc7e39a).setOrigin(0); // 땅
-    // 발판(타원)
-    const g = this.add.graphics();
-    g.fillStyle(0x9bc46a, 1);
-    g.fillEllipse(width * 0.74, height * 0.5, width * 0.34, height * 0.09);
-    g.fillEllipse(width * 0.26, height * 0.78, width * 0.42, height * 0.11);
+    this.bgLayer = this.add.container(0, 0).setDepth(0);
+    this.view.drawBackdrop(this.bgLayer, "bb_bg", "bb_msg");
   }
 
+  // AR 좌표: 내 포켓몬(back) (128,304) · 상대(front) (384,176), 둘 다 하단중앙 기준.
+  //  AR 스프라이트는 프레임이 44~48px로 작고, 소스의 위치보정이 전부 *2다(SpeciesMetrics) → 배틀에선 2배로 그린다.
   private buildSprites(): void {
-    const { width, height } = this.scale;
-    this.enemySprite = makeStillFront(this, "battle_enemy", width * 0.74, height * 0.42, this.spriteScale(height, 1.5));
-    this.allySprite = makeStillFront(this, "battle_ally", width * 0.26, height * 0.7, this.spriteScale(height, 1.9));
+    const v = this.view;
+    const ss = v.s * SPRITE_ZOOM;
+    // 가로는 화면 비율 기준(XC) — 배경이 화면을 채우므로 발판 위치도 비율로 따라간다.
+    this.enemySprite = makeStillFront(this, "battle_enemy", v.XC(384), v.Y(176), ss).setDepth(45);
+    this.allySprite = makeStillFront(this, "battle_ally", v.XC(128), v.Y(304), ss).setDepth(50);
     this.enemySprite.setOrigin(0.5, 1);
     this.allySprite.setOrigin(0.5, 1);
     // 살짝 등장 연출
     [this.enemySprite, this.allySprite].forEach((s) => {
-      const y = s.y; s.y = y - 10; s.alpha = 0;
+      const y = s.y; s.y = y - 10 * v.s; s.alpha = 0;
       this.tweens.add({ targets: s, y, alpha: 1, duration: 350, ease: "Back.out" });
     });
   }
-  private spriteScale(height: number, base: number): number {
-    return (height / 480) * base; // 480 기준 비율
-  }
 
   private buildHud(): void {
-    const { width, height } = this.scale;
-    const boxW = Math.min(width * 0.34, 360);
-    this.enemyBox = new HpBox(this, this.enemy, width * 0.05, height * 0.08, boxW, false);
-    this.allyBox = new HpBox(this, this.ally, width * 0.61, height * 0.5, boxW, true);
+    this.enemyBox = new DataBox(this, this.view, this.enemy, false);
+    this.allyBox = new DataBox(this, this.view, this.ally, true);
   }
 
   // ── 배틀 진행(상태머신) ──────────────────────────────────
@@ -182,21 +152,40 @@ export default class BattleScene extends Phaser.Scene {
     playSfx(this, SFX.exclaim, 0.5); // 조우 "!"
     if (this.trainer) {
       // 트레이너 배틀 인트로 — 승부를 걸고 포켓몬을 내보낸다.
-      await this.dlg.say(`${this.trainer}이(가) 승부를 걸어왔다!`);
-      await this.dlg.say(`${this.trainer}은(는) ${displayName(this.enemy)}을(를) 내보냈다!`);
+      await this.say(`${this.trainer}이(가) 승부를 걸어왔다!`);
+      await this.say(`${this.trainer}은(는) ${displayName(this.enemy)}을(를) 내보냈다!`);
     } else {
-      await this.dlg.say(`앗! 야생 ${displayName(this.enemy)}이(가) 나타났다!`);
+      await this.say(`앗! 야생 ${displayName(this.enemy)}이(가) 나타났다!`);
     }
 
     while (true) {
-      const choice = await this.selectCommand();
-      if (choice === "run") {
-        if (this.wild) { this.outcome = "run"; playSfx(this, SFX.flee, 0.5); await this.dlg.say("무사히 도망쳤다!"); break; }
-        await this.dlg.say("도망칠 수 없다!");
+      const cmd = await this.selectCommand();
+
+      if (cmd.kind === "run") {
+        if (this.wild) { this.outcome = "run"; playSfx(this, SFX.flee, 0.5); await this.say("무사히 도망쳤다!"); break; }
+        await this.say("도망칠 수 없다!");
         continue;
       }
 
-      const allySlot = this.ally.moves[choice];
+      if (cmd.kind === "switch") {
+        // 교체는 다음 단계(파티 교체 + 상대 팀 복수)에서 붙인다. 지금은 안내만 하고 커맨드로 돌아간다.
+        await this.say("지금은 포켓몬을 교체할 수 없다!");
+        continue;
+      }
+
+      // 가방: 아이템을 쓰면 그 턴에 기술은 못 쓴다(아이템 사용 = 턴 소비. AR·본가 동일).
+      //  아무것도 안 쓰고 닫았으면 턴이 지나가지 않고 다시 커맨드 선택으로 돌아간다.
+      if (cmd.kind === "item") {
+        const bag = await this.openBag();
+        if (!bag.used) continue;
+        if (bag.text) await this.say(bag.text);     // "OO의 HP가 20 회복됐다!" — 가방이 만든 문장
+        await this.allyBox.animateTo();                  // 회복된 HP를 HP바에 반영
+        await this.doTurn(this.enemy, this.ally, this.pickEnemyMove(), this.allyBox, false);
+        if (isFainted(this.ally)) { await this.lose(); break; }
+        continue;
+      }
+
+      const allySlot = this.ally.moves[cmd.idx];
       const enemySlot = this.pickEnemyMove();
 
       // 턴 순서: 우선도 → 스피드
@@ -222,7 +211,7 @@ export default class BattleScene extends Phaser.Scene {
   // 배틀 종료 처리: 패배=파티 전체 회복 후 집으로(화이트아웃) / 승리·도망=원위치 월드 복귀.
   private async endBattle(): Promise<void> {
     if (this.outcome === "lose") {
-      await this.dlg.say("눈앞이 깜깜해졌다...");
+      await this.say("눈앞이 깜깜해졌다...");
       const party = this.registry.get("playerParty") as Pokemon[] | undefined;
       party?.forEach((p) => { p.currentHp = p.maxHp; p.status = null; }); // 집에서 요양 → 전원 회복
       this.cameras.main.fadeOut(450, 0, 0, 0);
@@ -236,15 +225,15 @@ export default class BattleScene extends Phaser.Scene {
   // 한 포켓몬이 기술 하나 사용 → 메시지 + HP 연출
   private async doTurn(
     attacker: Pokemon, defender: Pokemon, slot: MoveSlot,
-    defenderBox: HpBox, isAlly: boolean,
+    defenderBox: DataBox, isAlly: boolean,
   ): Promise<void> {
     const who = isAlly ? displayName(attacker) : `상대 ${displayName(attacker)}`;
     const res = performMove(attacker, defender, slot);
 
-    if (res.noPp) { await this.dlg.say(`${who}은(는) 기술을 쓸 수 없다!`); return; }
-    await this.dlg.say(`${who}의 ${res.moveName}!`);
+    if (res.noPp) { await this.say(`${who}은(는) 기술을 쓸 수 없다!`); return; }
+    await this.say(`${who}의 ${res.moveName}!`);
 
-    if (res.missed) { await this.dlg.say("하지만 빗나갔다!"); return; }
+    if (res.missed) { await this.say("하지만 빗나갔다!"); return; }
 
     if (res.damage > 0) {
       // 데미지 효과음 — 상성에 따라 다른 소리
@@ -253,36 +242,36 @@ export default class BattleScene extends Phaser.Scene {
       this.flash(isAlly ? this.enemySprite : this.allySprite);
       await defenderBox.animateTo();
     }
-    if (res.crit) await this.dlg.say("급소에 맞았다!");
+    if (res.crit) await this.say("급소에 맞았다!");
     const eff = effectivenessText(res.effectiveness);
-    if (eff) await this.dlg.say(eff);
+    if (eff) await this.say(eff);
   }
 
   private async win(): Promise<void> {
     this.outcome = "win";
     this.fadeOutSprite(this.enemySprite);
-    await this.dlg.say(`상대 ${displayName(this.enemy)}을(를) 쓰러뜨렸다!`);
+    await this.say(`상대 ${displayName(this.enemy)}을(를) 쓰러뜨렸다!`);
     // 트레이너 배틀이면 승부 마무리 대사 + F1: 라이벌(트레이너)전 예약은 '이겼을 때만' 소비(지면 재대결 가능).
     if (this.trainer) {
-      await this.dlg.say(`${this.trainer}와(과)의 승부에서 이겼다!`);
+      await this.say(`${this.trainer}와(과)의 승부에서 이겼다!`);
       this.registry.set("rivalBattlePending", false);
     }
     // 경험치 지급(승리 시에만). this.ally는 registry 파티 선두와 동일 참조라 레벨업이 파티에 그대로 반영된다.
     const up = gainExp(this.ally, battleExpYield(this.enemy));
-    await this.dlg.say(`${displayName(this.ally)}은(는) ${up.gained} 경험치를 얻었다!`);
+    await this.say(`${displayName(this.ally)}은(는) ${up.gained} 경험치를 얻었다!`);
     for (const lv of up.levels) {
       playSfx(this, SFX.decision, 0.4);
-      await this.dlg.say(`${displayName(this.ally)}은(는) Lv.${lv}(으)로 올랐다!`);
+      await this.say(`${displayName(this.ally)}은(는) Lv.${lv}(으)로 올랐다!`);
     }
     if (up.levels.length) await this.allyBox.animateTo(); // 레벨업으로 바뀐 HP/Lv 표시 갱신
     for (const l of up.learned) {
-      await this.dlg.say(`${displayName(this.ally)}은(는) 새로운 기술 ${l.move}을(를) 배웠다!`);
+      await this.say(`${displayName(this.ally)}은(는) 새로운 기술 ${l.move}을(를) 배웠다!`);
     }
   }
   private async lose(): Promise<void> {
     this.outcome = "lose";
     this.fadeOutSprite(this.allySprite);
-    await this.dlg.say(`${displayName(this.ally)}은(는) 쓰러졌다...`);
+    await this.say(`${displayName(this.ally)}은(는) 쓰러졌다...`);
   }
 
   // 적 AI: PP 있는 기술 중 무작위(없으면 첫 기술)
@@ -293,13 +282,105 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   // ── 명령/기술 선택 메뉴 ──────────────────────────────────
-  // "싸운다 / 도망친다" → 싸운다면 기술 인덱스, 도망이면 "run"
-  private async selectCommand(): Promise<number | "run"> {
-    const pick = await this.menu(["싸운다", "도망친다"], false);
-    if (pick === 1) return "run";
+  // 커맨드 4개 — AR 원본 배치 그대로 2x2 (위: 싸운다·가방 / 아래: 포켓몬·도망).
+  //  menu()가 2열이라 배열 순서가 곧 그 배치가 된다.
+  private async selectCommand(): Promise<Command> {
+    const pick = await this.commandMenu();
+    if (pick === 1) return { kind: "item" };
+    if (pick === 2) return { kind: "switch" };
+    if (pick === 3) return { kind: "run" };
     const mv = await this.selectMove();
-    if (mv < 0) return this.selectCommand(); // 뒤로가기
-    return mv;
+    if (mv < 0) return this.selectCommand(); // 기술 선택에서 취소 → 커맨드로 뒤로가기
+    return { kind: "move", idx: mv };
+  }
+
+  // 대사창 — AR 원본 overlay_message(512x96) 위에 글자만 얹는다(직접 그린 박스 아님).
+  //  글자 시작 (32,306) · 색 base(80,80,88)/shadow(160,160,168) — 전부 AR 소스 값.
+  private say(text: string): Promise<void> {
+    return new Promise((resolve) => {
+      const v = this.view;
+      const layer = this.add.container(0, 0).setDepth(195);
+      v.bottomOverlay(layer, "bt_overlay_message");     // 화면 폭 전체
+      const t = this.add.text(v.XL(32), v.Y(306), text, {
+        fontFamily: FONT, fontSize: `${Math.round(20 * v.s)}px`, color: "#505058",
+        wordWrap: { width: 448 * v.s }, lineSpacing: Math.round(6 * v.s),
+      }).setOrigin(0);
+      t.setShadow(Math.max(1, v.s), Math.max(1, v.s), "#a0a0a8", 0, false, true);
+      layer.add(t);
+
+      const kb = this.input.keyboard!;
+      const done = () => {
+        kb.off("keydown-ENTER", done); kb.off("keydown-Z", done); kb.off("keydown-SPACE", done);
+        playSfx(this, SFX.decision, 0.35);
+        layer.destroy();
+        resolve();
+      };
+      kb.on("keydown-ENTER", done); kb.on("keydown-Z", done); kb.on("keydown-SPACE", done);
+    });
+  }
+
+  // 커맨드 메뉴 — AR 원본 overlay_command + cursor_command(버튼 시트).
+  //  ★ 버튼 그림에 "싸운다/가방/포켓몬/도망" 한글이 이미 그려져 있다(AR 한글판) → 글자를 얹지 않는다.
+  //  좌열=기본 / 우열(x=130)=선택.  반환 0=싸운다 1=가방 2=포켓몬 3=도망.
+  private commandMenu(): Promise<number> {
+    return new Promise((resolve) => {
+      const v = this.view;
+      const layer = this.add.container(0, 0).setDepth(200);
+      v.bottomOverlay(layer, "bt_overlay_command");     // 화면 폭 전체
+      const name = displayName(this.ally);
+      const prompt = this.add.text(v.XL(32), v.Y(306), `${name}${josa(name, "은는")}\n무엇을 할까?`, {
+        fontFamily: FONT, fontSize: `${Math.round(20 * v.s)}px`, color: "#505058",
+        lineSpacing: Math.round(6 * v.s),
+      }).setOrigin(0);
+      prompt.setShadow(Math.max(1, v.s), Math.max(1, v.s), "#a0a0a8", 0, false, true);
+      layer.add(prompt);
+
+      let idx = 0;
+      // 버튼은 화면 오른쪽 끝 기준(XR) — AR도 화면 우측에 붙여 놓는다.
+      const btns = CMD_SLOTS.map((slot) => {
+        const im = this.add.image(v.XR(slot.vx), v.Y(slot.vy), "bt_cursor_command").setOrigin(0).setScale(v.s);
+        layer.add(im);
+        return im;
+      });
+      const paint = () => {
+        CMD_SLOTS.forEach((slot, i) => {
+          const sx = i === idx ? 130 : 0;              // 우열 = 선택된 모습
+          btns[i].setCrop(sx, slot.row * 46, 130, 46);
+          btns[i].setPosition(v.XR(slot.vx) - sx * v.s, v.Y(slot.vy) - slot.row * 46 * v.s);
+        });
+      };
+      paint();
+
+      const kb = this.input.keyboard!;
+      const move = (d: number) => { idx = (idx + d + 4) % 4; playSfx(this, SFX.cursor, 0.4); paint(); };
+      const onLeft = () => move(-1), onRight = () => move(1), onUp = () => move(-2), onDown = () => move(2);
+      const onConfirm = () => {
+        kb.off("keydown-LEFT", onLeft); kb.off("keydown-RIGHT", onRight);
+        kb.off("keydown-UP", onUp); kb.off("keydown-DOWN", onDown);
+        kb.off("keydown-ENTER", onConfirm); kb.off("keydown-Z", onConfirm); kb.off("keydown-SPACE", onConfirm);
+        playSfx(this, SFX.decision, 0.4);
+        layer.destroy();
+        resolve(idx);
+      };
+      kb.on("keydown-LEFT", onLeft); kb.on("keydown-RIGHT", onRight);
+      kb.on("keydown-UP", onUp); kb.on("keydown-DOWN", onDown);
+      kb.on("keydown-ENTER", onConfirm); kb.on("keydown-Z", onConfirm); kb.on("keydown-SPACE", onConfirm);
+    });
+  }
+
+  // 배틀 위에 가방 화면을 띄우고, 아이템을 쓰거나 그냥 닫을 때까지 기다린다.
+  //  ★ AR·3세대와 같은 방식: 배틀 전용 가방을 새로 만들지 않고 필드 가방(BagScene)을 그대로 재사용한다.
+  //    (배틀 전용 4카테고리 화면은 HGSS 방식인데, 그건 DS 하단 터치스크린이 따로 있어서 가능했던 것.)
+  //  배틀 씬은 pause — 안 그러면 키 입력이 두 씬에 동시에 먹는다.
+  private openBag(): Promise<BagResult> {
+    return new Promise((resolve) => {
+      this.scene.pause();
+      this.scene.launch("BagScene", {
+        from: "BattleScene",
+        mode: "battle",
+        onResult: (r: BagResult) => resolve(r),   // 가방이 닫히며 결과를 돌려준다
+      });
+    });
   }
 
   private async selectMove(): Promise<number> {

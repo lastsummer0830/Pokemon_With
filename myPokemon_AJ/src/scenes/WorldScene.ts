@@ -155,7 +155,8 @@ export default class WorldScene extends Phaser.Scene {
     if (this.busy || this.moving) return;
     const party = this.registry.get("playerParty") as Pokemon[] | undefined;
     const ally = party && party.length ? party[0] : undefined;
-    this.scene.start("BattleScene", { ally, wild: true, returnPos: [this.tx, this.ty], returnFacing: this.facing });
+    // 배경 = 지금 있는 맵(태초마을 = 도시 배경). 1번도로가 붙으면 그 맵은 route를 넘긴다.
+    this.scene.start("BattleScene", { ally, wild: true, backdrop: "town", returnPos: [this.tx, this.ty], returnFacing: this.facing });
   }
 
   // 스타터 선택 후 연구소에서 나오면: 밖에서 기다리던 네모가 플레이어에게 다가와 라이벌 배틀을 건다.
@@ -185,7 +186,7 @@ export default class WorldScene extends Phaser.Scene {
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.time.delayedCall(320, () =>
       this.scene.start("BattleScene", {
-        ally, enemy, wild: false, trainer: "네모",
+        ally, enemy, wild: false, trainer: "네모", backdrop: "town",   // 라이벌전은 태초마을에서
         returnPos: [this.tx, this.ty], returnFacing: this.facing,
       }));
   }
