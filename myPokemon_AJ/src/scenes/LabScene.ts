@@ -32,6 +32,16 @@ const STARTERS: StarterDef[] = [
 const OAK_TILE: [number, number] = [8, 3];      // 스타팅 탁자 바로 뒤(중앙)
 const NEMONA_TILE: [number, number] = [11, 3];
 
+// 네모가 "밖에서 기다릴게" 하고 실제로 걸어 나가는 경로(제자리 (11,3) → 출구 문 (6,13)).
+//  ⚠️ 눈대중으로 찍은 좌표가 아니라 oak_lab.json의 blocked 격자에 BFS를 돌려 뽑은 최단경로다.
+//  (맵/충돌격자를 고치면 이 경로도 다시 뽑아야 한다 — 벽을 뚫고 걸어가면 그 때문이다.)
+const NEMONA_EXIT_PATH: [number, number][] = [
+  [11, 4], [11, 5], [11, 6],
+  [10, 6], [9, 6], [8, 6], [7, 6],
+  [7, 7], [7, 8], [7, 9], [7, 10], [7, 11], [7, 12],
+  [6, 12], [6, 13],
+];
+
 // 라이벌(네모)은 내 스타터가 상성상 유리한 스타터를 고른다(SV 네모 방식 — 첫 배틀은 플레이어 우세).
 //  풀(나오하) > 물(개구마르) > 불꽃(파이리) > 풀 …  즉 내가 고른 타입에 '약한' 스타터를 네모가 가진다.
 function rivalCounter(myKey: string): string {
@@ -51,6 +61,8 @@ export default class LabScene extends Phaser.Scene {
   private mapImg!: Phaser.GameObjects.Image;
   private oak!: Phaser.GameObjects.Sprite;
   private nemona!: Phaser.GameObjects.Sprite;
+  private nemTile: [number, number] = [...NEMONA_TILE];   // 네모가 지금 서 있는 칸(퇴장하며 움직인다)
+  private nemGone = false;                                // 문으로 나갔으면 true(다시 그리지 않는다)
   private balls: Phaser.GameObjects.Sprite[] = [];
 
   private player!: Phaser.GameObjects.Sprite;
@@ -113,9 +125,18 @@ export default class LabScene extends Phaser.Scene {
     const mk = (key: string, frames: number[]) =>
       this.anims.create({ key: `lab-${key}`, frames: this.anims.generateFrameNumbers(this.texKey, { frames }), frameRate: 8, repeat: -1 });
     mk("down", [0, 1, 2, 3]); mk("left", [4, 5, 6, 7]); mk("right", [8, 9, 10, 11]); mk("up", [12, 13, 14, 15]);
+    // 네모 걷기 애니(퇴장 연출용). AR 오버월드 시트는 주인공과 같은 배치 = 아래/왼/오른/위 4프레임씩.
+    //  애니는 씬이 아니라 게임 전역에 등록돼 재입장 시 이미 있다 → exists 검사로 중복 등록 경고를 막는다.
+    const mkNem = (key: string, frames: number[]) => {
+      if (!this.anims.exists(`nem-${key}`))
+        this.anims.create({ key: `nem-${key}`, frames: this.anims.generateFrameNumbers("nemona_ow", { frames }), frameRate: 8, repeat: -1 });
+    };
+    mkNem("down", [0, 1, 2, 3]); mkNem("left", [4, 5, 6, 7]); mkNem("right", [8, 9, 10, 11]); mkNem("up", [12, 13, 14, 15]);
 
     this.oak = this.add.sprite(0, 0, "oak_ow", 0).setOrigin(0.5, 1).setDepth(4);
     this.nemona = this.add.sprite(0, 0, "nemona_ow", 0).setOrigin(0.5, 1).setDepth(4);
+    // 이미 스타터를 골랐다면 네모는 진작 연구소를 나갔다 → 다시 들어와도 그 자리에 서 있으면 안 된다.
+    if (this.registry.get("starterChosen")) this.nemGone = true;
     // 탁자 위 포켓볼 3개(닫힌 볼 = obj_ball 프레임 0)
     this.balls = BALL_TILES.map(() => this.add.sprite(0, 0, "obj_ball", 0).setOrigin(0.5, 1).setDepth(3));
     this.player = this.add.sprite(0, 0, this.texKey, this.idleFrame.up).setOrigin(0.5, 1).setDepth(7);
@@ -182,7 +203,9 @@ export default class LabScene extends Phaser.Scene {
     this.tile = 32 * this.zoom;
     this.mapImg.setPosition(this.origin.x, this.origin.y).setScale(this.zoom);
     this.oak.setPosition(this.cx(OAK_TILE[0]), this.cy(OAK_TILE[1])).setScale(this.zoom * 0.92);
-    this.nemona.setPosition(this.cx(NEMONA_TILE[0]), this.cy(NEMONA_TILE[1])).setScale(this.zoom * 0.92);
+    // 네모는 퇴장하며 칸이 바뀐다 → 원위치가 아니라 '지금 서 있는 칸'으로 다시 그린다(창 크기 바뀔 때 되돌아가지 않게).
+    this.nemona.setPosition(this.cx(this.nemTile[0]), this.cy(this.nemTile[1])).setScale(this.zoom * 0.92);
+    if (this.nemGone) this.nemona.setVisible(false);
     // 포켓볼: 탁자 칸 가로중앙, 초록 상판 위(BALL_TOP)에 발을 얹음
     this.balls.forEach((b, i) => {
       const [bx, by] = BALL_TILES[i];
@@ -201,7 +224,7 @@ export default class LabScene extends Phaser.Scene {
     if (tx < 0 || ty < 0 || tx >= this.map.cols || ty >= this.map.rows) return false;
     if (this.map.blocked[ty][tx] !== 0) return false;
     if (tx === OAK_TILE[0] && ty === OAK_TILE[1]) return false;
-    if (tx === NEMONA_TILE[0] && ty === NEMONA_TILE[1]) return false;
+    if (!this.nemGone && tx === this.nemTile[0] && ty === this.nemTile[1]) return false;  // 나간 뒤엔 그 자리를 막지 않는다
     return true;
   }
 
@@ -285,8 +308,39 @@ export default class LabScene extends Phaser.Scene {
     // 라이벌 배틀 예약: 상대는 내 스타터가 상성상 유리한 카운터 스타터(SV 네모 방식).
     this.registry.set("rivalBattlePending", true);
     this.registry.set("rivalEnemySpecies", rivalCounter(pick.key));
+    // 말만 하고 계속 서 있으면 안 된다 — 네모가 실제로 문까지 걸어 나가고, 마을에서 기다리는 걸로 이어진다.
+    await this.walkNemonaOut();
     this.hint.setText("아래 문으로 나가면 네모가 기다린다!").setVisible(true);
     this.busy = false;
+  }
+
+  // 네모가 NEMONA_EXIT_PATH를 따라 한 칸씩 걸어 문으로 나가는 컷신. 다 나갈 때까지 기다린다(await).
+  //  한 칸 = 플레이어 이동과 같은 150ms. 방향은 직전 칸과의 차이로 정해 걷기 애니를 튼다.
+  private walkNemonaOut(): Promise<void> {
+    return new Promise((done) => {
+      let i = 0;
+      const step = (): void => {
+        if (i >= NEMONA_EXIT_PATH.length) {
+          // 문에 도착 → 문 여닫는 소리와 함께 사라진다.
+          this.nemona.stop();
+          playSfx(this, SFX.doorOut, 0.5);
+          this.tweens.add({
+            targets: this.nemona, alpha: 0, duration: 220,
+            onComplete: () => { this.nemGone = true; this.nemona.setVisible(false); done(); },
+          });
+          return;
+        }
+        const [nx, ny] = NEMONA_EXIT_PATH[i];
+        const [px, py] = this.nemTile;
+        const dir: Dir = nx > px ? "right" : nx < px ? "left" : ny > py ? "down" : "up";
+        this.nemona.play(`nem-${dir}`, true);
+        this.tweens.add({
+          targets: this.nemona, x: this.cx(nx), y: this.cy(ny), duration: 150,
+          onComplete: () => { this.nemTile = [nx, ny]; i++; step(); },
+        });
+      };
+      step();
+    });
   }
 
   // 별명 입력 — 인트로 이름입력과 동일한 한글 IME용 HTML <input>. 빈칸이면 별명 없음(종족명 사용).

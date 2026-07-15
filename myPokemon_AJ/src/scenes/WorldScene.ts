@@ -3,6 +3,7 @@ import { Gender } from "../data/Player";
 import { Pokemon, createFromSpecies } from "../data/Pokemon";
 import { playBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
+import DialogBox from "../ui/DialogBox";
 
 // 첫 마을 = 어나더레드 '태초마을'(Map55)을 소스에서 그대로 추출한 실제 맵.
 //  - 맵 이미지: assets/world/pallet_town.png (52x20칸, 32px 타일)
@@ -14,6 +15,12 @@ interface Warp { x: number; y: number; to: string; dir?: Dir; room?: string }
 
 const SCALE = 2;                 // 화면 확대(타일 32→64px)
 const START = { x: 17, y: 8 };   // 우리집 문 앞
+
+// 첫 라이벌 배틀 — 네모는 연구소에서 **먼저 나가**(LabScene의 퇴장 컷신) 밖에서 기다리고 있다.
+//  기다리는 자리는 고정좌표가 아니라 **플레이어가 서 있는 줄의 옆 칸들**로 잡는다(RIVAL_GAP칸 떨어져 대기 → 걸어옴).
+//  ⚠️ 고정좌표로 박으면 안 된다: 라이벌전에서 지면 집으로 보내지고 예약은 남아 있어(이겼을 때만 소비) 집 앞에서 재대결이
+//     걸리는데, 그때 네모가 연구소 앞 좌표에 서 있으면 화면 밖에서 혼자 걷고 플레이어만 얼어붙는다.
+const RIVAL_GAP = 4;   // 처음 서서 기다리는 거리(칸)
 
 export default class WorldScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
@@ -37,6 +44,10 @@ export default class WorldScene extends Phaser.Scene {
 
   private spawn = { ...START, face: "down" as Dir };
   private autoMenu = false;   // 디버그 '인게임 메뉴' 바로가기: 마을 위에 메뉴를 바로 연다
+  private nemona?: Phaser.GameObjects.Sprite;   // 첫 배틀 때 밖에서 기다리는 네모(그 외엔 없음)
+  private rival?: { path: [number, number][]; from: "left" | "right" };   // 네모가 걸어올 길(플레이어 기준으로 잡음)
+  private dlg!: DialogBox;
+  private onResize = (): void => this.dlg.layout();
 
   constructor() { super("WorldScene"); }
 
@@ -69,11 +80,35 @@ export default class WorldScene extends Phaser.Scene {
       this.anims.create({ key, frames: this.anims.generateFrameNumbers(this.texKey, { frames }), frameRate: 8, repeat: -1 });
     mkWalk("walk-down", [0, 1, 2, 3]); mkWalk("walk-left", [4, 5, 6, 7]);
     mkWalk("walk-right", [8, 9, 10, 11]); mkWalk("walk-up", [12, 13, 14, 15]);
+    // 네모 걷기 애니(주인공과 같은 시트 배치). 애니는 게임 전역이라 재입장 시 이미 있을 수 있다.
+    const mkNem = (key: string, frames: number[]) => {
+      if (!this.anims.exists(`nem-${key}`))
+        this.anims.create({ key: `nem-${key}`, frames: this.anims.generateFrameNumbers("nemona_ow", { frames }), frameRate: 8, repeat: -1 });
+    };
+    mkNem("down", [0, 1, 2, 3]); mkNem("left", [4, 5, 6, 7]); mkNem("right", [8, 9, 10, 11]); mkNem("up", [12, 13, 14, 15]);
 
     this.tx = this.spawn.x; this.ty = this.spawn.y; this.facing = this.spawn.face;
     this.player = this.add.sprite(this.cx(this.tx), this.cy(this.ty), this.texKey, this.idleFrame[this.facing])
       .setOrigin(0.5, 1).setScale(SCALE).setDepth(5);
     this.cursors = this.input.keyboard!.createCursorKeys();
+    this.dlg = new DialogBox(this);
+    // ⚠️ this.scale은 씬이 아니라 게임 전역 이벤트원이다 → off("resize")를 콜백 없이 부르면 '다른 씬 리스너까지' 다 지운다.
+    this.scale.on("resize", this.onResize);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.scale.off("resize", this.onResize); this.dlg.destroy(); });
+
+    // 첫 라이벌 배틀이 예약돼 있으면 = 네모는 연구소를 먼저 나와 **밖에서 이미 기다리고 있다**.
+    //  (플레이어가 문에서 나오는 순간 뒤에서 따라 내려오면 "안에 있다 따라나온" 꼴이라 흐름이 어긋난다.)
+    if (this.registry.get("rivalBattlePending")) {
+      this.rival = this.rivalApproach();
+      if (this.rival) {
+        const [wx, wy] = this.rival.path[0];   // 처음 서 있는 자리(가장 먼 칸)
+        this.textures.get("nemona_ow").setFilter(Phaser.Textures.FilterMode.NEAREST);
+        this.nemona = this.add.sprite(this.cx(wx), this.cy(wy), "nemona_ow",
+          this.rival.from === "left" ? this.idleFrame.right : this.idleFrame.left)   // 플레이어 쪽을 보고 선다
+          .setOrigin(0.5, 1).setScale(SCALE).setDepth(5);
+        this.busy = true;   // 컷신이 시작될 때까지 플레이어가 움직여 좌표가 어긋나지 않게 미리 잠근다
+      }
+    }
 
     // 카메라: 맵 경계 설정 + 주인공 추적, 픽셀 또렷하게
     this.cameras.main.setBounds(0, 0, this.cols * this.tile, this.rows * this.tile);
@@ -159,22 +194,58 @@ export default class WorldScene extends Phaser.Scene {
     this.scene.start("BattleScene", { ally, wild: true, backdrop: "town", returnPos: [this.tx, this.ty], returnFacing: this.facing });
   }
 
-  // 스타터 선택 후 연구소에서 나오면: 밖에서 기다리던 네모가 플레이어에게 다가와 라이벌 배틀을 건다.
-  //  (LabScene이 registry에 rivalBattlePending/ rivalEnemySpecies를 예약해 둔다.)
-  private maybeStartRivalBattle(): void {
+  // 스타터 선택 후 연구소에서 나오면: **이미 문 앞에서 기다리던** 네모가 다가와 말을 걸고 라이벌 배틀이 시작된다.
+  //  (LabScene이 registry에 rivalBattlePending/rivalEnemySpecies를 예약하고, 네모는 그 씬에서 먼저 걸어 나갔다.)
+  //  ⚠️ 입력을 통째로 끄면(this.input.enabled=false) 대사를 넘기는 키까지 죽는다 → busy 플래그만 쓴다(이동·메뉴는 busy로 막힘).
+  private async maybeStartRivalBattle(): Promise<void> {
     if (!this.registry.get("rivalBattlePending")) return;
+    // 양옆이 다 막혀 다가올 길이 없으면(거의 없음) 컷신을 건너뛰고 배틀만 시작한다 — 배틀이 통째로 사라지면 안 된다.
+    if (!this.nemona || !this.rival) { this.startRivalBattle(); return; }
     // (F1) 예약은 여기서 소비하지 않는다 — 배틀에서 '이겼을 때만' BattleScene이 소비한다(지면 재대결).
     this.busy = true;
-    this.input.enabled = false;
-    // 네모가 위쪽(연구소 방향)에서 걸어와 플레이어 한 칸 앞에 서는 짧은 연출.
-    //  (컷신 스프라이트라 충돌격자와 무관 — 배틀 전환 때 씬이 교체되며 사라진다.)
-    const nem = this.add.sprite(this.cx(this.tx), this.cy(this.ty) - this.tile * 2.4, "nemona_ow", 0)
-      .setOrigin(0.5, 1).setScale(SCALE).setDepth(6);
+    const nem = this.nemona;
+    const { path, from } = this.rival;
+    // 네모는 플레이어 쪽을 보고 걷고(왼쪽에서 오면 오른쪽 보기), 플레이어는 그 반대쪽을 돌아본다.
+    const nemDir: Dir = from === "left" ? "right" : "left";
+    const youDir: Dir = from === "left" ? "left" : "right";
+
+    // 나를 발견("!") → 기다리던 자리에서 옆 칸까지 한 칸씩 걸어온다(플레이어와 같은 150ms/칸).
     playSfx(this, SFX.exclaim, 0.5);
-    this.tweens.add({
-      targets: nem, y: this.cy(this.ty) - this.tile, duration: 380, ease: "Sine.inOut",
-      onComplete: () => this.time.delayedCall(220, () => this.startRivalBattle()),
-    });
+    await new Promise<void>((r) => this.time.delayedCall(420, r));
+    nem.play(`nem-${nemDir}`, true);
+    for (const [nx, ny] of path.slice(1)) {   // path[0] = 이미 서 있는 자리
+      await new Promise<void>((r) => this.tweens.add({
+        targets: nem, x: this.cx(nx), y: this.cy(ny), duration: 150, onComplete: () => r(),
+      }));
+    }
+    nem.stop(); nem.setFrame(this.idleFrame[nemDir]);
+    this.facing = youDir; this.player.stop(); this.player.setFrame(this.idleFrame[youDir]);
+
+    // 대사 = SV 네모 공식 대사 기반(창작 아님).
+    //  1줄: Bulbapedia 영문 정본 "we should battle right now—you and me!" / "see how great..." 를 옮김(한국어 공식판 미확인).
+    //  2줄: SV 한국어판 verbatim(첫 배틀 개시 대사) — 확인됨.
+    const you = (this.registry.get("playerName") as string) ?? "";
+    await this.dlg.say(`${you}! 지금 당장 나랑 한판 하자. 네 파트너가 얼마나 굉장한지 보고 싶어!`, "네모");
+    await this.dlg.say("처음 하는 포켓몬 승부니까 즐기면서 하자!", "네모");
+    this.dlg.hide();
+    this.startRivalBattle();
+  }
+
+  // 네모가 기다렸다 걸어올 길을 **플레이어 위치 기준**으로 잡는다(고정좌표 금지 — 재대결은 집 앞에서도 걸린다).
+  //  플레이어와 같은 줄에서 옆으로 RIVAL_GAP칸까지 걸을 수 있는 데까지 잡고, 왼쪽이 막혔으면 오른쪽으로 뒤집는다.
+  //  path[0] = 처음 서서 기다리는 자리(가장 먼 칸), 마지막 = 플레이어 바로 옆 칸(여기서 말을 건다).
+  private rivalApproach(): { path: [number, number][]; from: "left" | "right" } | undefined {
+    for (const from of ["left", "right"] as const) {
+      const sign = from === "left" ? -1 : 1;
+      const beside: [number, number][] = [];
+      for (let d = 1; d <= RIVAL_GAP; d++) {
+        const x = this.tx + sign * d;
+        if (!this.walkable(x, this.ty)) break;
+        beside.push([x, this.ty]);
+      }
+      if (beside.length >= 2) return { path: beside.reverse(), from };   // 먼 칸 → … → 플레이어 옆
+    }
+    return undefined;   // 양옆이 다 막힘(거의 없음) → 컷신 없이 바로 배틀
   }
 
   // 라이벌 트레이너 배틀 시작: 상대 = 예약된 카운터 스타터(Lv.5), wild:false(도망 불가·트레이너 인트로).
