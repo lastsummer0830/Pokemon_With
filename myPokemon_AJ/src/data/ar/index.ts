@@ -84,6 +84,18 @@ export interface ItemData {
   consumable: boolean;
 }
 
+// 야생 조우표 (tools/ar-data/extract-encounters.py — AR encounters.dat 그대로)
+export interface EncounterSlot {
+  w: number;      // 가중치(그 맵 land 슬롯들의 합 = 100)
+  id: string;     // 종족 id
+  min: number;    // 레벨 하한
+  max: number;    // 레벨 상한
+}
+export interface EncounterTable {
+  land: EncounterSlot[];
+  stepChance: number;   // AR step_chances[:Land] — 풀숲 한 걸음의 기본 조우 확률(%)
+}
+
 // ── 캐시 & 로더 ──────────────────────────────────────────────
 const DB = {
   types: {} as Record<string, TypeData>,
@@ -91,6 +103,7 @@ const DB = {
   moves: {} as Record<string, MoveData>,
   items: {} as Record<string, ItemData>,
   dexKanto: [] as string[],   // 칸토 도감 순서(151종). 배열 인덱스+1 = 도감번호.
+  encounters: {} as Record<string, EncounterTable>,   // 키 = AR 맵 번호 문자열(예: "10" = 1번도로)
 };
 let loaded = false;
 let loading: Promise<void> | null = null;
@@ -106,12 +119,14 @@ export function loadArDb(): Promise<void> {
     fetch(`${base}/moves.json`).then((r) => r.json()),
     fetch(`${base}/items.json`).then((r) => r.json()),
     fetch(`${base}/dex_kanto.json`).then((r) => r.json()),
-  ]).then(([t, s, m, i, d]) => {
+    fetch(`${base}/encounters.json`).then((r) => r.json()),
+  ]).then(([t, s, m, i, d, e]) => {
     DB.types = t;
     DB.species = s;
     DB.moves = m;
     DB.items = i;
     DB.dexKanto = d;
+    DB.encounters = e;
     loaded = true;
   });
   return loading;
@@ -139,6 +154,10 @@ export function allItems(): ItemData[] {
 // 칸토 도감 순서(151종). 도감 화면이 번호순으로 훑는 데 쓴다.
 export function dexKanto(): string[] {
   return DB.dexKanto;
+}
+// 그 맵의 야생 조우표. 조우가 없는 맵(태초·상록)은 undefined.
+export function getEncounters(arMapId: number): EncounterTable | undefined {
+  return DB.encounters[String(arMapId)];
 }
 
 // 공격 타입 atkType이 방어측 타입들(defTypes)에 주는 최종 배율(곱).

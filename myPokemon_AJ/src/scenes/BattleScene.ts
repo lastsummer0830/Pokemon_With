@@ -2,9 +2,11 @@ import Phaser from "phaser";
 import { frontPath, backPath, makeStillFront } from "../game/pokemonSprite";
 import { Pokemon, MoveSlot, createFromSpecies, displayName } from "../data/Pokemon";
 import { josa } from "../data/josa";
-import { loadArDb, getMove, getType } from "../data/ar";
-import { markSeen } from "../data/Pokedex";
+import { loadArDb, getMove, getType, getItem, dexKanto } from "../data/ar";
+import { markSeen, markOwn } from "../data/Pokedex";
+import { removeItem } from "../data/Bag";
 import { performMove, movesFirst, isFainted, effectivenessText } from "../systems/battle";
+import { captureShakes, SHAKE_FAIL_TEXT } from "../systems/capture";
 import { battleExpYield, gainExp } from "../systems/exp";
 import type { BagResult } from "./BagScene";
 import {
@@ -16,6 +18,9 @@ import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 
 const FONT = "Galmuri11";
 const SPRITE_ZOOM = 2;   // AR 배틀 스프라이트 확대 배율(원본 프레임 44~48px)
+const MAX_PARTY = 6;     // 파티 상한. 이 게임엔 아직 박스가 없어서 꽉 차면 포획을 거절한다.
+// 상대 포켓몬이 서는 자리(AR 좌표계 512x384 기준). 등장·포획 실패 복귀가 같은 값을 써야 해서 상수로 둔다.
+const ENEMY_VY = 176;
 
 // 이번 턴에 내가 고른 행동. (AR/본가의 커맨드 4개 = 싸운다·가방·포켓몬·도망)
 type Command =
@@ -52,7 +57,7 @@ export default class BattleScene extends Phaser.Scene {
   private trainer: string | null = null;   // 트레이너 배틀 상대 이름(야생이면 null)
   private allySpecies = "charmander";
   private enemySpecies = "pidgey";
-  private outcome: "win" | "lose" | "run" = "win";  // 배틀 결과
+  private outcome: "win" | "lose" | "run" | "catch" = "win";  // 배틀 결과(catch = 잡아서 끝남 — 복귀는 승리와 같다)
   private returnPos: [number, number] | undefined;   // 승리/도망 시 돌아갈 좌표
   private returnFacing: "down" | "left" | "right" | "up" = "down";
 
@@ -129,7 +134,7 @@ export default class BattleScene extends Phaser.Scene {
     const v = this.view;
     const ss = v.s * SPRITE_ZOOM;
     // 가로는 화면 비율 기준(XC) — 배경이 화면을 채우므로 발판 위치도 비율로 따라간다.
-    this.enemySprite = makeStillFront(this, "battle_enemy", v.XC(384), v.Y(176), ss).setDepth(45);
+    this.enemySprite = makeStillFront(this, "battle_enemy", v.XC(384), v.Y(ENEMY_VY), ss).setDepth(45);
     this.allySprite = makeStillFront(this, "battle_ally", v.XC(128), v.Y(304), ss).setDepth(50);
     this.enemySprite.setOrigin(0.5, 1);
     this.allySprite.setOrigin(0.5, 1);
@@ -178,6 +183,15 @@ export default class BattleScene extends Phaser.Scene {
       if (cmd.kind === "item") {
         const bag = await this.openBag();
         if (!bag.used) continue;
+        // 볼을 골랐다 → 던진다. 잡으면 배틀 끝, 놓치면 아이템과 똑같이 상대에게 한 턴을 준다.
+        if (bag.ball && bag.item) {
+          const thrown = await this.throwBall(bag.item);
+          if (!thrown) continue;                    // 못 던진 경우(파티 만석) — 턴이 지나가지 않는다
+          if (this.outcome === "catch") break;      // 잡았다
+          await this.doTurn(this.enemy, this.ally, this.pickEnemyMove(), this.allyBox, false);
+          if (isFainted(this.ally)) { await this.lose(); break; }
+          continue;
+        }
         if (bag.text) await this.say(bag.text);     // "OO의 HP가 20 회복됐다!" — 가방이 만든 문장
         await this.allyBox.animateTo();                  // 회복된 HP를 HP바에 반영
         await this.doTurn(this.enemy, this.ally, this.pickEnemyMove(), this.allyBox, false);
@@ -245,6 +259,55 @@ export default class BattleScene extends Phaser.Scene {
     if (res.crit) await this.say("급소에 맞았다!");
     const eff = effectivenessText(res.effectiveness);
     if (eff) await this.say(eff);
+  }
+
+  // 볼을 던진다 — 판정은 systems/capture.ts(AR 원본 공식), 여기선 연출·소비·파티 편입만.
+  //  반환 false = 못 던졌다(턴이 지나가지 않는다). true = 던졌다(잡았으면 this.outcome === "catch").
+  private async throwBall(itemId: string): Promise<boolean> {
+    const party = (this.registry.get("playerParty") as Pokemon[]) ?? [];
+    // 원본은 파티가 꽉 차면 박스로 보내지만 이 게임엔 박스가 없다 →
+    //  박스까지 만원일 때 원본이 쓰는 그 문장으로 거절한다("Can't catch any more..."의 한국어판).
+    if (party.length >= MAX_PARTY) { await this.say("더는 잡을 수 없습니다..."); return false; }
+
+    const def = getItem(itemId);
+    const itemName = def?.name ?? itemId;
+    if (!removeItem(this.registry, itemId, 1)) return false;   // 개수가 안 맞으면(있을 수 없지만) 조용히 무시
+
+    const me = (this.registry.get("playerName") as string) ?? "";
+    await this.say(`${me}${josa(me, "은는")} ${itemName}${josa(itemName, "을를")} 던졌다!`);
+
+    const shakes = captureShakes(this.enemy, itemId);
+    // 볼에 들어가는 연출 — 전용 볼 스프라이트가 아직 없어서 상대가 사라졌다 흔들림만큼 기다린다.
+    playSfx(this, SFX.decision, 0.4);
+    this.fadeOutSprite(this.enemySprite);
+    for (let i = 0; i < Math.max(1, shakes); i++) {
+      await new Promise<void>((r) => this.time.delayedCall(450, r));
+      playSfx(this, SFX.cursor, 0.5);
+    }
+
+    if (shakes < 4) {
+      // 빠져나온다 — 스프라이트를 되돌린다.
+      //  ⚠️ 먼저 트윈을 죽여야 한다: fadeOutSprite의 500ms 트윈이 아직 돌고 있으면
+      //     alpha를 1로 되돌려도 트윈이 그 값을 다시 0으로 끌고 가 상대가 사라진 채로 배틀이 계속된다.
+      this.tweens.killTweensOf(this.enemySprite);
+      this.enemySprite.setAlpha(1).setY(this.view.Y(ENEMY_VY));
+      await this.say(SHAKE_FAIL_TEXT[shakes] ?? SHAKE_FAIL_TEXT[0]);
+      return true;
+    }
+
+    const foe = displayName(this.enemy);
+    playSfx(this, SFX.decision, 0.5);
+    await this.say(`좋았어! ${foe}${josa(foe, "을를")} 잡았다!`);
+    // 도감 등록 + 파티 편입. 도감번호(id)는 칸토 도감에 있는 종족만 채운다(9세대 종족은 0으로 남는다).
+    markOwn(this.registry, this.enemy.speciesId);
+    const dexNo = dexKanto().indexOf(this.enemy.speciesId.toUpperCase());
+    this.enemy.id = dexNo >= 0 ? dexNo + 1 : 0;
+    party.push(this.enemy);
+    this.registry.set("playerParty", party);
+    await this.say(`${foe}${josa(foe, "이가")} 파티에 추가되었습니다.`);
+    // 경험치는 주지 않는다(잡으면 경험치가 없던 5세대까지의 규칙 — 별명 짓기도 아직 없다).
+    this.outcome = "catch";
+    return true;
   }
 
   private async win(): Promise<void> {
@@ -382,6 +445,7 @@ export default class BattleScene extends Phaser.Scene {
       this.scene.launch("BagScene", {
         from: "BattleScene",
         mode: "battle",
+        wild: this.wild,                          // 야생전에서만 볼 포켓이 열린다(트레이너 포켓몬은 못 잡는다)
         onResult: (r: BagResult) => resolve(r),   // 가방이 닫히며 결과를 돌려준다
       });
     });

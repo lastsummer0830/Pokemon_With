@@ -26,25 +26,30 @@ const DIR = "assets/ui/bag/cream";
 
 // 배틀 중에 열 수 있는 포켓 — AR/에센셜즈는 "배틀에서 쓸 수 있는 아이템"만 걸러 보여준다
 //  (pbItemMenu → PokemonBag_Scene을 choosing=true + battle_use 필터로 재사용).
-//  우리는 아이템 수가 적으니 포켓 단위로 단순화: 지금은 회복약만. (볼은 포획 붙일 때 3을 추가한다.)
+//  우리는 아이템 수가 적으니 포켓 단위로 단순화: 회복약(2) + 야생전이면 볼(3).
+//  ⚠️ 트레이너전에 볼 포켓을 빼는 건 연출이 아니라 규칙이다(남의 포켓몬은 못 잡는다).
 const BATTLE_POCKETS = [2];
+const BATTLE_POCKETS_WILD = [2, 3];
 
 // 배틀이 가방에서 돌려받는 결과. used=false면 아무것도 안 쓰고 닫은 것 → 턴이 지나가지 않는다.
 export interface BagResult {
   used: boolean;
   text?: string;    // 배틀 텍스트박스에 띄울 문장("OO의 HP가 20 회복됐다!")
   item?: string;    // 쓴 아이템 id
+  ball?: boolean;   // 몬스터볼을 골랐다 → 던지는 연출·포획 판정·볼 소비는 전부 BattleScene이 한다
 }
 
 interface BagInit {
   from?: string;
   mode?: "field" | "battle";
+  wild?: boolean;                      // 배틀 모드에서 야생전인가(볼 포켓을 보여줄지)
   onResult?: (r: BagResult) => void;   // 배틀에서 열었을 때 결과를 돌려줄 콜백
 }
 
 export default class BagScene extends Phaser.Scene {
   private from = "MenuScene";
   private mode: "field" | "battle" = "field";
+  private wild = false;
   private onResult?: (r: BagResult) => void;
   private pocketIdx = 0;        // pockets 배열 인덱스
   private idx = 0;              // 현재 포켓 안에서 고른 줄
@@ -63,6 +68,7 @@ export default class BagScene extends Phaser.Scene {
   init(data: BagInit): void {
     this.from = data?.from ?? "MenuScene";
     this.mode = data?.mode ?? "field";
+    this.wild = !!data?.wild;
     this.onResult = data?.onResult;
     this.pocketIdx = 0; this.idx = 0; this.top = 0;
     this.choosing = false; this.closing = false; this.partyIdx = 0; this.msg = "";
@@ -136,7 +142,10 @@ export default class BagScene extends Phaser.Scene {
 
   // ── 상태 ──────────────────────────────────────────────
   // 배틀에선 쓸 수 있는 포켓만 탭에 나온다(필드는 전부).
-  private get pockets(): number[] { return this.mode === "battle" ? BATTLE_POCKETS : POCKETS; }
+  private get pockets(): number[] {
+    if (this.mode !== "battle") return POCKETS;
+    return this.wild ? BATTLE_POCKETS_WILD : BATTLE_POCKETS;
+  }
   private get pocket(): number { return this.pockets[this.pocketIdx]; }
   private get items(): ReturnType<typeof itemsByPocket> { return itemsByPocket(this.registry, this.pocket); }
   private get party(): Pokemon[] { return (this.registry.get("playerParty") as Pokemon[]) ?? []; }
@@ -176,6 +185,13 @@ export default class BagScene extends Phaser.Scene {
     const list = this.items;
     if (this.idx >= list.length) { this.close(); return; }        // "닫는다" 줄
     const def = list[this.idx].def;
+    // 볼(포켓 3) = 야생 배틀에서만. 고르는 즉시 가방을 닫고 나머지는 배틀이 한다.
+    //  ⚠️ 여기서 볼을 소비하지 않는다(회복약과 다른 점) — 파티가 꽉 차 못 던지는 경우가 있어
+    //     "던졌다"가 확정된 뒤 BattleScene이 removeItem 한다.
+    if (this.mode === "battle" && this.wild && def.pocket === 3) {
+      this.close({ used: true, item: def.id, ball: true });
+      return;
+    }
     // 필드에서 쓸 수 있는 건 회복약(포켓 2)뿐. 볼·일반 아이템은 여기서 쓸 수 없다.
     if (def.pocket !== 2) { this.msg = `${def.name}${josa(def.name, "은는")} 지금 쓸 수 없다.`; this.render(); return; }
     if (!this.party.length) { this.msg = "포켓몬이 없다."; this.render(); return; }

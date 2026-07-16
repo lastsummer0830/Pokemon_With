@@ -62,7 +62,8 @@ export default class DebugMenuScene extends Phaser.Scene {
       if (!this.registry.get("playerName")) this.registry.set("playerName", "테스트");
       this.registry.set("playerGender", this.gender);
       // 집 꾸미기 확인용: 타입별 효과(불꽃/물/풀)를 바로 보려면 파티가 있어야 한다.
-      if ((data as { testParty?: boolean } | undefined)?.testParty) {
+      const testParty = (data as { testParty?: boolean } | undefined)?.testParty;
+      if (testParty) {
         const party = (this.registry.get("playerParty") as Pokemon[]) ?? [];
         if (!party.length) this.registry.set("playerParty", [
           createFromSpecies("CHARMANDER", 5), createFromSpecies("SQUIRTLE", 5), createFromSpecies("BULBASAUR", 5),
@@ -70,7 +71,8 @@ export default class DebugMenuScene extends Phaser.Scene {
       }
       // 가방·도감·배틀을 바로 볼 땐 가방 내용물·소지금·도감 기록이 있어야 화면이 채워진다.
       //  (배틀에서 '가방'을 눌렀을 때 쓸 게 없어 "닫는다"만 뜨던 문제 — 실게임은 IntroScene이 START_BAG을 넣어준다.)
-      if (key === "BagScene" || key === "PokedexScene" || key === "BattleScene") {
+      //  testParty를 주는 항목(예: E=1번도로)도 같이 채운다 — 안 그러면 풀숲에서 야생을 만나도 던질 볼이 없다.
+      if (key === "BagScene" || key === "PokedexScene" || key === "BattleScene" || testParty) {
         if (!this.registry.get("money")) this.registry.set("money", START_MONEY);
         if (!(this.registry.get("bag") as unknown[])?.length)
           this.registry.set("bag", [...START_BAG, { itemId: "SUPERPOTION", count: 2 }, { itemId: "ANTIDOTE", count: 1 },

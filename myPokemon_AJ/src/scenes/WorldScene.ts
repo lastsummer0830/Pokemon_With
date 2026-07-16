@@ -5,6 +5,8 @@ import { playBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 import DialogBox from "../ui/DialogBox";
 import { REGION_MAPS, REGION_COLS, REGION_ROWS, mapAtGlobal, toGlobal, toLocal, assertRegionMatches, RegionMap } from "../data/region";
+import { getEncounters } from "../data/ar";
+import { encounterTriggered, chooseWildPokemon, resetEncounterSteps } from "../systems/encounter";
 
 // 야외 = 어나더레드에서 그대로 추출한 맵 3장을 **하나로 이어붙인 리전**(52×100칸).
 //  - 위에서부터 상록시티(0~39) · 1번도로(40~79) · 태초마을(80~99). 배치 근거는 src/data/region.ts 주석 참고
@@ -38,6 +40,7 @@ export default class WorldScene extends Phaser.Scene {
   // 리전 전체 격자(맵 3장을 이어붙인 것). 좌표는 전부 글로벌.
   private cols = REGION_COLS; private rows = REGION_ROWS;
   private blocked: number[][] = [];
+  private grass: number[][] = [];   // 1 = 풀숲(야생 조우 판정 칸). 풀숲 없는 맵은 전부 0으로 남는다.
   private tile = 32 * SCALE;
   private tx = 0; private ty = 0;
   private moving = false; private busy = false;
@@ -97,12 +100,17 @@ export default class WorldScene extends Phaser.Scene {
     // 리전 격자를 "전부 막힘"으로 깔고, 맵 3장의 blocked를 각자 오프셋 위치에 찍어 넣는다.
     //  (맵이 안 덮는 칸은 막힌 채로 남아 밖으로 못 나간다 — 리전 가장자리 보호막 역할)
     this.blocked = Array.from({ length: REGION_ROWS }, () => new Array<number>(REGION_COLS).fill(1));
+    // 풀숲은 반대로 "전부 아님(0)"으로 깔고 맵이 준 칸만 켠다(맵 밖은 풀숲이 아니다).
+    this.grass = Array.from({ length: REGION_ROWS }, () => new Array<number>(REGION_COLS).fill(0));
     for (const m of REGION_MAPS) {
-      const col = this.cache.json.get(`${m.name}_col`) as { cols: number; rows: number; blocked: number[][] };
+      // grass는 풀숲이 있는 맵(1번도로)에만 있다 — 없는 맵은 extract-map.py가 키를 아예 안 넣는다.
+      const col = this.cache.json.get(`${m.name}_col`) as { cols: number; rows: number; blocked: number[][]; grass?: number[][] };
       assertRegionMatches(m.name, col.cols, col.rows);   // 크기가 어긋나면 조용히 깨지지 말고 여기서 죽어라
       for (let y = 0; y < col.rows; y++)
-        for (let x = 0; x < col.cols; x++)
+        for (let x = 0; x < col.cols; x++) {
           this.blocked[y + m.oy][x + m.ox] = col.blocked[y][x];
+          if (col.grass) this.grass[y + m.oy][x + m.ox] = col.grass[y][x];
+        }
       this.textures.get(m.name).setFilter(Phaser.Textures.FilterMode.NEAREST);
       this.add.image(m.ox * this.tile, m.oy * this.tile, m.name).setOrigin(0, 0).setScale(SCALE).setDepth(0);
     }
@@ -163,8 +171,6 @@ export default class WorldScene extends Phaser.Scene {
     this.add.text(12, 12, `${name ? name + "  |  " : ""}방향키: 이동  |  Enter: 메뉴`, {
       fontFamily: "Galmuri11, sans-serif", fontSize: "16px", color: "#ffffff", backgroundColor: "#00000088", padding: { x: 8, y: 4 },
     }).setScrollFactor(0).setDepth(100);
-    // (임시 디버그) B키 = 야생 배틀. 내 파티 선두를 아군으로 넘긴다(없으면 BattleScene 데모 폴백).
-    this.input.keyboard!.on("keydown-B", () => this.startWildBattle());
     // Enter/X = 인게임 메뉴(포켓몬/가방/저장) 오버레이 열기.
     this.input.keyboard!.on("keydown-ENTER", () => this.openMenu());
     this.input.keyboard!.on("keydown-X", () => this.openMenu());
@@ -193,12 +199,34 @@ export default class WorldScene extends Phaser.Scene {
   /** 한 칸 움직일 때마다 호출. 맵이 바뀌면 이름을 띄우고 BGM을 갈아준다(암전·로딩 없음). */
   private onEnterTile(): void {
     const m = mapAtGlobal(this.tx, this.ty);
-    if (!m || m === this.curMap) return;
-    const prev = this.curMap;
-    this.curMap = m;
-    this.showMapName(m.label);
-    // BGM은 곡이 실제로 바뀔 때만 갈아준다(태초마을↔집처럼 같은 곡이면 끊지 않는다).
-    if (prev?.bgm !== m.bgm) playBgm(this, m.bgm, 0.35);
+    if (m && m !== this.curMap) {
+      const prev = this.curMap;
+      this.curMap = m;
+      this.showMapName(m.label);
+      // BGM은 곡이 실제로 바뀔 때만 갈아준다(태초마을↔집처럼 같은 곡이면 끊지 않는다).
+      if (prev?.bgm !== m.bgm) playBgm(this, m.bgm, 0.35);
+    }
+    this.maybeWildEncounter();
+  }
+
+  /** 풀숲을 밟았으면 조우 판정(원본 pbBattleOnStepTaken과 같은 자리 = 한 보 걸을 때마다). */
+  private maybeWildEncounter(): void {
+    if (this.busy) return;                                   // 컷신·워프 중엔 안 걸린다
+    if (this.grass[this.ty]?.[this.tx] !== 1) return;         // 풀숲이 아니면 끝
+    const arMapId = this.curMap?.arMapId;
+    if (arMapId === undefined) return;                        // 조우표가 없는 맵
+    // 원본: $player.able_pokemon_count == 0 이면 조우 안 함(싸울 포켓몬이 없으면 배틀이 성립 안 된다)
+    const party = this.registry.get("playerParty") as Pokemon[] | undefined;
+    if (!party?.some((p) => p.currentHp > 0)) return;
+
+    const table = getEncounters(arMapId);
+    if (!table) return;
+    if (!encounterTriggered(table.stepChance)) return;
+    const pick = chooseWildPokemon(table);
+    if (!pick) return;
+
+    resetEncounterSteps();   // 원본처럼 조우 직후엔 걸음수·누산기를 리셋(다음 몇 보는 유예)
+    this.startWildBattle(pick.speciesId, pick.level);
   }
 
   /** 새 맵에 들어왔을 때 왼쪽 위에 이름을 잠깐 띄운다. */
@@ -234,8 +262,10 @@ export default class WorldScene extends Phaser.Scene {
       targets: this.player, x: this.cx(ntx), y: this.cy(nty), duration: 150,
       onComplete: () => {
         this.tx = ntx; this.ty = nty; this.moving = false;
-        this.onEnterTile();   // 맵 경계를 넘었는지 확인(암전 없이 그냥 넘어간다)
-        this.handleWarp();
+        this.onEnterTile();   // 맵 경계를 넘었는지 확인(암전 없이 그냥 넘어간다) + 풀숲 조우 판정
+        // 조우가 걸렸으면(busy) 워프는 건너뛴다 — 지금은 풀숲과 워프 칸이 겹치지 않지만,
+        //  겹치는 순간 배틀과 문 진입이 동시에 scene.start 되어 화면이 뒤엉킨다.
+        if (!this.busy) this.handleWarp();
       },
     });
   }
@@ -253,14 +283,20 @@ export default class WorldScene extends Phaser.Scene {
     this.scene.launch("MenuScene", { from: "WorldScene" });
   }
 
-  // 야생 배틀 시작: 내 파티 선두를 아군으로 넘긴다(없으면 BattleScene 데모 폴백).
-  private startWildBattle(): void {
-    if (this.busy || this.moving) return;
+  // 야생 배틀 시작: 조우표가 뽑은 종족·레벨로 상대를 만들고, 내 파티 선두를 아군으로 넘긴다.
+  private startWildBattle(speciesId: string, level: number): void {
+    this.busy = true;   // 배틀로 넘어가는 동안 한 칸 더 걸어 좌표가 어긋나는 것 방지
     const party = this.registry.get("playerParty") as Pokemon[] | undefined;
     const ally = party && party.length ? party[0] : undefined;
+    const enemy = createFromSpecies(speciesId, level);
     // 배경 = 지금 서 있는 맵이 정한다(AR map_metadata의 battle_background 그대로: 마을=town, 1번도로=route).
     const backdrop = this.curMap?.battleBg ?? "town";
-    this.scene.start("BattleScene", { ally, wild: true, backdrop, returnPos: [this.tx, this.ty], returnFacing: this.facing });
+    playSfx(this, SFX.exclaim, 0.5);
+    this.cameras.main.fadeOut(300, 0, 0, 0);
+    this.time.delayedCall(320, () =>
+      this.scene.start("BattleScene", {
+        ally, enemy, wild: true, backdrop, returnPos: [this.tx, this.ty], returnFacing: this.facing,
+      }));
   }
 
   // 스타터 선택 후 연구소에서 나오면: **이미 문 앞에서 기다리던** 네모가 다가와 말을 걸고 라이벌 배틀이 시작된다.
