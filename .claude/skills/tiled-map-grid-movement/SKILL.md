@@ -23,8 +23,17 @@ AGENTS.md 로드맵의 다음 우선순위 = **Another Red Tilesets로 Tiled 타
 5. 주인공 스프라이트: Another Red 오버월드(`public/assets/characters/`의 boy_/girl_). 도트는 `setFilter(NEAREST)`.
 
 ## 금지/주의
-- ⚠️ Another Red `Data/*.rxdata`는 RPG Maker 바이너리라 **맵 배열·로직을 직접 못 가져옴.** 타일셋 "그림"만 쓰고 맵 배치는 Phaser/Tiled로 재구성.
+- ✅ **Another Red `Data/*.rxdata`는 rubymarshal로 다 읽힌다** — 맵 배열·충돌·풀숲·연결·BGM·인카운터 전부.
+  (예전 "못 가져옴 → Tiled로 재구성"은 **틀린 서술**. `myPokemon_AJ/AGENTS.md` §4-C가 정본.)
+  뽑는 도구는 이미 있다 — **새로 만들지 말 것**:
+  - `tools/ar-map/extract-map.py --map <번호> --out <이름>` → 월드맵 PNG + `{cols,rows,blocked,grass?}`
+  - `tools/ar-map/extract.py` → **집(방·거실) 전용**. 돌리면 `rooms.json`을 덮어쓴다 — 조심.
+  - `tools/ar-data/extract-encounters.py --maps <번호>` → 야생 인카운터 표
+  - terrain_tag **2 = 풀숲**, `map_connections.dat` = 맵 이어붙이기 오프셋, `map_metadata.dat` = 배틀배경·한글이름
+- 야외 맵 배치·좌표변환의 정본 = **`src/data/region.ts`** (맵 3장을 이어붙인 52×100 리전).
+  ⚠️ WorldScene 좌표는 **리전 글로벌**. 다른 씬이 맵 기준 로컬로 말할 땐 `map` 이름을 같이 넘긴다(안 하면 엉뚱한 맵에 스폰).
 - 좌표 하드코딩 대신 타일 크기·격자 기준 계산.
+- ⚠️ 새 public 에셋(png·ogg·json)을 추가하면 **dev서버 재시작** — 안 하면 `text/html`로 응답해 "디코딩 실패/안 바뀜"으로 몇 시간 날린다.
 
 ## 검증
 - `npm run dev` → http://localhost:5180 에서 충돌/워프/이동을 직접 플레이. 화면 안 바뀌면 `build-run-debug` 참고.
