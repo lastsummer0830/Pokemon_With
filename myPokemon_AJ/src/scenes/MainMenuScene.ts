@@ -130,7 +130,8 @@ export default class MainMenuScene extends Phaser.Scene {
       this.cameras.main.fadeOut(250, 0, 0, 0);
       this.cameras.main.once("camerafadeoutcomplete", () => {
         if (loc.scene === "InteriorScene") this.scene.start("InteriorScene", { room: loc.room ?? "living", skipIntro: true });
-        else this.scene.start("WorldScene", { spawn: [loc.tx ?? 17, loc.ty ?? 8], face: loc.facing ?? "down" });
+        // 세이브의 tx/ty는 **그 맵 기준 로컬**이라 map을 같이 넘긴다(loadGame이 옛 세이브엔 "pallet"을 채워준다).
+        else this.scene.start("WorldScene", { spawn: [loc.tx ?? 17, loc.ty ?? 8], map: loc.map ?? "pallet", face: loc.facing ?? "down" });
       });
     } else if (action === "options") {
       this.showToast("옵션은 준비 중이에요");

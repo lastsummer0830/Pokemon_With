@@ -36,6 +36,8 @@ const FILES: Record<string, string> = {
   [SFX.pkmnGet]: "assets/audio/me_pkmn_get.ogg",
   // 마을/집/연구소 공용 BGM도 여기서 함께 로드(그래야 playBgm이 캐시에서 찾아 재생).
   bgm_town: "assets/audio/bgm_town.ogg",
+  bgm_route1: "assets/audio/bgm_route1.ogg",       // 1번도로 (AR KM_Route1)
+  bgm_viridian: "assets/audio/bgm_viridian.ogg",   // 상록시티 (AR KM_Pewter)
 };
 
 // 씬 preload에서 호출 — 아직 안 받은 효과음만 큐에 넣는다(중복 로드 방지).
@@ -52,11 +54,14 @@ export function playSfx(scene: Phaser.Scene, key: string, volume = 0.5): void {
 
 // BGM 키(bgm.ts와 함께 씀)
 // 씬별 BGM — AR 실제 맵 데이터(@bgm) 기준으로 매핑:
-//   태초마을(Map55)=KM_Pallet, 오박사연구소(Map157)=Lab, 야생배틀(metadata)=Battle wild.
+//   태초마을(Map55)=KM_Pallet, 1번도로(Map10)=KM_Route1, 상록시티(Map56)=KM_Pewter,
+//   오박사연구소(Map157)=Lab, 야생배틀(metadata)=Battle wild.
 //   집 내부는 AR에서 BGM 미설정(마을곡 상속) → town 사용.
 export const BGM = {
-  title: "bgm_title",   // 타이틀~인트로 (DP 호수 테마 — 사용자 지정)
-  town: "bgm_town",     // 마을/집 (KM_Pallet)
-  lab: "bgm_lab",       // 오박사 연구소 (Lab.mid → AR soundfont로 렌더)
-  battle: "bgm_battle", // 야생 배틀 (Battle wild)
+  title: "bgm_title",       // 타이틀~인트로 (DP 호수 테마 — 사용자 지정)
+  town: "bgm_town",         // 마을/집 (KM_Pallet)
+  route1: "bgm_route1",     // 1번도로 (KM_Route1)
+  viridian: "bgm_viridian", // 상록시티 (KM_Pewter)
+  lab: "bgm_lab",           // 오박사 연구소 (Lab.mid → AR soundfont로 렌더)
+  battle: "bgm_battle",     // 야생 배틀 (Battle wild)
 } as const;

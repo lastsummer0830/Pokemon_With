@@ -41,7 +41,7 @@ export default class DebugMenuScene extends Phaser.Scene {
       ["2. 인트로(성별·이름)", "IntroScene"],
       ["3. 시작 집 - 침실(인트로부터)", "InteriorScene"],
       ["4. 시작 집 - 거실 바로가기", "InteriorScene", { room: "living", skipIntro: true }],
-      ["5. 마을(World)", "WorldScene"],
+      ["5. 태초마을(World)", "WorldScene"],
       // 야생 데모 = 풀숲 조우 → 배경도 풀숲(route). 도시 배경(town)은 마을에서 싸울 때만.
       ["6. 배틀(Battle) - 야생 데모", "BattleScene", { wild: true, testParty: true, backdrop: "route" }],
       // 집 꾸미기는 별도 화면이 아니라 '내 방(2F)에서 F키'로 한다 → 침실로 바로 보낸다(테스트 파티 포함).
@@ -49,9 +49,13 @@ export default class DebugMenuScene extends Phaser.Scene {
       ["8. 시작 집 - 침실 바로가기(skip)", "InteriorScene", { room: "bedroom", skipIntro: true }],
       ["9. 포켓몬 연구소(스타팅 선택)", "LabScene"],
       ["0. 인게임 메뉴(파티/가방/저장)", "__MENU__"],
-      // 바로가기(클릭) — 색(look)은 버터 크림으로 확정됐다(시안 A~C 분기는 제거).
-      ["가방", "BagScene", { testParty: true }],
-      ["도감", "PokedexScene", { testParty: true }],
+      // 바로가기 — 색(look)은 버터 크림으로 확정됐다(시안 A~C 분기는 제거).
+      ["Q. 가방", "BagScene", { testParty: true }],
+      ["W. 도감", "PokedexScene", { testParty: true }],
+      // 야외 리전의 나머지 두 맵. spawn은 **그 맵 기준 로컬 좌표**라 map을 같이 준다(WorldScene.init 참고).
+      //  좌표는 눈대중이 아니라 맵 json의 blocked에서 걸을 수 있는 칸으로 골랐다(둘 다 남쪽 입구 = 실제 도착 지점).
+      ["E. 1번도로", "WorldScene", { map: "route1", spawn: [25, 39], face: "up", testParty: true }],
+      ["R. 상록시티", "WorldScene", { map: "viridian_city", spawn: [23, 38], face: "up", testParty: true }],
     ];
     const go = (key: string, data?: object) => {
       // 테스트용 기본값 — 인트로를 건너뛰어도 씬이 동작하도록
@@ -92,7 +96,8 @@ export default class DebugMenuScene extends Phaser.Scene {
       this.scene.start(key, data);
     };
 
-    const keyNames = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "ZERO"];
+    // 숫자 10개로는 모자라 알파벳까지 쓴다(항목 순서 = 이 배열 순서).
+    const keyNames = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "ZERO", "Q", "W", "E", "R"];
     // 항목 수에 맞춰 자동으로 화면 안에 다 들어오게(캔버스라 스크롤 없음).
     const startY = height * 0.30;
     const gap = Math.min(height * 0.07, (height * 0.66) / scenes.length);

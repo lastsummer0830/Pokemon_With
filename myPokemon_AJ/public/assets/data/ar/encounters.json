@@ -1,0 +1,91 @@
+{
+ "10": {
+  "land": [
+   {
+    "w": 8,
+    "id": "BUNNELBY",
+    "min": 2,
+    "max": 4
+   },
+   {
+    "w": 8,
+    "id": "CATERPIE",
+    "min": 2,
+    "max": 4
+   },
+   {
+    "w": 8,
+    "id": "LECHONK",
+    "min": 2,
+    "max": 4
+   },
+   {
+    "w": 8,
+    "id": "PIDGEY",
+    "min": 2,
+    "max": 4
+   },
+   {
+    "w": 8,
+    "id": "PIDOVE",
+    "min": 2,
+    "max": 4
+   },
+   {
+    "w": 8,
+    "id": "RATTATA",
+    "min": 2,
+    "max": 4
+   },
+   {
+    "w": 8,
+    "id": "SENTRET",
+    "min": 2,
+    "max": 4
+   },
+   {
+    "w": 8,
+    "id": "SKWOVET",
+    "min": 2,
+    "max": 4
+   },
+   {
+    "w": 8,
+    "id": "TAROUNTULA",
+    "min": 2,
+    "max": 4
+   },
+   {
+    "w": 8,
+    "id": "WURMPLE",
+    "min": 2,
+    "max": 4
+   },
+   {
+    "w": 6,
+    "id": "FLETCHLING",
+    "min": 2,
+    "max": 4
+   },
+   {
+    "w": 6,
+    "id": "SCATTERBUG",
+    "min": 2,
+    "max": 5
+   },
+   {
+    "w": 6,
+    "id": "STARLY",
+    "min": 2,
+    "max": 5
+   },
+   {
+    "w": 2,
+    "id": "EEVEE",
+    "min": 3,
+    "max": 3
+   }
+  ],
+  "stepChance": 21
+ }
+}

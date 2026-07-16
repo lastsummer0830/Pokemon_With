@@ -456,7 +456,9 @@ export default class LabScene extends Phaser.Scene {
     playSfx(this, SFX.doorOut, 0.5);
     this.cameras.main.fadeOut(340, 0, 0, 0);
     const [tx, ty] = this.map.exit.toTown;
-    this.time.delayedCall(360, () => this.scene.start("WorldScene", { spawn: [tx, ty], face: "down" }));
+    // ⚠️ toTown은 **태초마을 기준 로컬 좌표**다 → map을 같이 넘겨야 한다.
+    //    (WorldScene은 이제 맵 3장을 이어붙인 리전이라, map 없이 주면 글로벌로 읽혀 상록시티에 떨어진다.)
+    this.time.delayedCall(360, () => this.scene.start("WorldScene", { spawn: [tx, ty], map: "pallet", face: "down" }));
   }
 
   private wait(ms: number): Promise<void> { return new Promise((r) => this.time.delayedCall(ms, r)); }

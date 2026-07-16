@@ -4,17 +4,22 @@ import { Pokemon, createFromSpecies } from "../data/Pokemon";
 import { playBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 import DialogBox from "../ui/DialogBox";
+import { REGION_MAPS, REGION_COLS, REGION_ROWS, mapAtGlobal, toGlobal, toLocal, assertRegionMatches, RegionMap } from "../data/region";
 
-// 첫 마을 = 어나더레드 '태초마을'(Map55)을 소스에서 그대로 추출한 실제 맵.
-//  - 맵 이미지: assets/world/pallet_town.png (52x20칸, 32px 타일)
-//  - 충돌격자: assets/world/pallet_town.json (blocked) — AR passages 데이터에서 추출
-//  - 격자(칸) 단위 이동 + 카메라가 주인공을 따라감(맵이 화면보다 큼).
-//  - 연구소 문(28,14)로 들어가면 LabScene(스타팅), 우리집 문(17,7)로 들어가면 집(InteriorScene).
+// 야외 = 어나더레드에서 그대로 추출한 맵 3장을 **하나로 이어붙인 리전**(52×100칸).
+//  - 위에서부터 상록시티(0~39) · 1번도로(40~79) · 태초마을(80~99). 배치 근거는 src/data/region.ts 주석 참고
+//    (AR map_connections.dat에서 셋 다 오프셋 0으로 수직 연결인 걸 확인함).
+//  - 맵 경계에 암전·로딩이 없다. 그냥 걸어서 넘어간다(HGSS 감성).
+//  - 격자(칸) 단위 이동 + 카메라가 주인공을 따라감.
+//
+// ⚠️ 이 씬 안의 좌표(this.tx/ty, warps, walkable)는 전부 **리전 글로벌**이다.
+//    다른 씬이 "태초마을의 (28,14)"처럼 맵 기준으로 말할 땐 map 이름을 같이 넘긴다(init 참고).
 type Dir = "down" | "left" | "right" | "up";
 interface Warp { x: number; y: number; to: string; dir?: Dir; room?: string }
 
-const SCALE = 2;                 // 화면 확대(타일 32→64px)
-const START = { x: 17, y: 8 };   // 우리집 문 앞
+const SCALE = 2;                              // 화면 확대(타일 32→64px)
+const START_MAP = "pallet";
+const START_LOCAL = { x: 17, y: 8 };          // 태초마을 기준 우리집 문 앞
 
 // 첫 라이벌 배틀 — 네모는 연구소에서 **먼저 나가**(LabScene의 퇴장 컷신) 밖에서 기다리고 있다.
 //  기다리는 자리는 고정좌표가 아니라 **플레이어가 서 있는 줄의 옆 칸들**로 잡는다(RIVAL_GAP칸 떨어져 대기 → 걸어옴).
@@ -30,19 +35,24 @@ export default class WorldScene extends Phaser.Scene {
   private idleFrame: Record<Dir, number> = { down: 0, left: 4, right: 8, up: 12 };
   private facing: Dir = "down";
 
-  private cols = 0; private rows = 0;
+  // 리전 전체 격자(맵 3장을 이어붙인 것). 좌표는 전부 글로벌.
+  private cols = REGION_COLS; private rows = REGION_ROWS;
   private blocked: number[][] = [];
   private tile = 32 * SCALE;
-  private tx = START.x; private ty = START.y;
+  private tx = 0; private ty = 0;
   private moving = false; private busy = false;
   private lastBump = 0;   // 벽 부딪힘 효과음 연타 방지용
+  private curMap?: RegionMap;   // 지금 서 있는 맵(배틀 배경·저장·위치표시에 쓴다)
 
-  private warps: Warp[] = [
-    { x: 28, y: 14, to: "lab", dir: "up" },                         // 포켓몬 연구소
-    { x: 17, y: 7, to: "house", room: "living", dir: "up" },        // 우리집(거실로)
+  // 워프는 "어느 맵의 어느 칸"으로 적는다(로컬 좌표 — 원본 맵 기준이라 읽기 쉽다).
+  // create()에서 글로벌로 바꿔 this.warps에 넣는다.
+  private warpDefs: (Warp & { map: string })[] = [
+    { map: "pallet", x: 28, y: 14, to: "lab", dir: "up" },                    // 포켓몬 연구소
+    { map: "pallet", x: 17, y: 7, to: "house", room: "living", dir: "up" },   // 우리집(거실로)
   ];
+  private warps: Warp[] = [];   // create()에서 글로벌로 변환된 것
 
-  private spawn = { ...START, face: "down" as Dir };
+  private spawn = { x: 0, y: 0, face: "down" as Dir };
   private autoMenu = false;   // 디버그 '인게임 메뉴' 바로가기: 마을 위에 메뉴를 바로 연다
   private nemona?: Phaser.GameObjects.Sprite;   // 첫 배틀 때 밖에서 기다리는 네모(그 외엔 없음)
   private rival?: { path: [number, number][]; from: "left" | "right" };   // 네모가 걸어올 길(플레이어 기준으로 잡음)
@@ -51,16 +61,31 @@ export default class WorldScene extends Phaser.Scene {
 
   constructor() { super("WorldScene"); }
 
-  init(data: { spawn?: [number, number]; face?: Dir; openMenu?: boolean }): void {
-    if (data?.spawn) this.spawn = { x: data.spawn[0], y: data.spawn[1], face: data.face ?? "down" };
-    else this.spawn = { ...START, face: "down" };
+  // spawn 좌표의 의미가 두 가지다 — 안 지키면 엉뚱한 맵에 떨어진다:
+  //   · map을 같이 주면  → spawn은 **그 맵 기준 로컬** (예: LabScene이 "태초마을 (28,15)"로 내보냄)
+  //   · map이 없으면     → spawn은 **리전 글로벌** (예: BattleScene이 돌려주는 returnPos = 배틀 걸린 그 자리)
+  init(data: { spawn?: [number, number]; map?: string; face?: Dir; openMenu?: boolean }): void {
+    const face = data?.face ?? "down";
+    if (data?.spawn) {
+      const [gx, gy] = data.map ? toGlobal(data.map, data.spawn[0], data.spawn[1]) : data.spawn;
+      this.spawn = { x: gx, y: gy, face };
+    } else {
+      const [gx, gy] = toGlobal(START_MAP, START_LOCAL.x, START_LOCAL.y);
+      this.spawn = { x: gx, y: gy, face: "down" };
+    }
     this.autoMenu = !!data?.openMenu;
   }
 
   preload(): void {
     this.gender = (this.registry.get("playerGender") as Gender) ?? "boy";
-    this.load.image("pallet", "assets/world/pallet_town.png?v=" + Date.now());
-    this.load.json("pallet_col", "assets/world/pallet_town.json?v=" + Date.now());
+    // 맵 3장을 각각 불러온다(큰 PNG를 새로 굽지 않는다 — region.ts 주석 참고).
+    // ⚠️ 캐시에 남은 옛 격자를 먼저 지운다 — 안 지우면 맵 JSON을 고치고 씬을 다시 들어와도
+    //    "고쳤는데 똑같다"가 된다(.claude/rules/maps-collision.md 5번).
+    for (const m of REGION_MAPS) {
+      this.cache.json.remove(`${m.name}_col`);
+      this.load.image(m.name, `${m.img}?v=` + Date.now());
+      this.load.json(`${m.name}_col`, `${m.data}?v=` + Date.now());
+    }
     preloadCommonAudio(this);
     const file = this.gender === "girl" ? "assets/characters/trainer_DAWN.png" : "assets/characters/trainer_RED.png";
     this.load.spritesheet(this.texKey, file, { frameWidth: 32, frameHeight: 48 });
@@ -69,12 +94,25 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   create(): void {
-    const col = this.cache.json.get("pallet_col") as { cols: number; rows: number; blocked: number[][] };
-    this.cols = col.cols; this.rows = col.rows; this.blocked = col.blocked;
+    // 리전 격자를 "전부 막힘"으로 깔고, 맵 3장의 blocked를 각자 오프셋 위치에 찍어 넣는다.
+    //  (맵이 안 덮는 칸은 막힌 채로 남아 밖으로 못 나간다 — 리전 가장자리 보호막 역할)
+    this.blocked = Array.from({ length: REGION_ROWS }, () => new Array<number>(REGION_COLS).fill(1));
+    for (const m of REGION_MAPS) {
+      const col = this.cache.json.get(`${m.name}_col`) as { cols: number; rows: number; blocked: number[][] };
+      assertRegionMatches(m.name, col.cols, col.rows);   // 크기가 어긋나면 조용히 깨지지 말고 여기서 죽어라
+      for (let y = 0; y < col.rows; y++)
+        for (let x = 0; x < col.cols; x++)
+          this.blocked[y + m.oy][x + m.ox] = col.blocked[y][x];
+      this.textures.get(m.name).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      this.add.image(m.ox * this.tile, m.oy * this.tile, m.name).setOrigin(0, 0).setScale(SCALE).setDepth(0);
+    }
+    // 워프(로컬로 적어둔 것)를 글로벌로 바꾼다.
+    this.warps = this.warpDefs.map(w => {
+      const [gx, gy] = toGlobal(w.map, w.x, w.y);
+      return { x: gx, y: gy, to: w.to, dir: w.dir, room: w.room };
+    });
 
-    this.textures.get("pallet").setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.textures.get(this.texKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
-    const map = this.add.image(0, 0, "pallet").setOrigin(0, 0).setScale(SCALE).setDepth(0);
 
     const mkWalk = (key: string, frames: number[]) =>
       this.anims.create({ key, frames: this.anims.generateFrameNumbers(this.texKey, { frames }), frameRate: 8, repeat: -1 });
@@ -88,6 +126,7 @@ export default class WorldScene extends Phaser.Scene {
     mkNem("down", [0, 1, 2, 3]); mkNem("left", [4, 5, 6, 7]); mkNem("right", [8, 9, 10, 11]); mkNem("up", [12, 13, 14, 15]);
 
     this.tx = this.spawn.x; this.ty = this.spawn.y; this.facing = this.spawn.face;
+    this.curMap = mapAtGlobal(this.tx, this.ty);   // 시작 시점의 맵(이름 배너는 안 띄운다 — 들어온 게 아니라 원래 거기다)
     this.player = this.add.sprite(this.cx(this.tx), this.cy(this.ty), this.texKey, this.idleFrame[this.facing])
       .setOrigin(0.5, 1).setScale(SCALE).setDepth(5);
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -116,11 +155,12 @@ export default class WorldScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15);
     this.cameras.main.fadeIn(400, 0, 0, 0);
 
-    playBgm(this, BGM.town, 0.35); // 마을 BGM(팰릿타운 테마)
+    playBgm(this, this.curMap?.bgm ?? BGM.town, 0.35);   // 시작한 맵의 BGM(태초=KM_Pallet, 1번도로=KM_Route1 …)
 
     // HUD(화면 고정)
     const name = (this.registry.get("playerName") as string) ?? "";
-    this.add.text(12, 12, `${name ? name + "  |  " : ""}방향키: 이동  |  연구소 문으로 들어가기`, {
+    // 조작 안내는 맵과 무관한 것만 적는다 — 리전이 3장이 되면서 "연구소 문으로" 안내가 1번도로·상록시티에서도 떠서 틀렸다.
+    this.add.text(12, 12, `${name ? name + "  |  " : ""}방향키: 이동  |  Enter: 메뉴`, {
       fontFamily: "Galmuri11, sans-serif", fontSize: "16px", color: "#ffffff", backgroundColor: "#00000088", padding: { x: 8, y: 4 },
     }).setScrollFactor(0).setDepth(100);
     // (임시 디버그) B키 = 야생 배틀. 내 파티 선두를 아군으로 넘긴다(없으면 BattleScene 데모 폴백).
@@ -150,6 +190,28 @@ export default class WorldScene extends Phaser.Scene {
     return this.warps.find((w) => w.x === tx && w.y === ty);
   }
 
+  /** 한 칸 움직일 때마다 호출. 맵이 바뀌면 이름을 띄우고 BGM을 갈아준다(암전·로딩 없음). */
+  private onEnterTile(): void {
+    const m = mapAtGlobal(this.tx, this.ty);
+    if (!m || m === this.curMap) return;
+    const prev = this.curMap;
+    this.curMap = m;
+    this.showMapName(m.label);
+    // BGM은 곡이 실제로 바뀔 때만 갈아준다(태초마을↔집처럼 같은 곡이면 끊지 않는다).
+    if (prev?.bgm !== m.bgm) playBgm(this, m.bgm, 0.35);
+  }
+
+  /** 새 맵에 들어왔을 때 왼쪽 위에 이름을 잠깐 띄운다. */
+  private showMapName(label: string): void {
+    const t = this.add.text(16, 52, label, {
+      fontFamily: "Galmuri11, sans-serif", fontSize: "20px", color: "#ffffff",
+      backgroundColor: "#000000aa", padding: { x: 12, y: 6 },
+    }).setScrollFactor(0).setDepth(100).setAlpha(0);
+    this.tweens.add({ targets: t, alpha: 1, duration: 200 });
+    this.time.delayedCall(1800, () =>
+      this.tweens.add({ targets: t, alpha: 0, duration: 400, onComplete: () => t.destroy() }));
+  }
+
   update(): void {
     if (this.busy || this.moving) return;
     let dx = 0, dy = 0;
@@ -170,7 +232,11 @@ export default class WorldScene extends Phaser.Scene {
     this.player.play(`walk-${this.facing}`, true);
     this.tweens.add({
       targets: this.player, x: this.cx(ntx), y: this.cy(nty), duration: 150,
-      onComplete: () => { this.tx = ntx; this.ty = nty; this.moving = false; this.handleWarp(); },
+      onComplete: () => {
+        this.tx = ntx; this.ty = nty; this.moving = false;
+        this.onEnterTile();   // 맵 경계를 넘었는지 확인(암전 없이 그냥 넘어간다)
+        this.handleWarp();
+      },
     });
   }
 
@@ -178,7 +244,9 @@ export default class WorldScene extends Phaser.Scene {
   private openMenu(): void {
     if (this.busy || this.moving) return;
     // 저장 위치 기록(메뉴 '저장'이 이 값을 직렬화한다). 월드는 정확한 타일·방향까지 저장.
-    this.registry.set("saveLoc", { scene: "WorldScene", tx: this.tx, ty: this.ty, facing: this.facing });
+    // ⚠️ 저장은 **맵 이름 + 그 맵 기준 로컬 좌표**로 남긴다(글로벌로 남기면 나중에 맵을 끼워넣을 때 옛 세이브가 전부 어긋난다).
+    const at = toLocal(this.tx, this.ty);
+    this.registry.set("saveLoc", { scene: "WorldScene", map: at.map, tx: at.x, ty: at.y, facing: this.facing });
     this.input.enabled = false;
     this.cameras.main.resetFX();  // 진행 중이던 fadeIn(400ms)이 pause로 얼어 월드가 어둑하게 멈추는 것 방지
     this.scene.pause();
@@ -190,8 +258,9 @@ export default class WorldScene extends Phaser.Scene {
     if (this.busy || this.moving) return;
     const party = this.registry.get("playerParty") as Pokemon[] | undefined;
     const ally = party && party.length ? party[0] : undefined;
-    // 배경 = 지금 있는 맵(태초마을 = 도시 배경). 1번도로가 붙으면 그 맵은 route를 넘긴다.
-    this.scene.start("BattleScene", { ally, wild: true, backdrop: "town", returnPos: [this.tx, this.ty], returnFacing: this.facing });
+    // 배경 = 지금 서 있는 맵이 정한다(AR map_metadata의 battle_background 그대로: 마을=town, 1번도로=route).
+    const backdrop = this.curMap?.battleBg ?? "town";
+    this.scene.start("BattleScene", { ally, wild: true, backdrop, returnPos: [this.tx, this.ty], returnFacing: this.facing });
   }
 
   // 스타터 선택 후 연구소에서 나오면: **이미 문 앞에서 기다리던** 네모가 다가와 말을 걸고 라이벌 배틀이 시작된다.
@@ -257,7 +326,8 @@ export default class WorldScene extends Phaser.Scene {
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.time.delayedCall(320, () =>
       this.scene.start("BattleScene", {
-        ally, enemy, wild: false, trainer: "네모", backdrop: "town",   // 라이벌전은 태초마을에서
+        // 배경은 서 있는 맵이 정한다(야생전과 같은 규칙 — 하드코딩하면 나중에 도로/시티 트레이너전에서 틀린 배경이 뜬다).
+        ally, enemy, wild: false, trainer: "네모", backdrop: this.curMap?.battleBg ?? "town",
         returnPos: [this.tx, this.ty], returnFacing: this.facing,
       }));
   }
