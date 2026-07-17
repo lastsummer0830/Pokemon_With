@@ -227,3 +227,111 @@
 ## 10. 사용자가 직접 볼 곳
 **http://localhost:5180** → 타이틀에서 **D** → **`E`**(1번도로) → **풀숲을 걸어다니면** 야생 포켓몬이 나온다
 → 배틀에서 **가방 → 오른쪽 화살표(볼 포켓) → 몬스터볼**로 잡는다. (디버그 **`6`** = 야생 배틀 데모 = 포획만 바로 시험)
+
+---
+
+# ▣ 세션 3 — **틀 3: 트레이너전** (상대 팀 복수 + 파티 교체 + 트레이너 그림 + 상금)
+
+## 1. 착수 전 재검증
+- 워킹트리 clean, HEAD `210f458`. (이번엔 일지의 커밋 서술이 실제와 맞았다.)
+- 서브에이전트 2개 **병렬**: ① 배틀 코드 전수 감사 ② AR 원본 트레이너 데이터 추출 → 메인 컨텍스트에 파일 덤프 안 쌓음.
+- 사용자 결정: **"그림까지 통째로"** (트레이너 배틀 그림 포함).
+
+## 2. ★ AR 원본에서 확인한 사실 (추측 아님 — 원본 .dat/.rxdata 직접 판독)
+**1번도로(Map10) 트레이너 = 2명** (이벤트명 `Trainer(4)` = 시야 4칸, trigger=2)
+
+| | 반바지꼬마 **한주** | 짧은치마 **유정** |
+|---|---|---|
+| 좌표(맵 로컬) | (25,13) `dir=6` 오른쪽 | (33,6) `dir=4` 왼쪽 |
+| 팀 | RATTATA L3 + PIDGEY L3 | SKWOVET L3 + STARLY L3 |
+| 먼저 | `내 첫 포켓몬 배틀이야!` | `눈이 마주치면 배틀!` |
+| 지면(`real_lose_text`) | `이건 없던 거로 칠래!` | `내가 졌네?` |
+| 이긴 뒤(page1) | `어린 아이 상대로 부끄럽지도 않아?` | `이제 눈 안 마주칠게...` |
+
+- **타입 한글명** = `messages_kor_core.dat[13]`: `Youngster→반바지꼬마`, `Lass→짧은치마`. 표시 = `full_name` = `"타입명 이름"`.
+- **base_money=16, skill_level=50** (둘 다). **상금 = 상대 팀 최고레벨 × base_money** = 3×16 = **48원**(`pbGainMoney`).
+- **패배 시** = 내 최고레벨 × `multiplier[뱃지수]`, `multiplier=[8,16,24,36,48,64,80,100,120]` (`pbLoseMoney`).
+- **기술 지정 없음** → 원본도 `reset_moves`(레벨업 학습표)로 채운다 → 우리도 `createFromSpecies`에 맡긴다(= trainers.json에 기술 안 적음).
+- **시야 공식**(`pbEventFacesPlayer?` 0241_Overworld.rb:340): dir=6일 때 `x_min=ex+1`, `x_max=ex+distance` → **1 ≤ 거리 ≤ 시야**. 사이 칸이 전부 통행가능해야 함(`pbEventCanReachPlayer?` — 막히면 시야 차단).
+- **대사 원문**(전부 `messages_kor_core.dat[24]`에서 확인, 지어낸 것 0):
+  - 거둬들이기(`pbMessageOnRecall`, HP·턴수로 갈림): `잘했어, {1}! 돌아와!`(HP≤1/4) / `좋아, {1}! 돌아와!`(≤1/2) / `{1}, 잘했어! 돌아와!`(5턴+) / `{1}, 돌아와!`(2턴+) / `{1}, 교체야! 돌아와!`
+  - 교체로 내보내기(`pbMessagesOnReplace`, **상대 HP로 갈림** — `가랏!`이 아니다): `네 차례야, {1}!`(상대 만피/기절) / `힘내, {1}!`(≥1/2) / `조금 남았어! 힘내, {1}!`(≥1/4) / `상대가 약해져 있어! 가랏, {1}!`
+  - `{1}에게 승리했다!` · `승부에서 {1}원을 얻었다!` · `상대에게 {1}원을 상금으로 주었다...` · `더 이상 싸울 수 있는 포켓몬이 없습니다!` · `\j[{1},은,는] 이미 배틀에 나가 있다!` · `\j[{1},은,는] 기절해서 나갈 수 없다!`
+- **AI 교체**: skill 50 → `ConsiderSwitching` 플래그가 붙어 **원본은 교체 경로가 열려 있다**. 다만 L3 2마리라 조건이 거의 안 걸림 → **우리는 미구현(순서대로 냄)**. 코드 주석에 명시.
+
+## 3. 바꾼 파일
+**새 도구** — `tools/ar-data/extract-trainers.py`
+- `--maps 10` → `public/assets/data/ar/trainers.json` = `{defs, placements}`.
+- **맵에 실제로 서 있는 트레이너만** 뽑는다(585명 중 2명) — `--maps` 화이트리스트, extract-encounters.py와 같은 철학.
+- 좌표·대사·팀을 **손으로 안 베낀다**(원본이 정본). 함정: `@pokemon` 항목 키가 Symbol이라 `p["species"]`로 안 잡힘 → `sym()` 필요. species도 Symbol이라 `str()` 쓰면 `:RATTATA`가 된다.
+
+**새 에셋** — `public/assets/trainers/{YOUNGSTER,LASS,NEMONA}.png` (AR `Graphics/Trainers/` 128px 원본)
+
+**`src/data/ar/index.ts`** — `TrainerDef`/`TrainerMon`/`TrainerPlacement` 타입 + `getTrainer`/`getMapTrainers`/`trainerFullName`, `loadArDb`가 trainers.json도 받음.
+
+**`src/scenes/BattleScene.ts` (대공사)**
+- `ally`/`enemy` 단수 필드 → **`party`+`allyIdx` / `enemyTeam`+`enemyIdx`** + getter. → 0714부터 적혀 있던 *"ally는 파티 선두와 같은 참조"* 전제를 없앰.
+- **스프라이트 런타임 로드**: 텍스처 키를 **종족별**(`bsp_front_<종족>`)로 → 예전 `battle_enemy` 한 키 돌려쓰기 + `textures.remove()` 해킹 **제거**(교체·다음 상대는 preload 시점에 종족을 알 수 없다).
+- 상대 기절 → 경험치 → 다음 마리(`sendOutEnemy`) / 아군 기절 → 강제 교체(취소 불가) / 전멸 → 패배. 판정은 `resolveFaints()` 한 곳으로 모음.
+- `switch` 스텁 제거 → **파티 교체**(턴 소비). 트레이너 그림 등장·퇴장·재등장, 상금 획득/상실, `trainersDefeated` 기록.
+- `BattleInit`에 `enemyTeam`/`trainerId`/`trainerSprite` 추가. **`trainerId`만 주면 팀·대사·상금·그림을 전부 AR 정의에서 가져온다.**
+
+**`src/scenes/MenuScene.ts`** — `mode:"switch"` 추가. 배틀 교체는 **필드 파티 화면을 그대로 재사용**(가방(BagScene) 재사용과 같은 방침 — UI 새로 안 지어냄). 못 내보내는 선택의 사유 안내는 배틀이 원본 문장으로 한다.
+
+**`src/scenes/WorldScene.ts`** — 1번도로 트레이너 2명 배치(좌표·방향·시야·대사 전부 trainers.json). `sightPath()`=원본 공식, 발견 "!"→걸어옴→대사→배틀. 트레이너 칸은 막음. 라이벌 네모도 `trainerSprite:"NEMONA"`로 그림이 뜬다.
+
+**`src/scenes/DebugMenuScene.ts`** — **`T` = 트레이너전 데모(반바지꼬마 한주)**. keyNames에 `T` 추가.
+
+## 4. ⚠️⚠️ 이번 세션 최대 발견 — **기존 버그: 배틀 후 플레이어가 얼어붙는다**
+- **증상:** 야생 배틀에서 이기고 월드로 돌아오면 **방향키가 아예 안 먹는다.** 틀2(커밋 `3c568fa`)부터 있던 버그 — 내 트레이너 코드와 무관.
+- **원인:** **Phaser는 `scene.start`로 다시 시작해도 같은 인스턴스를 재사용한다 → 클래스 필드 초기화식(`private busy = false`)이 다시 안 돈다.**
+  `startWildBattle`/`handleWarp`/컷신이 켠 `busy=true`를 **되돌리는 코드가 어디에도 없었다** → 돌아오면 켜진 채 → `update()`가 입력을 통째로 무시.
+- **실증:** 인스턴스에 표식을 심고 재시작 → `sameInstance:true, busy:true`. 야생전 실주행 → 복귀 후 좌표 안 변함.
+- **수정:** `WorldScene.init()`에서 `busy=false; moving=false`(init은 scene.start마다 도는 유일한 자리).
+- **같은 부류로 3건 더 나옴(전부 수정):**
+  1. `WorldScene.trainers` 배열을 안 비워 **파괴된 스프라이트**를 걷게 하려다 크래시(`t.sprite.play` → undefined). ← 시야 검증에서 실제로 터짐
+  2. `BattleScene.trainerImg` 미초기화 → 트레이너전 다음 **야생전**이 파괴된 그림을 물고 감
+  3. `setupTrainers`의 `isActive()` 가드가 '이전 실행'을 못 거름(재시작해도 active) → 실행번호(`setupRun`)로 교정
+- **교훈(다음 세션):** 이 리포의 씬은 **인스턴스가 재사용된다.** 씬에 상태 필드를 추가하면 **반드시 `init()`에서 리셋**할 것. 배열은 `push` 전에 비울 것. `async` 작업은 실행번호로 옛 실행을 걸러낼 것.
+
+## 5. 검증 (playwright 실주행 — 전부 통과, 콘솔 에러 0)
+스크립트 = 스크래치패드(리포 밖) `t3_trainer.mjs` / `t3_sight.mjs` / `t3_rematch.mjs`, 캡처 = `<repo>/.claude/.verify/t3_*.png`
+- **트레이너전 데모(T):** 이름 `반바지꼬마 한주` · 팀 **2마리** · 트레이너 그림 등장 → 포켓몬 내면 퇴장 · 라타→(교체)→구구 · **상금 정확히 +48원** · `trainersDefeated=['YOUNGSTER:한주']`
+- **파티 교체:** 배틀 위에 AR 파티 화면(`mode:"switch"`) → 꼬부기 선택 → `allyIdx 0→1`, 뒷모습 텍스처가 `bsp_back_SQUIRTLE`로 바뀜
+- **시야:** 5칸=안 걸림 / **4칸=걸림**(원본 공식과 일치) → 걸어와서 `내 첫 포켓몬 배틀이야!`(이름창 `한주`) → 배틀
+- **재도전 방지:** 이기고 복귀 → `defeated:true` → 시야 안을 다시 걸어도 트레이너전 재발 없음(그 자리 풀숲이라 **야생 조우**는 걸리는데, 테스트가 둘을 구분하게 고침)
+- **얼어붙음 수정 확인:** 야생전 승리 후 복귀 → (25,79)→(25,82) 실제 이동
+- **파티 UI 픽셀 대조**(`t3_12_비교_파티_필드vs배틀.png` — MenuScene을 고쳤으므로 game-ui.md 5번 게이트):
+  필드 파티 화면(레퍼런스, 안 건드린 경로) vs 배틀 교체 파티 화면(`mode:"switch"`)을 **같은 파티로 고정**(파이리/꼬부기/이상해씨 L5 male, 풀피)해 대조.
+  ⚠️처음엔 23% 달라 놀랐는데 **디버그 `0`은 6마리·`T`는 3마리를 넣어서**였다(렌더 차이 아님. 성별도 랜덤이라 갈렸다) → 파티를 고정해 재측정.
+  결과 **차이 0.59%, 덩어리 딱 3개(각 ~72×72px)** = 파이리(x222~296,y141~212)·꼬부기(x682~756,y175~238)·이상해씨(x214~285,y316~387) **아이콘 자리와 정확히 일치**
+  = 64×64 2프레임 까딱 애니의 **위상 차이뿐**(세션2 가방 대조와 같은 결론).
+  **나머지는 전부 동일:** 2열 스태거드 패널 기하 · 선택표시(파랑 패널+빨강 테두리, 둘 다 슬롯0) · HP바/HP숫자/Lv 태그/성별기호 · 하단 "포켓몬을 선택하세요."+취소 버튼 · 벽지.
+  → **내 변경은 진입경로·반환만 바꿨고 그림은 안 건드렸다**는 게 픽셀로 확인됨.
+- `npx tsc --noEmit` 통과 (⚠️ **반드시 `myPokemon_AJ/`에서** — Bash 작업디렉터리가 스크래치패드에 남아 헛돌았다)
+
+## 6. `/code-review`(high) 5건 → 고친 것 3건
+`trainerImg` 미초기화 · `setupTrainers` 실행번호 가드 · **쓰러진 상대의 HP박스가 화면에 남던 것**(스샷으로 발견 → `onEnemyFainted`에서 `destroy`, `sendOutEnemy`가 매번 새로 만듦).
+**안 고친 2건(의도):** ① 같은 턴에 서로 쓰러지면 기절한 내 포켓몬이 경험치를 받는다(원본은 안 줌 — 엣지) ② MenuScene switch모드의 detail 분기는 도달 불가(죽은 코드).
+
+## 7. ⚠️ 함정 (이번에 실제로 걸린 것)
+- **playwright에 문자열로 함수를 넘기면 '평가'만 되고 호출이 안 된다** — `page.evaluate("() => {...}")`는 함수 객체를 반환(→ undefined)하고 **본문이 안 돈다.** HP 세팅이 조용히 무시돼 한참 헤맴. **반드시 `(() => {...})()`**.
+- **검증 스크립트가 기술 0번을 골라 아무 일도 안 일어남** — 파이리 기술 0번이 **울음소리(변화기, 위력 0)**. 위력>0인 기술을 골라야 한다(`ar.getMove(id).power`).
+- 새 public 에셋(`trainers/*.png`) 추가 후 **dev서버 재시작 필수** — `NEMONA.png`가 `text/html`로 응답했다.
+- **`pkill -f vite`를 같은 명령줄에서 쓰면 그 뒤 `nohup npm run dev`도 같이 죽는다**(exit 144). 별도 명령으로 `setsid nohup ... & disown`.
+- 타이틀에서 키가 안 먹으면 **`page.click("canvas")`로 포커스**부터.
+
+## 8. 다음 세션 시작 지점 = **틀 4 (상록시티 + 체육관 + 첫 뱃지)**
+- 맵 png/json은 세션1에서 이미 추출해둠(`viridian_gym`/`viridian_pc`/`viridian_mart`). BuildingScene(PC·마트) + 체육관 그린 + 뱃지.
+- **틀3이 깔아준 것:** `trainerId`만 주면 배틀이 완성된다 → 체육관 트레이너는 `extract-trainers.py --maps 194`로 뽑아 배치만 하면 됨. `badges`는 세이브에 이미 있고 `LOSE_MONEY_MULT`가 이미 뱃지수를 읽는다.
+- **남은 구멍(틀3 범위 밖):** 트레이너에게 **말 걸기 없음**(`afterText`를 뽑아뒀지만 WorldScene에 A버튼 상호작용 자체가 없어 미사용) · AI 교체 미구현 · 경험치 참전 분배 없음 · 별명 짓기 없음.
+- 그 뒤 세부: **affinity 가구 0개 = 차별점 미발동(제일 아픔)** · 와이드 대응 · 난이도 화면(데드코드) · 상태이상 거는 코드 없음 · `BedroomScene` 고아 씬.
+
+## 9. 새 지침/skills/memory 요지
+- 새 훅·규칙·스킬 추가 **없음**.
+- memory `starter-lab-flow` 갱신: **틀3 완료 / 다음 = 틀4**, ⚠️**씬 인스턴스 재사용 → init()에서 상태 리셋** 함정 추가.
+
+## 10. 사용자가 직접 볼 곳
+**http://localhost:5180** → 타이틀에서 **D**
+- **`T`** = 트레이너전 데모(반바지꼬마 한주) — 그림 등장 → 팀 2마리 → **`포켓몬`으로 교체** → 이기면 상금 48원
+- **`E`** = 1번도로 → **위로 걸어가면** 반바지꼬마 한주(오른쪽을 봄)·짧은치마 유정과 **눈이 마주쳐** 승부가 걸린다
