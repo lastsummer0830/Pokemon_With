@@ -336,7 +336,8 @@
 - **`T`** = 트레이너전 데모(반바지꼬마 한주) — 그림 등장 → 팀 2마리 → **`포켓몬`으로 교체** → 이기면 상금 48원
 - **`E`** = 1번도로 → **위로 걸어가면** 반바지꼬마 한주(오른쪽을 봄)·짧은치마 유정과 **눈이 마주쳐** 승부가 걸린다
 
-## 11. 🔴 다음 세션 **첫 작업** — 배틀 대화창에 ▼ 화살표가 없다 (사용자 지적, 2026-07-17)
+## 11. ✅ **완료** (2026-07-17 세션4) — 배틀 대화창에 ▼ 화살표가 없다 (사용자 지적)
+> 아래는 착수 전 기록. 실제 조사·수정 결과는 이 절 맨 끝 **"§11 처리 결과"** 참조.
 - **증상:** 필드 대화창(`src/ui/DialogBox.ts`)엔 오른쪽 아래 **▼가 있는데**, **배틀 대화창엔 없다.**
   → `BattleScene.say()`(`overlay_message` 위에 텍스트만 얹음)에 화살표를 안 그린다. 같은 게임인데 두 대화창이 따로 논다
   = 배틀에서 "키를 눌러 넘겨라"는 신호가 아예 없다.
@@ -347,3 +348,33 @@
   - 원본 스크립트에서 메시지 대기 표시를 그리는 부분(`Window_AdvancedTextPokemon`/`MessageWindow` 계열) 판독
   - 우리 배틀 UI는 이미 AR 원본 `assets/ui/battle/overlay_message.png`를 쓰므로, 화살표도 원본 에셋으로 맞춰야 톤이 안 깨진다.
 - 고친 뒤 **반드시 캡처해 눈으로 확인**하고 `.claude/.verify/`에 '비교' 몽타주를 남길 것(enforce-ui-verify 훅이 막는다).
+
+### §11 처리 결과 (세션4, 2026-07-17)
+
+**★ AR 원본에서 확인한 사실 (추측 아님 — `Data/Scripts.rxdata`를 zlib로 풀어 535개 스크립트 직접 판독)**
+- 그래픽 = **`Graphics/UI/pause_arrow.png` (80x28 = 20x28 4프레임)**. 필드 DialogBox의 `▼`(텍스트)와 **완전히 다른 물건** — 복사하지 않았다.
+- 움직임 = **깜빡임이 아니라 위아래 까딱임.** 프레임마다 삼각형이 그려진 세로위치가 다르다(top = 8→12→14→10) → 프레임만 돌리면 원본처럼 흔들린다.
+- 속도 = `allocPause`: `AnimatedSprite.create("Graphics/UI/pause_arrow", 4, 3)` + `AnimatedSprite` 주석 `"frameskip is in 1/20ths of a second"` → **3/20초 = 150ms/프레임, 4프레임 한 바퀴 600ms.**
+- 위치 = `MessageConfig::CURSOR_POSITION = 1`("Lower right") → `moveCursor`:
+  `x = 창.x + 창.width - 40 + 프레임폭/2 = 482` · `y = 창.y + 창.height - 60 + 프레임높이/2 = 338`
+  그 창 = `pbBottomLeftLines(msgwindow, 2)` → x0 / w512 / h(borderY 32 + 2*32)=96 / y(384-96)=288
+  = **우리 `overlay_message`(512x96 @ 0,288)와 정확히 같은 사각형** → 좌표를 그대로 쓸 수 있었다.
+
+**바꾼 파일**
+- `public/assets/ui/pause_arrow.png` (신규) — AR 원본 복사. ※ `assets/ui/`인데 키는 `bt_` 접두(= `bt_types`와 같은 관례) → BattleScene의 NEAREST 루프(`bt_`/`bb_`/`bsp_`)에 자동으로 걸린다.
+- `src/scenes/battleView.ts` — `PAUSE_W/H/VX/VY/MS` 상수 + 위 근거를 주석으로 박음(다음 세션이 다시 안 캐도 되게).
+- `src/scenes/BattleScene.ts` — preload에 스프라이트시트, `create()`에서 애니 1회 등록, `say()`에서 표시. 앵커는 `XR`(대사창이 화면 폭을 꽉 채우므로 — 커맨드 버튼과 같은 관례).
+
+**검증 (playwright 실주행)**
+- **픽셀 대조: 4프레임 전부 AR 원본과 464픽셀 중 불일치 0** → 그림·위치·NEAREST·프레임순서가 한 번에 증명됨.
+- 속도 실측 **149.1ms/프레임 → 596ms/바퀴**(원본 150/600ms). 콘솔 에러 0. 와이드(1600x720)에서도 정상.
+- 산출물: `.claude/.verify/0717_battle_pause_arrow_비교.png`(몽타주) · `_실화면.png`
+
+**⚠️ 이번에 실제로 걸린 함정 (다음 PC/세션도 반드시 걸린다)**
+1. **`curl`이 200을 줘도 png가 아닐 수 있다.** `public/`에 **새로 넣은 파일**은 dev서버가 모르고 `index.html`(993B, `content-type: text/html`)을 200으로 돌려준다 → Phaser `Failed to process file: spritesheet`. **상태코드 말고 `content_type`까지 확인**하고, 새 에셋을 넣었으면 **dev서버 재시작**(AGENTS의 "새 폴더" 함정이 새 *파일*에도 적용됨).
+   `curl -s -o /dev/null -w "%{http_code} %{content_type} %{size_download}" http://localhost:5180/assets/ui/pause_arrow.png`
+2. **`/code-review`가 내가 넣은 버그를 잡았다** — 텍스처 로드 실패 시 `generateFrameNumbers`가 빈 배열 → 0프레임 애니 → `sprite.play()`가 throw → `runBattle().catch`는 콘솔만 찍고 **배틀이 첫 대사에서 통째로 멈춤**(위 1번 때문에 실제 발생). `say()`는 원래 에셋 의존이 0이었다. → **그림 없으면 화살표만 건너뛰도록** 고쳤고, png를 막아 재현해 **배틀이 커맨드 메뉴까지 정상 진행**하는 것까지 확인.
+
+**남은 것 / 안 한 것**
+- **필드 DialogBox는 그대로 `▼` 텍스트다**(요청 범위 밖이라 안 건드림). 원본 톤으로 통일하려면 같은 `pause_arrow` 에셋으로 바꾸면 된다 — 그때 이 절의 좌표계산(창 사각형 기준)을 필드 대화창 사각형에 다시 적용할 것.
+- 배틀 창 리사이즈 중 화살표 재배치 없음(기존 UI 전부 동일 — `BattleView.measure()`가 생성자에서만 불림). 기존 한계지 이번 회귀 아님.

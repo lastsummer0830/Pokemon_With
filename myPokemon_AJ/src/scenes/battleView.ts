@@ -49,6 +49,19 @@ export const FIGHT_SLOTS = [
 ];
 export const TYPE_ICON_W = 64, TYPE_ICON_H = 28;   // Graphics/UI/types.png (64x560 = 28px × 20행)
 
+// ── 대사창 "계속" 화살표 (AR 원본 pause_arrow) ────────────────
+//  근거(AR 소스): Window_AdvancedTextPokemon#allocPause
+//    @pausesprite = AnimatedSprite.create("Graphics/UI/pause_arrow", 4, 3)
+//      → 4프레임 · frameskip 3 = 3/20초 = 150ms/프레임 (AnimatedSprite: "frameskip is in 1/20ths of a second")
+//  위치는 moveCursor의 cursorMode = MessageConfig::CURSOR_POSITION = 1 ("Lower right"):
+//    x = 창.x + 창.width  - 40 + 프레임폭/2  = 0   + 512 - 40 + 10 = 482
+//    y = 창.y + 창.height - 60 + 프레임높이/2 = 288 + 96  - 60 + 14 = 338
+//  (창 = pbBottomLeftLines(msgwindow, 2) → x 0 / width 512 / height borderY 32 + 2*32 = 96 / y 384-96 = 288
+//   = overlay_message.png 512x96 을 (0,288)에 놓은 우리 대사창과 정확히 같은 사각형)
+export const PAUSE_W = 20, PAUSE_H = 28;           // pause_arrow.png (80x28) = 20x28 × 4프레임
+export const PAUSE_VX = 482, PAUSE_VY = 338;       // 위 계산값 (가상좌표)
+export const PAUSE_MS = 150;                       // 프레임당 150ms → 4프레임 한 바퀴 600ms
+
 // ⚠️ 타입 아이콘 시트는 20행인데 기술 버튼 시트는 19행뿐이다(스텔라 = iconPosition 19 → 버튼 그림이 없다).
 //   그대로 자르면 시트 바깥을 잘라 버튼이 통째로 안 보인다 → 버튼 행만 노말(0)로 떨군다.
 const FIGHT_ROWS = 19;

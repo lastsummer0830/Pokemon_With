@@ -13,6 +13,7 @@ import type { BagResult } from "./BagScene";
 import {
   BattleView, DataBox, CMD_SLOTS,
   FIGHT_SLOTS, FIGHT_BTN_W, FIGHT_BTN_H, TYPE_ICON_W, TYPE_ICON_H, PP_COLORS, ppStage, moveNameColor, fightRow,
+  PAUSE_W, PAUSE_H, PAUSE_VX, PAUSE_VY, PAUSE_MS,
 } from "./battleView";
 import { playBgm, stopBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
@@ -138,6 +139,12 @@ export default class BattleScene extends Phaser.Scene {
     }
     // 타입 아이콘 시트(기술 선택 화면 오른쪽) — 배틀 UI가 아니라 공용 UI 폴더에 있다.
     if (!this.textures.exists("bt_types")) this.load.image("bt_types", "assets/ui/types.png");
+    // 대사창 "계속" 화살표 — AR 원본 Graphics/UI/pause_arrow.png(80x28 = 20x28 4프레임).
+    //  프레임마다 삼각형이 그려진 높이가 달라서, 프레임만 돌리면 위아래로 까딱인다(원본과 동일).
+    if (!this.textures.exists("bt_pause_arrow")) {
+      this.load.spritesheet("bt_pause_arrow", "assets/ui/pause_arrow.png",
+                            { frameWidth: PAUSE_W, frameHeight: PAUSE_H });
+    }
     // ★ 포켓몬·트레이너 그림은 여기서 안 받는다 — 교체하거나 상대가 다음 포켓몬을 내면
     //   그 종족을 preload 시점엔 알 수 없다. 필요할 때 ensureBattleSprite()로 그때그때 받는다.
     preloadCommonAudio(this);
@@ -185,6 +192,17 @@ export default class BattleScene extends Phaser.Scene {
     for (const k of this.textures.getTextureKeys())
       if (k.startsWith("bt_") || k.startsWith("bb_") || k.startsWith("bsp_"))
         this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
+
+    // 대사창 "계속" 화살표 애니메이션 — 게임 전역에 한 번만 등록한다(씬은 재사용되므로).
+    //  프레임마다 삼각형 높이가 달라서 프레임만 돌리면 위아래로 까딱인다(AR 원본과 동일).
+    if (this.textures.exists("bt_pause_arrow") && !this.anims.exists("pause_arrow")) {
+      this.anims.create({
+        key: "pause_arrow",
+        frames: this.anims.generateFrameNumbers("bt_pause_arrow", { start: 0, end: 3 }),
+        duration: PAUSE_MS * 4,   // 프레임당 150ms
+        repeat: -1,
+      });
+    }
 
     this.view = new BattleView(this);
     this.buildBackground();
@@ -658,6 +676,16 @@ export default class BattleScene extends Phaser.Scene {
       }).setOrigin(0);
       t.setShadow(Math.max(1, v.s), Math.max(1, v.s), "#a0a0a8", 0, false, true);
       layer.add(t);
+
+      // "계속" 화살표 — AR 원본 그림·좌표·속도 그대로(battleView의 PAUSE_* 주석에 근거).
+      //  ★ 대사창은 화면 폭을 꽉 채우니 화살표도 오른쪽 끝 기준(XR) — 커맨드 버튼과 같은 앵커.
+      //  그림이 없으면 화살표만 건너뛴다 — 장식 하나 때문에 배틀 진행이 멈추면 안 된다.
+      if (this.anims.exists("pause_arrow")) {
+        const arrow = this.add.sprite(v.XR(PAUSE_VX), v.Y(PAUSE_VY), "bt_pause_arrow")
+          .setOrigin(0).setScale(v.s);
+        arrow.play("pause_arrow");
+        layer.add(arrow);
+      }
 
       const kb = this.input.keyboard!;
       const done = () => {
