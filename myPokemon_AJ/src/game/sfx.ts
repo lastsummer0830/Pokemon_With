@@ -64,5 +64,7 @@ export const BGM = {
   viridian: "bgm_viridian", // 상록시티 (KM_Pewter)
   lab: "bgm_lab",           // 오박사 연구소 (Lab.mid → AR soundfont로 렌더)
   gym: "bgm_gym",           // 상록체육관 (Gym.mid → AR soundfont로 렌더 — tools/ar-audio/render-mid.py)
+  center: "bgm_pc",         // 포켓몬 센터 (Poke Center.mid → AR soundfont로 렌더)
+  mart: "bgm_mart",         // 프렌들리 숍/마트 (Poke Mart.mid → AR soundfont로 렌더)
   battle: "bgm_battle",     // 야생 배틀 (Battle wild)
 } as const;

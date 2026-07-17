@@ -70,6 +70,9 @@ export default class WorldScene extends Phaser.Scene {
     { map: "pallet", x: 17, y: 7, to: "house", room: "living", dir: "up" },   // 우리집(거실로)
     // 상록체육관 — 문 칸·도착 좌표 전부 AR 원본 Map56 이벤트(Home door)의 transfer 값이다(눈대중 아님).
     { map: "viridian_city", x: 35, y: 9, to: "gym", dir: "up" },
+    // 상록 포켓몬센터(AR Map158)·프렌들리 숍(AR Map159) — 문 칸도 Map56 transfer 값 그대로.
+    { map: "viridian_city", x: 26, y: 25, to: "pc", dir: "up" },
+    { map: "viridian_city", x: 35, y: 25, to: "mart", dir: "up" },
   ];
   private warps: Warp[] = [];   // create()에서 글로벌로 변환된 것
 
@@ -541,6 +544,8 @@ export default class WorldScene extends Phaser.Scene {
     this.time.delayedCall(340, () => {
       if (w.to === "lab") this.scene.start("LabScene");
       else if (w.to === "gym") this.scene.start("GymScene");
+      else if (w.to === "pc") this.scene.start("BuildingScene", { building: "pc" });
+      else if (w.to === "mart") this.scene.start("BuildingScene", { building: "mart" });
       else if (w.to === "house") this.scene.start("InteriorScene", { room: w.room ?? "living", skipIntro: true });
       else {
         // 모르는 to = 워프를 추가하며 분기를 안 넣은 것. 그냥 두면 **암전된 채 얼어붙는다**

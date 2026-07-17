@@ -57,3 +57,49 @@
 ## 사용자가 직접 볼 곳
 **http://localhost:5180** → 타이틀 **D** → **`Y` = 상록체육관**. 들어서면 그린 컷신 자동 재생 → 배틀.
 ⚠️ 테스트 파티(L5 3마리)로는 그린(L10~13 4마리)을 못 이겨 **배지 장면까진 안 간다** — 파티를 키우거나 검증 스크립트로 상대 HP를 낮출 것.
+
+---
+
+# 0718 세션2 — 상록 건물(포켓몬센터+마트) 구현 + 사용자 지적 3건
+
+## ✅ 완료·검증 — 상록시티 실내 건물 (센터 회복 / 마트 진입)
+**바꾼/추가 파일**
+- **신규 `src/scenes/BuildingScene.ts`** — 센터·마트 겸용 실내 씬(GymScene 패턴 미러링). `init({building:"pc"|"mart"})`로 png/json/BGM/NPC/좌표 분기. 격자이동·도어매트 출입·NPC 배치·센터 회복·마트 점원.
+- `src/main.ts` — BuildingScene 등록(GymScene 뒤).
+- `src/scenes/DebugMenuScene.ts` — **U=포켓몬센터, I=마트**(keyNames에 U,I 자동바인딩됨).
+- `src/scenes/WorldScene.ts` — 워프 2개(`viridian_city` PC문 **(26,25)**, 마트문 **(35,25)** dir up) + handleWarp에 `pc`/`mart` 분기.
+- `src/game/sfx.ts` — `BGM.center="bgm_pc"`, `BGM.mart="bgm_mart"`.
+- **신규 에셋** `public/assets/audio/bgm_pc.ogg`·`bgm_mart.ogg` — AR `Poke Center.mid`/`Poke Mart.mid`를 원본 soundfont로 렌더(`tools/ar-audio/render-mid.py`, tinysoundfont 스크래치패드 설치).
+
+**전부 AR 원본 소스에서 뽑은 좌표(눈대중 아님)** — AR MapInfos/Map56·158·159 이벤트 판독:
+- viridian_pc = **AR Map158**(문(26,25)→내부(7,8)) · viridian_mart = **AR Map159**(문(35,25)→내부(4,7)).
+- 도어매트(스폰=출구): PC **(7,8)**, 마트 **(4,7)**(픽셀측정). 복귀 toCity: PC (26,26)·마트 (35,26)(문 한칸 아래, face down).
+- 간호순=`NPC 16`@(7,2) · 보조간호순=`NPC_PikeMaid`@(8,2) · 마트점원=`NPC 19`@(2,3)(모두 128×192=32×48 4방향, public에 이미 있음).
+- 회복 카운터 앞칸 판정: 위보고 A로 front tile이 counterTiles에 들면 발동(PC=row3 cols5~9 / 마트=row4 cols0~3).
+
+**실동작 검증(playwright, 스샷 `.claude/.verify/`):** ⚠️ **headless는 rAF 스로틀로 걷기가 느려 워프가 안 걸리는 것처럼 보인다** → launch args `--disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows` 붙이면 정상. (이거 몰라서 한참 헤맴 — 다음 세션 필수 팁.)
+- `full_2_healed.png`: 도시→위로걸어 센터 진입→카운터 A→**파티 전원 HP/상태이상/PP 완전복구**(A 4→20·화상해제, B 1→18·독해제, PP 5→35)+간호순 대사.
+- `exit_back_city.png`: 도어매트 아래→busy=true(tryExit)→**상록시티 (26,26) 복귀**.
+- `mart_clerk.png`: 마트 (2,5)위보기 A→**점원 "어서 오세요!"**.
+- tsc 통과 · code-review(medium) correctness 버그 0.
+
+⚠️ **BGM은 dev서버 재시작해야 남**(새 ogg가 아직 text/html 응답 — Vite 실행중 추가파일 인식못함). `curl -w '%{content_type}' .../bgm_pc.ogg`가 audio/ogg 나올 때까지.
+
+## ⚠️ 사용자 지적 3건 (2건 미해결 — 다음 세션 최우선)
+### ③ [최우선·사용자 분노] **트레이너(남자애)가 나무 타일 위에 서 있음** — 실제 배치 버그
+- 사용자 확인: **상록시티(`viridian_city` = AR Map56)** 맵에서 남자애(트레이너/NPC) 스프라이트가 **나무 타일 위에** 서 있음. (앞서 내가 "상수숲"으로 잘못 적었으나 사용자가 상록시티라고 정정 — 숲 아님.)
+- **재조사 시작점(상록시티 한정):** AR DB 로드 후 WorldScene에서 이 맵의 트레이너/NPC 스프라이트 실좌표를 찍고 `viridian_city.json` blocked(나무)와 대조. `trainers.json` placements 중 map56 항목 좌표계·오프셋 확인(상록시티 오버월드에 트레이너가 있는지부터).
+- ⚠️ **내 오판 기록**: 런타임 프로브에서 `trainers=0`이라 "route1 분홍/회색은 맵에 구워진 꽃장식"이라 단정했는데 **이건 AR DB 로드 전이라 트레이너가 아직 안 뜬 상태였을 뿐**. 사용자가 보는 건 실제 트레이너 스프라이트다.
+- **재조사법(다음세션):** `isArDbLoaded()` 완료를 기다린 뒤 WorldScene에서 트레이너 스프라이트 실좌표를 찍고, 그 타일이 해당 맵 json에서 blocked(나무)인지 대조. 정본=`public/assets/data/ar/trainers.json` `placements`. 알려진 route1 트레이너: 한주(25,13)·유정(33,6) — 이 좌표가 나무면 placements 추출 오프셋/좌표계 버그 의심. **"상수숲"이 별도 forest 맵이면 그 맵부터 추출·확인.**
+
+### ② 배틀 상태이상·기술UI·대사 — 미구현 확정(틀3 영역, 별개 큰 작업)
+- `src/systems/battle.ts`: 데미지·상성대사만. **상태이상 부여·능력랭크 변화 대사("○○의 ○○가 떨어졌다")·상태이상 애니 전무.** status 카테고리 기술은 effectiveness:1만 반환하고 무효과. `moves.json`에 `functionCode`·`effectChance` 데이터는 있으나 코드 미사용. → `turn-battle-system`으로 상태이상 시스템+대사+애니+기술UI(AR 대조) 전용 블록 필요. (치료제 "효과 없음"도 같은 뿌리.)
+
+### ① 건물 진입 — 위에서 완료·검증함(원인=내가 워프 늦게 붙임).
+
+## 미착수(다음 후보)
+- 마트 상점(구매/판매) UI — AR 마트/가방 UI 조사 + Pick 후 구현(사용자가 이번엔 "점원 인사만"으로 합의). AR Map159 판매목록 우리 카탈로그 교집합 = 몬스터볼/슈퍼볼/상처약/좋은상처약/해독제/마비·잠깨는·화상·얼음치료제/기력의조각.
+- PC 보관함 BoxScene(6×5 그리드, AR Storage UI). · 상록 민가(Home door Map160~163) 워프.
+
+## 다음 세션 첫 프롬프트 제안
+"작업일지 세션2 읽고 **③ 트레이너 나무 위 배치 버그**부터 재조사·수정. 먼저 '상수숲'이 어느 맵인지 확인."

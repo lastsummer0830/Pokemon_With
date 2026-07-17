@@ -64,6 +64,9 @@ export default class DebugMenuScene extends Phaser.Scene {
       //  ⚠️ testParty(L5 3마리)로는 그린(L10~13 4마리)을 못 이긴다 — 배지까지 보려면 파티를 키우거나
       //     검증 스크립트로 상대 HP를 낮춰야 한다.
       ["Y. 상록체육관(관장 그린)", "GymScene", { testParty: true }],
+      // 상록시티 실내 건물 — 센터(회복)·마트(점원). testParty로 회복 확인용 파티 채움.
+      ["U. 포켓몬 센터(회복)", "BuildingScene", { building: "pc", testParty: true }],
+      ["I. 프렌들리 숍(마트)", "BuildingScene", { building: "mart", testParty: true }],
     ];
     const go = (key: string, data?: object) => {
       // 테스트용 기본값 — 인트로를 건너뛰어도 씬이 동작하도록

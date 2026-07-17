@@ -8,6 +8,7 @@ import DebugMenuScene from "./scenes/DebugMenuScene";
 import WorldScene from "./scenes/WorldScene";
 import LabScene from "./scenes/LabScene";
 import GymScene from "./scenes/GymScene";
+import BuildingScene from "./scenes/BuildingScene";
 import BattleScene from "./scenes/BattleScene";
 import MenuScene from "./scenes/MenuScene";
 import BagScene from "./scenes/BagScene";
@@ -27,7 +28,7 @@ const config: Phaser.Types.Core.GameConfig = {
     height: "100%",
   },
   // 맨 앞 씬이 가장 먼저 실행됨. Title → Intro(성별·이름) → Interior(시작 집: 방2층↔거실1층) → World 순서.
-  scene: [TitleScene, MainMenuScene, IntroScene, InteriorScene, BedroomScene, DebugMenuScene, WorldScene, LabScene, GymScene, BattleScene, MenuScene, BagScene, PokedexScene],
+  scene: [TitleScene, MainMenuScene, IntroScene, InteriorScene, BedroomScene, DebugMenuScene, WorldScene, LabScene, GymScene, BuildingScene, BattleScene, MenuScene, BagScene, PokedexScene],
 };
 
 // ★ 게임 시작 전에 폰트를 확실히 로드한다.
