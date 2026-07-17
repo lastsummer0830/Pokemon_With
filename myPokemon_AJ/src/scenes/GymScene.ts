@@ -29,7 +29,14 @@ interface GymMap {
   spawn: [number, number];
   exit: { x: number; y: number; toCity: [number, number] };
 }
-interface GymInit { skipIntro?: boolean; testParty?: boolean }
+interface GymInit {
+  skipIntro?: boolean;
+  testParty?: boolean;
+  // 그린 배틀에서 돌아온 참인지 — BattleScene이 씬 데이터로 직접 준다(전역 플래그 아님).
+  //  패배하면 화이트아웃으로 집에 가 이 씬으로 안 돌아오므로, fromBattle=true면 '실제로 이기고 온 것'이다.
+  fromBattle?: boolean;
+  battleOutcome?: "win" | "lose" | "run" | "catch";
+}
 
 const GREEN_TRAINER_ID = "LEADER_Green:그린";
 const GREEN_START: [number, number] = [10, 5];   // 원본 EV3 위치
@@ -126,12 +133,9 @@ export default class GymScene extends Phaser.Scene {
 
     this.cameras.main.fadeIn(400, 0, 0, 0);
 
-    // 배틀에서 돌아온 참이면 그 뒷대사부터 이어간다. 아니면 처음 들어온 것 → 원본처럼 자동 컷신.
-    //  ⚠️ **이겼을 때만** 이어야 한다: 지면 화이트아웃으로 집에 가버려 이 표시가 남는데,
-    //     그대로 믿으면 다시 들어왔을 때 싸우지도 않고 배지를 준다.
-    const cameBack = !!this.registry.get("gymGreenBattleDone");
-    this.registry.remove("gymGreenBattleDone");
-    if (cameBack && this.registry.get("lastBattleOutcome") === "win") {
+    // 배틀에서 이기고 돌아온 참이면 그 뒷대사부터 이어간다. 아니면 처음 들어온 것 → 원본처럼 자동 컷신.
+    //  fromBattle은 BattleScene이 씬 데이터로 직접 넘긴다(전역 플래그 아님) → 패배 후 재입장으로 새는 일이 없다.
+    if (this.initData.fromBattle && this.initData.battleOutcome === "win") {
       void this.afterBattle();
     } else if (!this.greenGone && !this.initData.skipIntro) {
       void this.runIntro();
@@ -258,8 +262,8 @@ export default class GymScene extends Phaser.Scene {
   }
 
   private startBattle(): void {
-    // 돌아왔을 때 뒷대사부터 이어가라는 표시(배틀 씬은 우리 씬을 모른다).
-    this.registry.set("gymGreenBattleDone", true);
+    // returnScene="GymScene"만 주면 된다 — 이기고 돌아올 때 BattleScene이 fromBattle/battleOutcome을
+    //  씬 데이터로 넘겨 우리 create()가 뒷대사를 잇는다(전역 플래그를 안 써 패배 후 누수가 없다).
     this.cameras.main.fadeOut(340, 0, 0, 0);
     this.time.delayedCall(360, () => {
       // trainerId만 주면 팀(랜덤 3버전)·대사·상금·그림을 전부 AR 정의에서 가져온다.

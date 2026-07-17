@@ -16,6 +16,13 @@ dist_electron/
 .DS_Store
 .vite/
 
+# 파이썬 도구(tools/) 바이트코드 캐시 — 실행하면 다시 생김
+__pycache__/
+*.pyc
+
 # TypeScript가 no outDir 설정에서 src 옆에 만든 산출물
 src/**/*.js
 src/**/*.js.map
+
+# UI 검증 산출물(로컬 전용)
+.claude/.verify/

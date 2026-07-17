@@ -392,19 +392,19 @@ export default class BattleScene extends Phaser.Scene {
 
   // 배틀 종료 처리: 패배=파티 전체 회복 후 집으로(화이트아웃) / 승리·도망=원위치 월드 복귀.
   private async endBattle(): Promise<void> {
-    // 부른 쪽이 결과를 확인할 수 있게 남긴다.
-    //  ⚠️ 없으면 안 된다: 체육관은 "배틀 다녀옴" 표시만 보고 뒷대사(=배지 지급)를 잇는데,
-    //     지면 화이트아웃으로 집에 가버려 그 표시가 registry에 남는다 → 다시 들어오면 안 싸우고 배지를 먹는다.
-    this.registry.set("lastBattleOutcome", this.outcome);
     if (this.outcome === "lose") {
       await this.loseMoney();
       await this.say("눈앞이 깜깜해졌다...");
       this.party.forEach((p) => { p.currentHp = p.maxHp; p.status = null; }); // 집에서 요양 → 전원 회복
       this.cameras.main.fadeOut(450, 0, 0, 0);
+      // ⚠️ 패배는 returnScene을 무시하고 화이트아웃으로 집에 간다 → 실내 씬(체육관)엔 돌아가지 않는다.
+      //    (그래서 결과를 registry 전역 플래그로 남기지 않는다 — 남기면 "배틀 다녀옴" 표시가 살아남아
+      //     나중에 다른 배틀을 이기고 재입장하면 안 싸우고 배지를 먹었다. 결과는 아래처럼 씬 데이터로만 넘긴다.)
       this.time.delayedCall(500, () => this.scene.start("InteriorScene", { room: "living", skipIntro: true }));
     } else if (this.returnScene) {
-      // 실내 씬(체육관)이 부른 배틀 — 그 씬이 알아서 뒷대사를 이어간다. 좌표는 그 씬이 정한다.
-      this.time.delayedCall(300, () => this.scene.start(this.returnScene!));
+      // 실내 씬(체육관)이 부른 배틀 — 그 씬이 뒷대사를 이어간다. 결과를 씬 데이터로 직접 넘긴다(전역 플래그 X).
+      //  패배 경로는 여기 안 오므로, 이 데이터를 받은 씬은 "이 배틀에서 실제로 이기고 돌아온 것"이 보장된다.
+      this.time.delayedCall(300, () => this.scene.start(this.returnScene!, { fromBattle: true, battleOutcome: this.outcome }));
     } else {
       this.time.delayedCall(300, () =>
         this.scene.start("WorldScene", { spawn: this.returnPos, face: this.returnFacing }));
