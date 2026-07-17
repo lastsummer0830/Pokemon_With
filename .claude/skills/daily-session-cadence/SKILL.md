@@ -28,7 +28,7 @@ description: "오늘 계획 짜줘", "하루 계획", "오늘 뭐 하지" 요청
 
 ## 4. 작업일지 (다음 세션의 유일한 기억)
 
-- 위치는 프로젝트 규칙 우선: AJ_Proj → `<MyStudy>/02_MY_NOTES/연동관련/AJ_PROJ/YYYY-MM-DD_AJ_Proj_작업일지.md` / Pokemon → `00_ImportBox/작업일지/MMDD_...` / 규칙 없는 곳은 위치를 물어본다.
+- 위치는 프로젝트 규칙 우선: AJ_Proj → `<MyStudy>/02_MY_NOTES/연동관련/AJ_PROJ/YYYY-MM-DD_AJ_Proj_작업일지.md` / Pokemon → `00_ImportBox/작업일지/MMDD_...` / Acorn → `<MyStudy>/02_MY_NOTES/연동관련/ACORN-E-학습터/YYYY-MM-DD_E학습터_작업일지.md` / MyStudy → CLAUDE.md의 작업일지 규칙 / 규칙 없는 곳은 위치를 물어본다.
 - 내용 5가지: ① 한 것(파일 경로까지) ② 검증 결과 ③ 미검증·미결 ④ **다음 세션 시작 지점**(열 파일·첫 명령) ⑤ 남은 블록 목록.
 - 같은 날 파일이 있으면 덮지 말고 이어 쓴다.
 
