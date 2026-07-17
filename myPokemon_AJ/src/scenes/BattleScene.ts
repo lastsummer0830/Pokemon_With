@@ -2,7 +2,9 @@ import Phaser from "phaser";
 import { frontPath, backPath, makeStillFront } from "../game/pokemonSprite";
 import { Pokemon, MoveSlot, createFromSpecies, displayName } from "../data/Pokemon";
 import { josa } from "../data/josa";
-import { loadArDb, getMove, getType, getItem, dexKanto, getTrainer, trainerFullName } from "../data/ar";
+import { loadArDb, getMove, getType, getItem, dexKanto, getTrainer, trainerFullName, trainerTeam } from "../data/ar";
+import { Backdrop } from "../data/region";
+import { getBadges } from "../data/Badges";
 import type { TrainerDef } from "../data/ar";
 import { markSeen, markOwn } from "../data/Pokedex";
 import { removeItem, addMoney, getMoney } from "../data/Bag";
@@ -30,7 +32,10 @@ const LOSE_MONEY_MULT = [8, 16, 24, 36, 48, 64, 80, 100, 120];
 //  키를 "battle_enemy" 하나로 돌려쓰면 종족이 바뀌어도 Phaser가 옛 그림을 재사용한다(교체·다음 상대가 안 바뀜).
 const frontKey = (species: string) => `bsp_front_${species.toUpperCase()}`;
 const backKey = (species: string) => `bsp_back_${species.toUpperCase()}`;
-const trainerKey = (file: string) => `bsp_trainer_${file.toUpperCase()}`;
+// ⚠️ 트레이너 그림은 **파일명을 대소문자 그대로** 써야 한다 — AR 파일명이 곧 트레이너 타입 id다.
+//    (예전엔 대문자로 바꿔 URL을 만들었다. YOUNGSTER·LASS·NEMONA가 원래 대문자라 우연히 통했을 뿐,
+//     LEADER_Green.png 같은 혼합 대소문자는 404 → Phaser "Failed to process file" → 배틀이 안 뜬다.)
+const trainerKey = (file: string) => `bsp_trainer_${file}`;
 
 // 이번 턴에 내가 고른 행동. (AR/본가의 커맨드 4개 = 싸운다·가방·포켓몬·도망)
 type Command =
@@ -51,8 +56,12 @@ export interface BattleInit {
   trainerId?: string;      // 예: "YOUNGSTER:한주"
   trainerSprite?: string;  // AR 정의가 없는 상대(라이벌 네모)의 배틀 그림 = assets/trainers/<이름>.png
   returnPos?: [number, number]; // 배틀 끝나고 돌아갈 월드 좌표(승리/도망 시)
+  // 승리 후 돌아갈 씬. 안 주면 WorldScene(야외 트레이너·야생전).
+  //  실내 씬에서 부른 배틀(체육관)은 그 씬으로 돌아가야 한다 — 안 그러면 건물 밖으로 튕겨난다.
+  //  ⚠️ 패배는 예외 — 원본대로 화이트아웃해서 집으로 간다(returnScene 무시).
+  returnScene?: string;
   returnFacing?: "down" | "left" | "right" | "up";
-  backdrop?: "town" | "route";  // 배틀 배경(AR battleback). 마을=town, 1번도로=route.
+  backdrop?: Backdrop;  // 배틀 배경(AR battleback). 마을=town, 1번도로=route, 체육관=gym.
 }
 
 export default class BattleScene extends Phaser.Scene {
@@ -73,7 +82,7 @@ export default class BattleScene extends Phaser.Scene {
   private enemyBox!: DataBox;
   private allySprite!: Phaser.GameObjects.Image;
   private enemySprite!: Phaser.GameObjects.Image;
-  private backdrop: "town" | "route" = "town";
+  private backdrop: Backdrop = "town";
 
   private trainerImg?: Phaser.GameObjects.Image;   // 상대 트레이너 그림(포켓몬을 내보내면 물러난다)
 
@@ -88,6 +97,7 @@ export default class BattleScene extends Phaser.Scene {
   private outcome: "win" | "lose" | "run" | "catch" = "win";  // 배틀 결과(catch = 잡아서 끝남 — 복귀는 승리와 같다)
   private returnPos: [number, number] | undefined;   // 승리/도망 시 돌아갈 좌표
   private returnFacing: "down" | "left" | "right" | "up" = "down";
+  private returnScene: string | null = null;         // 승리 후 돌아갈 씬(실내 배틀). null이면 WorldScene.
 
   constructor() { super("BattleScene"); }
 
@@ -106,6 +116,7 @@ export default class BattleScene extends Phaser.Scene {
     this.enemySpecies = (this.pendingEnemyTeam?.[0]?.speciesId ?? "PIDGEY").toLowerCase();
     this.returnPos = data?.returnPos;
     this.returnFacing = data?.returnFacing ?? "down";
+    this.returnScene = data?.returnScene ?? null;
     // 배경은 "어디서 싸우느냐"가 정한다(AR도 맵 메타데이터의 battle_background). 마을=town, 도로·풀숲=route.
     this.backdrop = data?.backdrop ?? "route";
     this.outcome = "win";
@@ -176,8 +187,9 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     // 상대 팀 — 넘어온 팀 > AR 트레이너 정의 > 데모 1마리.
+    //  trainerTeam()은 팀이 여러 버전이면(그린) 무작위로 하나를 고른다 → 여기서 딱 한 번만 부른다.
     this.enemyTeam = this.pendingEnemyTeam
-      ?? this.trainerDef?.team.map((m) => createFromSpecies(m.id, m.level))
+      ?? (this.trainerDef ? trainerTeam(this.trainerDef).map((m) => createFromSpecies(m.id, m.level)) : null)
       ?? [createFromSpecies(this.enemySpecies, 3)];
     this.enemyIdx = 0;
 
@@ -185,7 +197,7 @@ export default class BattleScene extends Phaser.Scene {
     await this.ensureBattleSprite(backKey(this.ally.speciesId), backPath(this.ally.speciesId));
     await this.ensureBattleSprite(frontKey(this.enemy.speciesId), frontPath(this.enemy.speciesId));
     const tf = this.trainerSpriteFile;
-    if (tf) await this.ensureBattleSprite(trainerKey(tf), `assets/trainers/${tf.toUpperCase()}.png`);
+    if (tf) await this.ensureBattleSprite(trainerKey(tf), `assets/trainers/${tf}.png`);
 
     // 도트 에셋은 NEAREST(확대해도 또렷하게)
     //  (bsp_ = 트레이너 그림. 포켓몬은 makeStillFront가 잘라낸 __still 텍스처에 직접 걸어준다.)
@@ -380,12 +392,19 @@ export default class BattleScene extends Phaser.Scene {
 
   // 배틀 종료 처리: 패배=파티 전체 회복 후 집으로(화이트아웃) / 승리·도망=원위치 월드 복귀.
   private async endBattle(): Promise<void> {
+    // 부른 쪽이 결과를 확인할 수 있게 남긴다.
+    //  ⚠️ 없으면 안 된다: 체육관은 "배틀 다녀옴" 표시만 보고 뒷대사(=배지 지급)를 잇는데,
+    //     지면 화이트아웃으로 집에 가버려 그 표시가 registry에 남는다 → 다시 들어오면 안 싸우고 배지를 먹는다.
+    this.registry.set("lastBattleOutcome", this.outcome);
     if (this.outcome === "lose") {
       await this.loseMoney();
       await this.say("눈앞이 깜깜해졌다...");
       this.party.forEach((p) => { p.currentHp = p.maxHp; p.status = null; }); // 집에서 요양 → 전원 회복
       this.cameras.main.fadeOut(450, 0, 0, 0);
       this.time.delayedCall(500, () => this.scene.start("InteriorScene", { room: "living", skipIntro: true }));
+    } else if (this.returnScene) {
+      // 실내 씬(체육관)이 부른 배틀 — 그 씬이 알아서 뒷대사를 이어간다. 좌표는 그 씬이 정한다.
+      this.time.delayedCall(300, () => this.scene.start(this.returnScene!));
     } else {
       this.time.delayedCall(300, () =>
         this.scene.start("WorldScene", { spawn: this.returnPos, face: this.returnFacing }));
@@ -395,7 +414,7 @@ export default class BattleScene extends Phaser.Scene {
   // 지면 상금을 뺏긴다 — 내 파티 최고레벨 × 뱃지수별 배수(AR pbLoseMoney). 가진 돈보다 많으면 가진 만큼만.
   private async loseMoney(): Promise<void> {
     const top = Math.max(...this.party.map((p) => p.level));
-    const badges = ((this.registry.get("badges") as string[]) ?? []).length;
+    const badges = getBadges(this.registry).length;
     const mult = LOSE_MONEY_MULT[Math.min(badges, LOSE_MONEY_MULT.length - 1)];
     const lost = Math.min(top * mult, getMoney(this.registry));
     if (lost <= 0) return;

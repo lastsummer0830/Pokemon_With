@@ -35,6 +35,70 @@
      "level": 3
     }
    ]
+  },
+  "LEADER_Green:그린": {
+   "type": "LEADER_Green",
+   "typeName": "체육관 관장",
+   "name": "그린",
+   "baseMoney": 100,
+   "loseText": "어라, 왜 졌지?",
+   "sprite": "LEADER_Green",
+   "teams": [
+    [
+     {
+      "id": "GROWLITHE",
+      "level": 10
+     },
+     {
+      "id": "BRONZOR",
+      "level": 11
+     },
+     {
+      "id": "YAMPER",
+      "level": 12
+     },
+     {
+      "id": "RHYHORN",
+      "level": 13
+     }
+    ],
+    [
+     {
+      "id": "PSYDUCK",
+      "level": 10
+     },
+     {
+      "id": "NACLI",
+      "level": 10
+     },
+     {
+      "id": "SMOLIV",
+      "level": 11
+     },
+     {
+      "id": "HERDIER",
+      "level": 13
+     }
+    ],
+    [
+     {
+      "id": "SANDSHREW",
+      "level": 10
+     },
+     {
+      "id": "LOTAD",
+      "level": 11
+     },
+     {
+      "id": "MASCHIFF",
+      "level": 12
+     },
+     {
+      "id": "PIDGEOTTO",
+      "level": 13
+     }
+    ]
+   ]
   }
  },
  "placements": {

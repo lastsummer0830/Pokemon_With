@@ -133,7 +133,20 @@ def extract(ar: str, mid: int, out: str):
     if grass_cells:
         data["grass"] = grass
     json_path = os.path.join(OUT_DIR, f"{out}.json")
-    json.dump(data, open(json_path, "w"), ensure_ascii=False)
+
+    # ⚠️ 이 도구가 만드는 건 cols/rows/blocked/grass 뿐이다. 실내 맵 JSON엔 씬이 쓰는
+    #    img·spawn·exit 같은 **손으로 넣은 키**가 함께 들어있다(예: viridian_gym, oak_lab).
+    #    통째로 덮어쓰면 그게 조용히 사라져 씬이 스폰 좌표를 못 찾고 죽는다 → 기존 키는 남긴다.
+    kept = {}
+    if os.path.isfile(json_path):
+        try:
+            old = json.load(open(json_path, encoding="utf-8"))
+            kept = {k: v for k, v in old.items() if k not in data and k != "grass"}
+        except (OSError, ValueError) as e:
+            print(f"  ⚠️ 기존 JSON을 못 읽어 보존을 건너뛴다({e}) — spawn/exit가 있었다면 다시 넣을 것")
+    if kept:
+        print(f"  기존 키 보존: {', '.join(sorted(kept))}")
+    json.dump({**data, **kept}, open(json_path, "w"), ensure_ascii=False)
 
     blocked_cells = sum(sum(r) for r in blocked)
     print(f"Map{mid:03d} → {out}: {xs}x{ys}칸  막힘 {blocked_cells}칸  풀숲 {grass_cells}칸")

@@ -11,6 +11,13 @@
 //   · **글로벌 좌표** = 리전 전체(52×100) 기준. 태초는 oy=80이라 같은 문이 (28,94)
 //   WorldScene 안에서는 전부 글로벌을 쓴다. 다른 씬이 로컬로 말할 땐 map 이름을 같이 준다.
 
+/**
+ * 배틀 배경 종류 = AR map_metadata의 battle_background 값 그대로.
+ * 파일은 `assets/battlebacks/<값>_bg.png` + `<값>_message.png` (AR Graphics/Battlebacks 원본).
+ * ⚠️ 값을 추가하려면 그 png 두 장을 먼저 넣을 것 — 없으면 배틀 배경이 안 뜬다.
+ */
+export type Backdrop = "town" | "route" | "gym";
+
 export interface RegionMap {
   name: string;        // 텍스처 키 겸 저장파일에 남는 이름
   label: string;       // 화면에 보여줄 한글 이름 (AR map_metadata의 real_name)
@@ -20,7 +27,7 @@ export interface RegionMap {
   oy: number;
   cols: number;
   rows: number;
-  battleBg: string;    // 이 맵에서 배틀 걸리면 쓸 배경 (AR map_metadata의 battle_background)
+  battleBg: Backdrop;  // 이 맵에서 배틀 걸리면 쓸 배경 (AR map_metadata의 battle_background)
   bgm: string;         // 이 맵의 BGM 키 (AR 맵 데이터의 @bgm 그대로)
   arMapId?: number;    // AR 원본 맵 번호 = encounters.json의 키. 없으면 그 맵엔 야생 조우가 없다.
 }

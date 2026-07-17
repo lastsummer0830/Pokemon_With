@@ -5,6 +5,10 @@ AR의 트레이너 정의(trainers.dat / trainer_types.dat)와 맵 위 배치(Ma
 쓰는 법:
     python3 tools/ar-data/extract-trainers.py --maps 10          # 1번도로
     python3 tools/ar-data/extract-trainers.py --maps 10,56
+    # 맵 이벤트로는 안 잡히는 트레이너(오토런 관장 등)는 --trainers로 직접 지정한다.
+    # 형식 "TYPE:이름:버전" — 같은 TYPE:이름의 버전을 여러 개 적으면 teams(복수)로 묶인다.
+    python3 tools/ar-data/extract-trainers.py --maps 10 \
+        --trainers "LEADER_Green:그린:1,LEADER_Green:그린:2,LEADER_Green:그린:3"
 
 결과물: public/assets/data/ar/trainers.json
     {
@@ -15,6 +19,10 @@ AR의 트레이너 정의(trainers.dat / trainer_types.dat)와 맵 위 배치(Ma
           "loseText": "이건 없던 거로 칠래!",
           "sprite": "YOUNGSTER",      # public/assets/trainers/<sprite>.png (배틀 그림)
           "team": [{"id": "RATTATA", "level": 3}, ...]
+        },
+        "LEADER_Green:그린": {        # 팀이 여러 버전이면 team 대신 teams
+          ...,
+          "teams": [[...ver1...], [...ver2...], [...ver3...]]
         }
       },
       "placements": {                 # 맵 위 어디에 서 있나
@@ -141,9 +149,12 @@ def read_map_placements(ar, mid):
                     after = strip_speaker(text(ca["@parameters"][0]))
                     break
 
-        ttype, tname, _ver = battle
+        ttype, tname, ver = battle
         out.append({
             "id": f"{ttype}:{tname}",
+            # 배틀 호출이 지정한 버전. JSON엔 안 남기고(아래 main에서 pop) 어느 팀을 뽑을지 고르는 데만 쓴다.
+            #  ⚠️ 예전엔 이 값을 버렸는데, 같은 TYPE:이름이 여러 버전이면 조용히 엉뚱한 팀이 뽑힌다.
+            "_ver": ver,
             "x": int(at["@x"]),
             "y": int(at["@y"]),
             "dir": DIRS.get(graphic["@direction"], "down"),
@@ -160,16 +171,27 @@ def read_map_placements(ar, mid):
 def main():
     ap = argparse.ArgumentParser(description="AR 트레이너 정의 + 맵 배치 추출")
     ap.add_argument("--maps", default="10", help="맵 번호 쉼표구분 (기본 10=1번도로)")
+    ap.add_argument("--trainers", default="",
+                    help='맵 이벤트로 안 잡히는 트레이너를 직접 지정. "TYPE:이름:버전" 쉼표구분')
     ap.add_argument("--ar", default=None)
     a = ap.parse_args()
     ar = find_ar(a.ar)
     want = [m.strip() for m in a.maps.split(",") if m.strip()]
 
-    # 1) 맵에 실제로 서 있는 트레이너만 먼저 모은다.
+    # 1) 맵에 실제로 서 있는 트레이너 + --trainers로 직접 지정한 트레이너를 모은다.
+    #    needed = {"TYPE:이름": {쓸 버전들}}  — 버전까지 봐야 팀을 정확히 고른다.
     placements = {mid: read_map_placements(ar, mid) for mid in want}
-    needed = {p["id"] for rows in placements.values() for p in rows}
+    needed: dict[str, set[int]] = {}
+    for rows in placements.values():
+        for p in rows:
+            needed.setdefault(p["id"], set()).add(p.pop("_ver"))  # _ver는 JSON에 안 남긴다
+    for item in (t.strip() for t in a.trainers.split(",") if t.strip()):
+        base, _, ver = item.rpartition(":")
+        if not base or not ver.isdigit():
+            sys.exit(f'--trainers 형식이 틀렸다: "{item}" (TYPE:이름:버전 이어야 한다)')
+        needed.setdefault(base, set()).add(int(ver))
     if not needed:
-        sys.exit(f"이 맵들에 트레이너 이벤트가 없다: {want}")
+        sys.exit(f"뽑을 트레이너가 없다 (맵: {want}, --trainers: {a.trainers or '없음'})")
 
     # 2) 한국어 타입명 표 (Youngster → 반바지꼬마)
     kor = loads(open(f"{ar}/Data/messages_kor_core.dat", "rb").read())
@@ -184,18 +206,20 @@ def main():
             "baseMoney": int(at["@base_money"]),
         }
 
-    # 4) 필요한 트레이너 정의만
-    defs = {}
+    # 4) 필요한 트레이너 정의만. trainers.dat의 키는 (타입, 이름, 버전) 튜플이라
+    #    같은 TYPE:이름이 버전별로 여러 항목일 수 있다(예: 그린은 1~4. 4는 후반 재대결용이라 안 쓴다).
+    found: dict[str, dict[int, dict]] = {}   # key -> {버전: 항목}
     for k, v in loads(open(f"{ar}/Data/trainers.dat", "rb").read()).items():
         at = v.attributes
         ttype, tname = sym(at["@trainer_type"]), text(at["@real_name"])
         key = f"{ttype}:{tname}"
-        if key not in needed:
+        ver = int(at["@version"])
+        if ver not in needed.get(key, ()):
             continue
         ti = types.get(ttype)
         if not ti:
             sys.exit(f"트레이너 타입이 trainer_types.dat에 없다: {ttype}")
-        defs[key] = {
+        found.setdefault(key, {})[ver] = {
             "type": ttype,
             "typeName": text(kor_types.get(ti["realName"], ti["realName"])),
             "name": tname,
@@ -206,25 +230,52 @@ def main():
             "team": [mon_entry(p) for p in at["@pokemon"]],
         }
 
-    missing = needed - set(defs)
+    missing = {f"{k}:{v}" for k, vers in needed.items() for v in vers
+               if v not in found.get(k, {})}
     if missing:
-        sys.exit(f"맵이 부르는데 trainers.dat엔 없는 트레이너: {sorted(missing)}")
+        sys.exit(f"trainers.dat에 없는 트레이너(타입:이름:버전): {sorted(missing)}")
+
+    # 버전이 하나면 team(단수), 여러 개면 teams(복수) — 원본이 배틀 때마다 무작위로 하나를 고른다.
+    defs = {}
+    for key, by_ver in found.items():
+        vers = sorted(by_ver)
+        base = dict(by_ver[vers[0]])
+        if len(vers) > 1:
+            texts = {by_ver[v]["loseText"] for v in vers}
+            if len(texts) > 1:
+                print(f"⚠️ {key}: 버전마다 패배대사가 다르다 → 가장 낮은 버전({vers[0]}) 것을 쓴다: {sorted(texts)}")
+            base.pop("team")
+            base["teams"] = [by_ver[v]["team"] for v in vers]
+        defs[key] = base
 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     json.dump({"defs": defs, "placements": placements},
               open(OUT, "w"), ensure_ascii=False, indent=1)
 
+    def team_lines(d):
+        """team(단수) / teams(복수) 둘 다 보기 좋게."""
+        teams = d.get("teams") or [d["team"]]
+        return [f"      팀{f'(랜덤 {i+1}/{len(teams)})' if len(teams) > 1 else ''}: "
+                + " + ".join(f"{t['id']} L{t['level']}" for t in tm)
+                for i, tm in enumerate(teams)]
+
     for mid, rows in placements.items():
         print(f"Map{mid}: 트레이너 {len(rows)}명")
         for p in rows:
             d = defs[p["id"]]
-            team = " + ".join(f"{t['id']} L{t['level']}" for t in d["team"])
             print(f"   {d['typeName']} {d['name']}  ({p['x']},{p['y']}) "
                   f"{p['dir']} 시야{p['sight']}  상금base {d['baseMoney']}")
-            print(f"      팀: {team}")
+            print("\n".join(team_lines(d)))
             print(f"      먼저: {p['introText']}")
             print(f"      지면: {d['loseText']}")
             print(f"      이긴 뒤: {p['afterText']}")
+
+    placed = {p["id"] for rows in placements.values() for p in rows}
+    for key in sorted(set(defs) - placed):   # --trainers로 넣은, 맵 배치가 없는 트레이너
+        d = defs[key]
+        print(f"배치없음(씬이 직접 부름): {d['typeName']} {d['name']}  상금base {d['baseMoney']}")
+        print("\n".join(team_lines(d)))
+        print(f"      지면: {d['loseText']}")
     print(f"\n→ {OUT}")
 
 

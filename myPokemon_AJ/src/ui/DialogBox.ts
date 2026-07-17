@@ -111,23 +111,33 @@ export default class DialogBox {
     });
   }
 
-  // 예/아니오 선택 — 대화박스 위 오른쪽 작은 메뉴. ↑↓ + Enter/Z.
-  askYesNo(): Promise<boolean> {
+  // 예/아니오 선택 — askChoice의 흔한 경우.
+  async askYesNo(): Promise<boolean> {
+    return (await this.askChoice(["예", "아니오"])) === 0;
+  }
+
+  /**
+   * 선택지 메뉴 — 대화박스 위 오른쪽. ↑↓ + Enter/Z. 고른 항목의 **인덱스**를 준다.
+   * 상자 폭은 실제 글자 너비에서 잰다(긴 선택지가 상자 밖으로 삐져나오지 않게).
+   */
+  askChoice(opts: string[]): Promise<number> {
     const font = this.rect.font;
     const rowH = Math.round(font * 1.9);
-    const boxW = Math.max(Math.round(font * 5), 140);
-    const boxH = rowH * 2 + Math.round(font * 0.8);
+    const cursorW = Math.round(font * 1.6);   // 왼쪽 ▶ 자리
+    // 글자를 먼저 만들어 너비를 재고, 그 뒤에 상자를 그 크기로 그린다.
+    const rows = opts.map((t) =>
+      this.scene.add.text(0, 0, t, { fontFamily: this.FONT, fontSize: `${font}px`, color: "#ffffff" })
+        .setOrigin(0, 0).setScrollFactor(0).setDepth(1004));
+    const textW = Math.max(...rows.map((r) => r.width));
+    const boxW = Math.max(Math.round(cursorW + textW + font * 0.9), 140);
+    const boxH = rowH * opts.length + Math.round(font * 0.8);
     const bx = this.rect.x + this.rect.w - boxW;
     const by = this.rect.y - boxH - 12;
     const g = this.scene.add.graphics().setScrollFactor(0).setDepth(1003);
     g.fillStyle(0x000000, 0.3); g.fillRoundedRect(bx + 3, by + 5, boxW, boxH, 12);
     g.fillStyle(0xf6efd8, 1); g.fillRoundedRect(bx, by, boxW, boxH, 12);
     g.fillStyle(0x21314f, 1); g.fillRoundedRect(bx + 5, by + 5, boxW - 10, boxH - 10, 8);
-    const opts = ["예", "아니오"];
-    const labelX = bx + Math.round(font * 1.6);
-    const rows = opts.map((t, i) =>
-      this.scene.add.text(labelX, by + Math.round(font * 0.6) + i * rowH, t, { fontFamily: this.FONT, fontSize: `${font}px`, color: "#ffffff" })
-        .setOrigin(0, 0).setScrollFactor(0).setDepth(1004));
+    rows.forEach((r, i) => r.setPosition(bx + cursorW, by + Math.round(font * 0.6) + i * rowH));
     const cursor = this.scene.add.text(0, 0, "▶", { fontFamily: this.FONT, fontSize: `${font}px`, color: "#ffe27a" })
       .setOrigin(0, 0).setScrollFactor(0).setDepth(1004);
     let idx = 0;
@@ -142,7 +152,7 @@ export default class DialogBox {
         kb.off("keydown-UP", up); kb.off("keydown-DOWN", down);
         kb.off("keydown-ENTER", confirm); kb.off("keydown-Z", confirm); kb.off("keydown-SPACE", confirm);
         g.destroy(); rows.forEach((r) => r.destroy()); cursor.destroy();
-        resolve(idx === 0);
+        resolve(idx);
       };
       kb.on("keydown-UP", up); kb.on("keydown-DOWN", down);
       kb.on("keydown-ENTER", confirm); kb.on("keydown-Z", confirm); kb.on("keydown-SPACE", confirm);

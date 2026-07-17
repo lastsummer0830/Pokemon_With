@@ -63,5 +63,6 @@ export const BGM = {
   route1: "bgm_route1",     // 1번도로 (KM_Route1)
   viridian: "bgm_viridian", // 상록시티 (KM_Pewter)
   lab: "bgm_lab",           // 오박사 연구소 (Lab.mid → AR soundfont로 렌더)
+  gym: "bgm_gym",           // 상록체육관 (Gym.mid → AR soundfont로 렌더 — tools/ar-audio/render-mid.py)
   battle: "bgm_battle",     // 야생 배틀 (Battle wild)
 } as const;

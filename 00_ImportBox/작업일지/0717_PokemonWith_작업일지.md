@@ -422,3 +422,89 @@ g.scene.start("BattleScene", { wild:true, testParty:true, backdrop:"route" });
 - 다음 작업 = **§8 그대로 틀4 (상록시티 + 체육관 + 첫 뱃지).**
 
 **사용자가 직접 볼 곳** — GitHub 저장소 첫 화면(push 후). 로컬 확인은 위 함정1 방법.
+
+---
+
+# ▣ 세션 6 — **틀 4: 상록체육관 + 첫 배지** (⚠️ 미완 — 커밋 안 함, /code-review 안 함)
+
+> 이 PC = 집PC/C드라이브. 컨텍스트 한계로 중간에 끊었다. **아래 "남은 일"부터 이어서 하면 된다.**
+
+## 1. ★ AR 원본에서 확인한 사실 (조사 에이전트 2개를 **각각 독립**으로 돌려 교차검증 — 둘이 일치했다)
+**일지·계획의 틀4 가정이 여러 개 틀려 있었다:**
+- **체육관에 잡몹 트레이너가 없다. 퍼즐도 없다.** Map194 이벤트는 **3개뿐** — 출구(10,11)·간판(10,2)·그린(10,5).
+  → 세션3이 적어둔 "`extract-trainers.py --maps 194`로 뽑아 배치만 하면 됨"은 **안 통한다**(아래 3번).
+- **그린은 `trigger=3` = 오토런** — 들어서면 자동 재생. → **말 걸기(A버튼) 시스템이 필요없어졌다**(계획엔 있었음).
+- **상록체육관이 AR에선 1번째 배지다**(`$player.badges[0]`, 스위치 이름도 `Defeated Gym 1`). "원래라면 마지막 배지인 그린 배지를 먼저 따버렸다"가 AR의 설정.
+- **그린 팀 = 랜덤 3버전**(이벤트가 `VAR100 = 랜덤(1~3)` 굴린 뒤 그 번호로 배틀). base_money **100** → 상금 = 최고레벨 13 × 100 = **1300원**.
+  ⚠️ `trainers.dat`엔 **ver4(L24 재대결용)**도 있는데 **Map194는 안 부른다** → 넣으면 틀린다.
+- 컷신 순서(원본 명령 그대로): 20프레임 대기 → `이런...` → **그린 아래로 2칸**(10,5→10,7) → `배지가 7개가 아니면...` → **플레이어 위로 3칸**(10,11→10,8) → 소개장 → 선택지 → `후딱 끝내버리자고요.` → 배틀.
+- 입구/출구: 상록시티 **(35,9)** → 체육관 **(10,11)** / 체육관 (10,11) → 상록시티 **(35,10)**. (도착칸=출구칸이 같다.)
+- **⚠️ 그린 그림 불일치 = AR 자체 결함:** 오버월드(`trainer_RIVAL2`)는 **연두머리 여성**인데 배틀 그림 `LEADER_Green.png`는 **주황머리 남성**이다. `LEADER_Green.png`·`GREEN.png`·`CHAMPION_Green.png` **md5가 전부 동일**(=바닐라 잔재), 338개 배틀그림 중 연두머리 대체본 **0개**.
+  → **사용자 결정: "원본 그대로(주황머리 남성)"**. 비교 이미지 `01_Resources/Pick/07_그린_배틀그림/_미리보기_불일치.png`.
+
+## 2. ★ 체육관 BGM — .mid뿐이라 못 쓴다던 문제 **해결됨**
+- ffmpeg엔 MIDI 디코더가 **없다**(검색되는 mv30/mvdv는 무관한 영상코덱). fluidsynth·사운드폰트도 미설치.
+- **결정적 단서:** `sfx.ts`의 주석 `lab: "bgm_lab", // Lab.mid → AR soundfont로 렌더` → **과거 세션이 이미 같은 문제를 풀었다.**
+- **AR 원본 루트에 `soundfont.sf2`가 동봉돼 있다**(4.1MB). RPG Maker가 MIDI 재생에 쓰는 그 음색 = **이걸로 렌더하면 곧 원본 재현**이다.
+- **신규 도구 `tools/ar-audio/render-mid.py`** — `tinysoundfont`로 렌더 → ogg. 시스템 무변경(스크래치패드에 `pip install --no-deps --target ... tinysoundfont`. **`--no-deps` 필수** — pyaudio는 실시간재생용이라 불필요한데 빌드가 깨진다).
+  ```
+  PYTHONPATH=<스크래치패드>/_pylibs python3 tools/ar-audio/render-mid.py --mid "Gym" --out ../../public/assets/audio/bgm_gym.ogg
+  ```
+- **파이프라인 검증:** 같은 방법으로 `Lab.mid`를 렌더해 **커밋된 `bgm_lab.ogg`와 대조** → **음량 포락선 상관 0.878, 시간차 0ms = 같은 곡·같은 템포.**
+  (파형 상관은 0.130으로 낮은데 **음색이 달라서**다 — 과거 세션은 다른 신시사이저를 썼다. 내 쪽이 AR 동봉 폰트라 더 원본에 가깝다.)
+- 음량도 기존 곡과 맞다(gym mean −20.7dB/max −4.0 vs 마을 −22.0/−5.3). ⚠️ **기존 `bgm_lab.ogg`는 max 0.0dB로 클리핑돼 있다**(과거 렌더가 과했음 — 언젠가 다시 뽑으면 좋다).
+- **PC·마트 BGM(`Poke Center.mid`·`Poke Mart.mid`)도 이 도구로 그대로 뽑으면 된다** (틀4 다음 블록).
+
+## 3. 바꾼 파일
+**새 도구**
+- `tools/ar-audio/render-mid.py` (신규, 위 2번)
+- `tools/ar-data/extract-trainers.py` — **`--trainers "TYPE:이름:버전"`** 추가(오토런 관장은 맵 이벤트로 안 잡힌다). 같은 TYPE:이름의 버전 여러 개 → `teams`(복수)로 묶음.
+  **잠재버그도 고침:** 배틀 호출의 버전번호를 버리고 있어서, 다버전 트레이너가 배치되면 **조용히 엉뚱한 팀**이 나왔다.
+  ```
+  python3 tools/ar-data/extract-trainers.py --maps 10 --trainers "LEADER_Green:그린:1,LEADER_Green:그린:2,LEADER_Green:그린:3"
+  ```
+- `tools/ar-map/extract-map.py` — **기존 손입력 키(img/spawn/exit) 보존**. 안 그러면 재추출 때 조용히 날아가 씬이 죽는다(실제로 그럴 뻔).
+
+**새 에셋** — `bgm_gym.ogg` · `trainers/LEADER_Green.png` · `characters/trainer_RIVAL2.png` · `ui/icon_badges.png`(256x64, **AR 배지는 전부 흑백**. 그린배지 = 시트 (0,0,32,32)) · `battlebacks/gym_bg.png`+`gym_message.png`
+
+**신규 코드**
+- **`src/data/Badges.ts`** — `GREEN_BADGE`/`getBadges`/`hasBadge`/`giveBadge`/`badgeIconRect`. 배지 이름을 문자열로 흩뿌리지 않으려고 한 곳에 모음. 중복 지급 방지(배지 수가 틀어지면 `LOSE_MONEY_MULT`까지 어긋난다).
+- **`src/scenes/GymScene.ts`** — LabScene 패턴. 오토런 컷신 → 배틀 → 배지 → 그린 퇴장. 원본 명령 순서를 주석에 근거까지 박아둠.
+
+**수정**
+- `src/data/region.ts` — **`Backdrop` 타입 신설**(`"town"|"route"|"gym"`), `battleBg`를 string → Backdrop. (타입은 data에 둔다 — data가 scenes를 import하면 계층이 거꾸로다.)
+- `src/data/ar/index.ts` — `TrainerDef.team`을 optional로, **`teams?`** 추가 + **`trainerTeam(def)`** 헬퍼(여러 버전이면 무작위 1개 — 원본과 같은 동작). 호출부마다 분기하면 한쪽을 반드시 빠뜨린다.
+- `src/ui/DialogBox.ts` — **`askChoice(opts)`** 신설(인덱스 반환), `askYesNo`는 이걸 쓰게 일반화. 상자 폭은 **실제 글자 너비에서 잰다**(긴 선택지가 삐져나오지 않게).
+- `src/scenes/BattleScene.ts` — `returnScene`(실내 배틀이 그 씬으로 복귀) · **`lastBattleOutcome` registry 기록** · backdrop `gym` · `trainerTeam` 사용 · `getBadges` 사용.
+- `src/scenes/WorldScene.ts` — 체육관 워프 `(35,9)→gym` + **모르는 `to`면 얼어붙던 것 방지**(busy=true·페이드아웃만 하고 씬을 안 켰다).
+- `src/scenes/DebugMenuScene.ts` — **`Y` = 상록체육관**. `src/main.ts` — GymScene 등록. `src/game/sfx.ts` — `BGM.gym`.
+
+## 4. ⚠️⚠️ 이번에 잡은 실제 버그 2건 (둘 다 내가 만든 게 아니라 기존/잠재)
+1. **`BattleScene`이 트레이너 그림 파일명을 대문자로 바꿔 찾았다** (`assets/trainers/${tf.toUpperCase()}.png`).
+   기존 3명(YOUNGSTER·LASS·NEMONA)이 **원래 대문자라 우연히 통했을 뿐** → `LEADER_Green.png`에서 404 → `Failed to process file` → **배틀이 아예 안 떴다.**
+   → 파일명은 **대소문자 그대로** 쓴다(AR 파일명 = 트레이너 타입 id). 4명 전부 일치 확인함.
+2. **체육관 배틀에서 지면 공짜 배지** — 지면 화이트아웃으로 집에 가는데 `gymGreenBattleDone` 표시가 registry에 남아, 다시 들어오면 **안 싸우고 뒷대사(=배지 지급)로 이어졌다.**
+   → `BattleScene.endBattle`이 `lastBattleOutcome`을 남기고, GymScene이 **`=== "win"`일 때만** 잇는다.
+
+## 5. 검증 (playwright 실주행, 캡처 = `.claude/.verify/t4_*.png`)
+- **체육관 진입**: 스폰 (10,11) / 그린 (10,5) / 콘솔에러 0 (`t4_1_체육관_컷신시작.png` — 이름표 "그린" + `이런...`)
+- **컷신 이동이 원본과 일치**: 그린 (10,5)→**(10,7)** / 플레이어 (10,11)→**(10,8)**
+- **배틀 진입**(`t4_2_그린_배틀.png`): backdrop **gym** · 상대 **체육관 관장 그린** · 팀 **GROWLITHE L10+BRONZOR L11+YAMPER L12+RHYHORN L13**(= 원본 ver1) · 그린 배틀그림 표시
+- **승리 → 배지**: `badges: ["그린 배지"]` · 그린 사라짐(`greenGone=true`) · 그 칸 통행가능으로 풀림 · **세이브에도 `["그린 배지"]`**(save.ts가 이미 badges를 직렬화 — 스키마 변경 불필요했다) · 뒷대사 29번째에 `busy=false`로 **정상 복귀(얼어붙지 않음)**
+- 새 에셋 8개 전부 `content_type` 확인(200만 보면 안 된다 — text/html이 200으로 온다)
+- `npx tsc --noEmit` 통과 (⚠️ **반드시 `myPokemon_AJ/`에서**)
+
+## 6. ⚠️ 남은 일 (다음 세션 시작 지점 — 순서대로)
+1. **미검증**: ① 상록시티 (35,9) 문 → 체육관 워프 ② 체육관 출구 → 상록시티 (35,10) 복귀 ③ 지고 나서 재입장 시 컷신이 다시 도는지 ④ 랜덤 3팀이 실제로 갈리는지(ver1만 봤다)
+2. **`/code-review`(effort medium) 안 돌렸다.** → 돌리고 → 커밋. **지금 워킹트리는 커밋 안 된 상태**(`git status`로 확인).
+3. **원본에 있는데 일부러 안 넣은 것**(GymScene 주석에도 박아둠): **TM92(트릭룸)** — 기술머신 시스템이 아예 없다(items.json 10개, TM 0개) / **포켓몬 도감 지급** — 원본은 `!has_pokedex`일 때만 주는데 우린 오박사가 이미 줌 = **안 도는 게 원본과 같은 동작** / 그 둘에 딸린 "선물 받아주세요" 선택지.
+4. **경호(체육관 문지기) 미배치** — 원본은 **22번도로 트레이너 4명**을 다 이겨야 비켜준다. 그 맵이 리전에 없어 이번엔 **안 넣고 문을 열어뒀다**(사용자: "일단 문제없이 해"). **22번도로를 만드는 세션에 원본 조건 그대로 올릴 것.**
+5. **배지 UI 표시 없음** — `icon_badges.png`는 넣었는데 보여주는 화면이 없다(트레이너카드 미구현). `badgeIconRect()`가 자를 사각형을 준다.
+6. 그 뒤: PC·마트(BuildingScene, **BGM은 위 2번 도구로 뽑으면 됨**) · 아일라 스토리배틀 · affinity 가구 0개(차별점 미발동, 제일 아픔).
+
+## 7. 새 지침/skills/memory 요지
+- 새 훅·규칙·스킬 **없음**. memory `starter-lab-flow`는 **아직 갱신 못 했다** — 다음 세션이 "틀4 진행중(체육관 코어 완료·미커밋)"으로 갱신할 것.
+
+## 8. 사용자가 직접 볼 곳
+**http://localhost:5180** → 타이틀에서 **D** → **`Y` = 상록체육관** — 들어서면 그린 컷신이 자동으로 돌고 배틀까지 간다.
+⚠️ **테스트 파티(L5 3마리)로는 그린(L10~13 4마리)을 절대 못 이긴다** → 배지 받는 장면까지 보려면 파티를 키우거나 검증 스크립트로 상대 HP를 낮춰야 한다.

@@ -109,7 +109,11 @@ export interface TrainerDef {
   baseMoney: number;   // 상금 = 상대 팀 최고레벨 × baseMoney
   loseText: string;    // 졌을 때 하는 말
   sprite: string;      // 배틀 그림 = assets/trainers/<sprite>.png
-  team: TrainerMon[];
+  // team / teams 중 하나만 있다 — 둘 다 볼 필요 없이 trainerTeam()을 쓸 것.
+  team?: TrainerMon[];
+  // 팀이 여러 버전인 트레이너(체육관 관장 그린). 원본도 배틀 때마다 무작위로 하나를 고른다
+  //  (Map194 이벤트가 `VAR100 = 랜덤(1~3)`을 굴린 뒤 그 번호로 TrainerBattle.start를 부른다).
+  teams?: TrainerMon[][];
 }
 export interface TrainerPlacement {
   id: string;          // TrainerDef 키 (예: "YOUNGSTER:한주")
@@ -203,6 +207,15 @@ export function getMapTrainers(arMapId: number): TrainerPlacement[] | undefined 
 // 화면에 띄우는 이름 = "반바지꼬마 한주" (AR의 full_name과 같은 규칙).
 export function trainerFullName(def: TrainerDef): string {
   return `${def.typeName} ${def.name}`;
+}
+/**
+ * 이 트레이너가 이번 배틀에 낼 팀.
+ * 팀이 여러 버전이면(그린) 원본처럼 **무작위로 하나**를 고른다 → 부를 때마다 달라질 수 있으니
+ * 배틀 시작 때 한 번만 부르고 결과를 들고 있을 것.
+ */
+export function trainerTeam(def: TrainerDef): TrainerMon[] {
+  if (def.teams?.length) return def.teams[Math.floor(Math.random() * def.teams.length)];
+  return def.team ?? [];
 }
 
 // 공격 타입 atkType이 방어측 타입들(defTypes)에 주는 최종 배율(곱).

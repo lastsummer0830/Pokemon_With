@@ -68,6 +68,8 @@ export default class WorldScene extends Phaser.Scene {
   private warpDefs: (Warp & { map: string })[] = [
     { map: "pallet", x: 28, y: 14, to: "lab", dir: "up" },                    // 포켓몬 연구소
     { map: "pallet", x: 17, y: 7, to: "house", room: "living", dir: "up" },   // 우리집(거실로)
+    // 상록체육관 — 문 칸·도착 좌표 전부 AR 원본 Map56 이벤트(Home door)의 transfer 값이다(눈대중 아님).
+    { map: "viridian_city", x: 35, y: 9, to: "gym", dir: "up" },
   ];
   private warps: Warp[] = [];   // create()에서 글로벌로 변환된 것
 
@@ -538,7 +540,15 @@ export default class WorldScene extends Phaser.Scene {
     this.cameras.main.fadeOut(320, 0, 0, 0);
     this.time.delayedCall(340, () => {
       if (w.to === "lab") this.scene.start("LabScene");
+      else if (w.to === "gym") this.scene.start("GymScene");
       else if (w.to === "house") this.scene.start("InteriorScene", { room: w.room ?? "living", skipIntro: true });
+      else {
+        // 모르는 to = 워프를 추가하며 분기를 안 넣은 것. 그냥 두면 **암전된 채 얼어붙는다**
+        //  (busy=true + 페이드아웃까지 해놓고 씬을 안 켠다) → 원위치로 되돌려 최소한 계속 놀 수 있게.
+        console.error(`[WorldScene] 모르는 워프 대상 "${w.to}" — 분기를 안 넣었다.`);
+        this.cameras.main.fadeIn(320, 0, 0, 0);
+        this.busy = false;
+      }
     });
   }
 }
