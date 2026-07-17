@@ -378,3 +378,47 @@
 **남은 것 / 안 한 것**
 - **필드 DialogBox는 그대로 `▼` 텍스트다**(요청 범위 밖이라 안 건드림). 원본 톤으로 통일하려면 같은 `pause_arrow` 에셋으로 바꾸면 된다 — 그때 이 절의 좌표계산(창 사각형 기준)을 필드 대화창 사각형에 다시 적용할 것.
 - 배틀 창 리사이즈 중 화살표 재배치 없음(기존 UI 전부 동일 — `BattleView.measure()`가 생성자에서만 불림). 기존 한계지 이번 회귀 아님.
+
+---
+
+## 12. ✅ **완료** (2026-07-17 세션5) — 포트폴리오 README 신규 작성 (커밋 `99d1221`)
+
+> 사용자 요청: "게임 작업 이어서 하기 전에 리드미부터. 취업 걸려있으니 잘 써주고 로고도 적극적으로." → 게임 완성되면 수정하는 전제로 **지금 완성본**을 만들었다.
+
+**확인 후 진행한 사용자 결정 (2건만 물음)**
+- 톤 = **기술 역량 쇼케이스**("포켓몬 팬게임"이 아니라 "Phaser3+TS 2D RPG 엔진 + AR 바이너리 추출 파이프라인"을 전면에).
+- 라이선스 = **비상업·학습용 명시**(Nintendo/GF 권리 고지 + "본인 저작 = 코드와 타이틀 로고 아트").
+
+**바꾼 파일 (전부 신규)**
+- `README.md` — 개요 / 봐주셨으면 하는 것(4) / 주요기능 / 화면 / 스택 / 아키텍처(+추출 파이프라인 도식) / **트러블슈팅 4건** / 검증 수치표 / 실행 / 진행상황 / 규모 / 라이선스.
+- `docs/logo.png` — **`myPokemon_AJ/public/assets/title/logo.png`**(TitleScene이 실제 로드하는 라이브 에셋, 투명배경 RGBA)를 560x420으로 축소(2.7MB → 387KB).
+- `docs/screenshots/` 6장 — `.claude/.verify/`(untracked 스크래치)에서 선별해 **git에 올라가는 `docs/`로 복사**해야 GitHub이 렌더한다. 오버월드 2장은 좌상단 디버그 HUD(`테스트 | 방향키: 이동`)를 **상단 44px 크롭**으로 제거.
+
+**트러블슈팅 4건 = 일지 0701~0717에서 선별** (①씬 인스턴스 재사용 얼어붙음+결함군 3건 ②흰화면=브라우저 WebGL, playwright 통과≠정상, 우회 원복 ③눈대중 UI 실패→guard-ui-edit/enforce-ui-verify 훅으로 승격 ④CRLF로 가드훅이 정반대 작동) + 보너스(텍스처 최대폭 초과).
+
+**검증 (전부 실제로 함 — 일지 인용 안 믿고 재확인)**
+- 수치 재검증: `species.json` **1463종** / `moves.json` **920개** / `types.json` **20종** / `dex_kanto.json` **151** / 1번도로 풀숲 **178칸** / 에셋 **122MB** — 전부 실측 일치. `npm run build` 설명도 package.json 실제값(`tsc && vite build`)에 맞춤.
+- **README를 GitHub 실제 엔진으로 렌더해 전 구간 육안 확인** → 깨진 이미지 0건.
+- 이미지 6장 상대경로 존재 + `.gitignore` 미포함 확인.
+
+**⚠️ 이번에 실제로 걸린 함정 (다음 세션도 걸린다)**
+1. **README 프리뷰는 `python-markdown`으로 하면 안 된다 — GFM이 아니라 가짜 깨짐이 뜬다**(헤더 볼드·배지가 다 깨져 보였는데 실제 GitHub에선 정상). **정답: `pip install --target <scratchpad> cmarkgfm`**(= GitHub이 쓰는 cmark-gfm 그 엔진) + `Options.CMARK_OPT_UNSAFE`(raw HTML 통과). WSL엔 `ensurepip`이 없어 venv가 안 만들어지고 시스템 pip은 PEP668로 막히니 **`--target`으로 스크래치패드에 격리 설치**. 렌더 후 저장소 루트를 `python -m http.server`로 서빙해야 `docs/` 상대경로 이미지가 뜬다.
+2. **★한국어 README의 GFM 볼드 함정 (실제 버그 2건 발견·수정)** — **볼드가 구두점으로 끝나고 바로 한글 조사가 붙으면 GFM이 볼드를 안 닫아 `**`가 화면에 그대로 노출된다.** (`**...10%**로`, `**\`*.sh text eol=lf\`**로`) 닫는 `**`의 right-flanking 규칙 때문. **해결: 조사를 볼드 안 letter로 흡수**(`**...최대 +10% 상승**으로`) 또는 볼드 해제. 검사법 = 렌더된 HTML에서 태그 제거 후 리터럴 `**` 검색 → 현재 **0건**.
+3. **캡처 속 포켓몬이 영문명으로 나온다** — 버그 아니라 **AR 원본 데이터에 9세대 일부 종족의 한글명이 없다**(`LECHONK`→`Lechonk`, `TAROUNTULA`→`Tarountula`. 캐터피/꼬렛/구구 등은 정상 한글). → 캡처는 **한글명 있는 종족으로 찍으면 된다.**
+4. **배틀 캡처 타이밍** — 등장 대사 직후엔 상대 스프라이트가 **`alpha: 0`**(대사 넘기면 `alpha:1` 페이드인). 너무 일찍 찍으면 상대가 없는 그림이 나온다(버그 아님). **Space로 대사 넘긴 뒤 캡처**해야 상대·HP박스·커맨드 메뉴가 다 나온다.
+5. `/tmp`에 둔 playwright 스크립트는 `import { chromium } from "playwright"`가 **ERR_MODULE_NOT_FOUND** — 스크립트 위치 기준으로 node_modules를 찾기 때문. **절대경로로 import**(`.../myPokemon_AJ/node_modules/playwright/index.mjs`).
+
+**재현용 캡처 방법 (README 스샷 갱신할 때 그대로 쓸 것)**
+```js
+// dev서버(5180) 띄운 뒤. DebugMenuScene "6. 배틀 - 야생 데모"와 동일 = 파이리 vs 구구(둘 다 한글)
+g.scene.getScenes(true).forEach(s => g.scene.stop(s.scene.key));
+g.scene.start("BattleScene", { wild:true, testParty:true, backdrop:"route" });
+// 3.5초 대기 → Space(등장대사 넘김) → 2초 대기 → tools/_snap.mjs 의 snap()
+```
+
+**남은 것 / 다음에 할 것**
+- **게임 마무리 후 README 갱신**: ①"현재 진행 상황" 체크리스트(체육관·뱃지 완료 시 체크) ②스크린샷을 **실제 플레이 흐름(1번도로 인카운터)에서 한글 종족이 뜬 순간**으로 교체(지금은 디버그 데모라 정직하긴 하나 실플레이가 더 낫다).
+- **박스(PC) 보관은 README 기능 목록에서 뺐다** — 조사해보니 **BoxScene이 실제로 없다**(`viridian_pc.json`은 스텁). "다음 할 일"로 내려놨으니 만들면 올릴 것.
+- 다음 작업 = **§8 그대로 틀4 (상록시티 + 체육관 + 첫 뱃지).**
+
+**사용자가 직접 볼 곳** — GitHub 저장소 첫 화면(push 후). 로컬 확인은 위 함정1 방법.
