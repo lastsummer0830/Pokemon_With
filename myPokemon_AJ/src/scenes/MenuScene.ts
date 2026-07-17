@@ -18,10 +18,20 @@ const THEMES: Record<string, Theme> = {
 };
 
 type MenuState = "main" | "party" | "detail";
-interface MenuInit { from?: string }
+interface MenuInit {
+  from?: string;
+  // "switch" = 배틀에서 교체할 포켓몬 고르기. 파티 화면으로 바로 들어가고, 고르면 onPick으로 그 칸을 돌려준다.
+  //  (배틀 전용 파티 화면을 새로 만들지 않고 이 화면을 그대로 재사용한다 — 가방(BagScene)과 같은 방식.)
+  mode?: "field" | "switch";
+  canCancel?: boolean;              // switch 전용. false = 기절해서 강제 교체라 취소할 수 없다.
+  onPick?: (idx: number) => void;   // switch 전용. 고른 파티 칸(취소면 -1).
+}
 
 export default class MenuScene extends Phaser.Scene {
   private from = "WorldScene";
+  private mode: "field" | "switch" = "field";
+  private canCancel = true;
+  private onPick?: (idx: number) => void;
   private party: Pokemon[] = [];
   private state: MenuState = "main";
   private idx = 0;
@@ -38,8 +48,16 @@ export default class MenuScene extends Phaser.Scene {
 
   init(data: MenuInit): void {
     this.from = data?.from ?? "WorldScene";
-    this.state = "main";
-    this.idx = 1;   // 시안 A: 기본 선택 = 포켓몬(가운데)
+    this.mode = data?.mode ?? "field";
+    this.canCancel = data?.canCancel ?? true;
+    this.onPick = data?.onPick;
+    if (this.mode === "switch") {
+      this.state = "party";   // 교체는 하단 바를 거치지 않고 파티 화면부터
+      this.idx = 0;
+    } else {
+      this.state = "main";
+      this.idx = 1;   // 시안 A: 기본 선택 = 포켓몬(가운데)
+    }
   }
 
   preload(): void {
@@ -155,15 +173,34 @@ export default class MenuScene extends Phaser.Scene {
       else if (item === "설정") { this.toast("설정은 준비 중이야."); }
     } else if (this.state === "party") {
       if (!this.party.length) return;
+      // 교체 모드 — 상세로 안 들어가고 고른 칸을 배틀에 돌려준다.
+      //  못 내보내는 포켓몬(이미 나와 있음·기절)인지는 배틀이 판단해 이유를 말해준다.
+      if (this.mode === "switch") { this.pick(this.idx); return; }
       this.detailIdx = this.idx; this.state = "detail"; this.renderState();
     }
   }
 
   private cancel(): void {
+    if (this.mode === "switch") {
+      // 기절해서 강제로 교체하는 중이면 취소가 안 된다(반드시 골라야 한다).
+      if (this.state === "party" && !this.canCancel) return;
+      playSfx(this, SFX.cancel, 0.4);
+      if (this.state === "party") { this.pick(-1); return; }
+      this.state = "party"; this.idx = this.detailIdx; this.renderState();
+      return;
+    }
     playSfx(this, SFX.cancel, 0.4);
     if (this.state === "main") { this.close(); }
     else if (this.state === "party") { this.state = "main"; this.idx = 1; this.renderState(); }
     else { this.state = "party"; this.idx = this.detailIdx; this.renderState(); }
+  }
+
+  // 교체 모드에서 결과를 돌려주고 닫는다.
+  private pick(i: number): void {
+    const cb = this.onPick;
+    this.onPick = undefined;   // 두 번 부르지 않게(닫히는 도중 키가 또 들어올 수 있다)
+    this.close();
+    cb?.(i);
   }
 
   private close(): void {

@@ -1,0 +1,66 @@
+{
+ "defs": {
+  "YOUNGSTER:한주": {
+   "type": "YOUNGSTER",
+   "typeName": "반바지꼬마",
+   "name": "한주",
+   "baseMoney": 16,
+   "loseText": "이건 없던 거로 칠래!",
+   "sprite": "YOUNGSTER",
+   "team": [
+    {
+     "id": "RATTATA",
+     "level": 3
+    },
+    {
+     "id": "PIDGEY",
+     "level": 3
+    }
+   ]
+  },
+  "LASS:유정": {
+   "type": "LASS",
+   "typeName": "짧은치마",
+   "name": "유정",
+   "baseMoney": 16,
+   "loseText": "내가 졌네?",
+   "sprite": "LASS",
+   "team": [
+    {
+     "id": "SKWOVET",
+     "level": 3
+    },
+    {
+     "id": "STARLY",
+     "level": 3
+    }
+   ]
+  }
+ },
+ "placements": {
+  "10": [
+   {
+    "id": "YOUNGSTER:한주",
+    "x": 25,
+    "y": 13,
+    "dir": "right",
+    "sight": 4,
+    "overworld": "trainer_YOUNGSTER",
+    "speaker": "한주",
+    "introText": "내 첫 포켓몬 배틀이야!",
+    "afterText": "어린 아이 상대로 부끄럽지도 않아?"
+   },
+   {
+    "id": "LASS:유정",
+    "x": 33,
+    "y": 6,
+    "dir": "left",
+    "sight": 4,
+    "overworld": "trainer_LASS",
+    "speaker": "유정",
+    "introText": "눈이 마주치면 배틀!",
+    "afterText": "이제 눈 안 마주칠게..."
+   }
+  ]
+ }
+}

@@ -56,6 +56,10 @@ export default class DebugMenuScene extends Phaser.Scene {
       //  좌표는 눈대중이 아니라 맵 json의 blocked에서 걸을 수 있는 칸으로 골랐다(둘 다 남쪽 입구 = 실제 도착 지점).
       ["E. 1번도로", "WorldScene", { map: "route1", spawn: [25, 39], face: "up", testParty: true }],
       ["R. 상록시티", "WorldScene", { map: "viridian_city", spawn: [23, 38], face: "up", testParty: true }],
+      // 트레이너전 데모 — 팀 2마리(라타·구구) + 교체 + 그림 + 상금을 바로 시험한다.
+      //  좌표·팀·대사는 안 넘긴다: trainerId만 주면 BattleScene이 AR 정의(trainers.json)에서 전부 가져온다.
+      ["T. 배틀 - 트레이너전 데모(반바지꼬마 한주)", "BattleScene",
+        { trainerId: "YOUNGSTER:한주", testParty: true, backdrop: "route" }],
     ];
     const go = (key: string, data?: object) => {
       // 테스트용 기본값 — 인트로를 건너뛰어도 씬이 동작하도록
@@ -99,7 +103,7 @@ export default class DebugMenuScene extends Phaser.Scene {
     };
 
     // 숫자 10개로는 모자라 알파벳까지 쓴다(항목 순서 = 이 배열 순서).
-    const keyNames = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "ZERO", "Q", "W", "E", "R"];
+    const keyNames = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "ZERO", "Q", "W", "E", "R", "T"];
     // 항목 수에 맞춰 자동으로 화면 안에 다 들어오게(캔버스라 스크롤 없음).
     const startY = height * 0.30;
     const gap = Math.min(height * 0.07, (height * 0.66) / scenes.length);

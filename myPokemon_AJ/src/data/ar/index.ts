@@ -96,6 +96,33 @@ export interface EncounterTable {
   stepChance: number;   // AR step_chances[:Land] — 풀숲 한 걸음의 기본 조우 확률(%)
 }
 
+// 트레이너 (tools/ar-data/extract-trainers.py — AR trainers.dat + 맵 이벤트 그대로)
+export interface TrainerMon {
+  id: string;      // 종족 id
+  level: number;
+  // 기술은 없다 — AR도 지정 안 하고 레벨업 학습표로 채운다(reset_moves).
+}
+export interface TrainerDef {
+  type: string;        // 트레이너 타입 id (예: "YOUNGSTER")
+  typeName: string;    // 한글 타입명 (예: "반바지꼬마")
+  name: string;        // 이름 (예: "한주")
+  baseMoney: number;   // 상금 = 상대 팀 최고레벨 × baseMoney
+  loseText: string;    // 졌을 때 하는 말
+  sprite: string;      // 배틀 그림 = assets/trainers/<sprite>.png
+  team: TrainerMon[];
+}
+export interface TrainerPlacement {
+  id: string;          // TrainerDef 키 (예: "YOUNGSTER:한주")
+  x: number;           // 맵 로컬 좌표(리전 글로벌 아님)
+  y: number;
+  dir: "up" | "down" | "left" | "right";   // 바라보는 방향
+  sight: number;       // 시야 칸수
+  overworld: string;   // 오버월드 시트 = assets/characters/<overworld>.png
+  speaker: string;     // 대화 이름창에 띄울 이름(원본 `\xn[...]` 태그 값. 예: "한주")
+  introText: string;   // 눈이 마주쳤을 때
+  afterText: string;   // 이긴 뒤 말 걸면(아직 말 걸기 기능이 없어 미사용)
+}
+
 // ── 캐시 & 로더 ──────────────────────────────────────────────
 const DB = {
   types: {} as Record<string, TypeData>,
@@ -104,6 +131,8 @@ const DB = {
   items: {} as Record<string, ItemData>,
   dexKanto: [] as string[],   // 칸토 도감 순서(151종). 배열 인덱스+1 = 도감번호.
   encounters: {} as Record<string, EncounterTable>,   // 키 = AR 맵 번호 문자열(예: "10" = 1번도로)
+  trainers: {} as Record<string, TrainerDef>,             // 키 = "YOUNGSTER:한주"
+  trainerSpots: {} as Record<string, TrainerPlacement[]>, // 키 = AR 맵 번호 문자열
 };
 let loaded = false;
 let loading: Promise<void> | null = null;
@@ -120,13 +149,16 @@ export function loadArDb(): Promise<void> {
     fetch(`${base}/items.json`).then((r) => r.json()),
     fetch(`${base}/dex_kanto.json`).then((r) => r.json()),
     fetch(`${base}/encounters.json`).then((r) => r.json()),
-  ]).then(([t, s, m, i, d, e]) => {
+    fetch(`${base}/trainers.json`).then((r) => r.json()),
+  ]).then(([t, s, m, i, d, e, tr]) => {
     DB.types = t;
     DB.species = s;
     DB.moves = m;
     DB.items = i;
     DB.dexKanto = d;
     DB.encounters = e;
+    DB.trainers = tr.defs;
+    DB.trainerSpots = tr.placements;
     loaded = true;
   });
   return loading;
@@ -158,6 +190,19 @@ export function dexKanto(): string[] {
 // 그 맵의 야생 조우표. 조우가 없는 맵(태초·상록)은 undefined.
 export function getEncounters(arMapId: number): EncounterTable | undefined {
   return DB.encounters[String(arMapId)];
+}
+
+// 트레이너 정의. 키는 "타입:이름"(예: "YOUNGSTER:한주").
+export function getTrainer(id: string): TrainerDef | undefined {
+  return DB.trainers[id];
+}
+// 그 맵에 서 있는 트레이너들. 없는 맵은 undefined.
+export function getMapTrainers(arMapId: number): TrainerPlacement[] | undefined {
+  return DB.trainerSpots[String(arMapId)];
+}
+// 화면에 띄우는 이름 = "반바지꼬마 한주" (AR의 full_name과 같은 규칙).
+export function trainerFullName(def: TrainerDef): string {
+  return `${def.typeName} ${def.name}`;
 }
 
 // 공격 타입 atkType이 방어측 타입들(defTypes)에 주는 최종 배율(곱).
