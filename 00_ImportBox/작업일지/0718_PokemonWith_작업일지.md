@@ -214,3 +214,31 @@
 2. 스탯랭크: 공/방/특공/특방/스피드/명중/회피 stage(-6..+6) 필드 + 데미지·명중 반영 + 변화기 functionCode(RaiseUserAttack1·LowerTargetDefense1 등, moves.json 이미 있음) 작동. Pokemon에 stage 필드(배틀스코프, 세이브X — 배틀시작 리셋).
 3. **그 위에 사용자 최종 그림 = 유대→회피/명중 확장**(bond가 회피/명중 stage에 보너스). 이게 이 게임 차별점의 배틀쪽 심화.
 4. 그 밖 미구현(상태이상 후속): 혼란·풀죽음(Flinch)·맹독누적(BadPoison=현재 일반독 취급)·Fire/Ice Fang류 복합코드(BurnFlinchTarget 등 미부여).
+
+---
+
+# 0718 세션6 — 배틀 토대 2/2: **스탯랭크(stat stage)** 구현·검증·커밋 완료
+
+## 시작 판단 (재검증)
+- 세션5 상태이상 작업은 일지엔 "미커밋"이었으나 실제로는 이미 `2820bdc`에 커밋돼 있었음(일지가 커밋 직전 메모). → 추가 커밋 불필요 확인 후 스탯랭크 착수.
+
+## ✅ 완료·커밋 (`4f97856`)
+**바꾼/추가 파일**
+- **신규 `src/systems/stages.ts`** — 능력변화 단일원천(status.ts와 같은 패턴). `StatStages`(공/방/특공/특방/스피드/명중/회피 -6..+6), 배율표(일반 `(2+n)/2`·명중회피 `(3+n)/3`), `effectiveStat`·`accEvaMult`, functionCode **앵커 파서**(`^(Raise|Lower)(User|Target)<스탯><숫자>$` — 순수 변화기만, 복합코드 전부 스킵=오탐0), `applyStatChange`·`statChangeMessage`·`resetStages`.
+- `src/systems/battle.ts` — computeDamage 공/방 stage, performMove 명중판정에 명중/회피, movesFirst 스피드 stage, `rollStatChanges`(+`MoveResult.statChanges`). **쓰러뜨린 데미지기라도 사용자 자기강화(RaiseUser)는 적용**(code-review 지적 반영, 상대 하강만 스킵).
+- `src/data/Pokemon.ts` — `stages?: StatStages`(옵셔널, 배틀 스코프, 세이브 호환).
+- `src/scenes/BattleScene.ts` — 진입·교체·상대 내보내기 3곳 `resetStages`(세이브 오염 차단), doTurn 능력변화 메시지.
+
+**검증**: tsc 통과 · 로직 29/29(playwright 실TS모듈, 데미지 공격+2→14→28 정확 2배) · 씬 실동작 4/4(resetStages 실제 0초기화, 텍스트박스 "공격이 크게 올라갔다!"/"상대…떨어졌다!" 렌더) · `/code-review`(medium) 고위험0.
+
+## 함정·팁
+- **playwright 배틀 검증 confound(재확인)**: Space 입력이 백그라운드 runBattle에 가로채져 **진짜 턴이 실행**됨(enemy.stages가 실턴으로 변함=오히려 실플레이 작동 증거). 해결 = `scene.say`를 `()=>Promise.resolve()`로 패치해 입력대기 제거 + send-out 완료를 `waitForFunction(enemy.stages 존재)`로 폴링 후 샘플.
+- 스탯랭크는 **세이브에 남을 수 있으나 배틀 시작 resetStages로 자동 정정** — 무해.
+
+## 미반영(저위험, 보류)
+- statChangeMessage 문구 AR/공식 글자대조 미실시(§1.5, 세션5 #1과 동류).
+- 복합 functionCode(MinimizeUser·혼합숫자 `Atk1Spd2`·Side/Allies 전체대상 등) 미지원 — 의도적 스킵.
+
+## 다음 세션 시작 지점 — **유대(bond)→회피/명중 확장**
+- 사용자 최종 그림: 유대가 깊을수록 배틀에서 **회피율·명중률 stage 보너스**. stages 토대(명중/회피 stage + accEvaMult)가 깔렸으니 `systems/bond.ts`가 `bondOf` 기반으로 명중/회피 stage 보너스를 얹으면 됨(현재 bond는 데미지 +10%만). 이게 집꾸미기→유대→배틀 차별점의 배틀쪽 심화.
+- 그 밖 상태이상 후속(혼란·풀죽음·맹독누적)도 여전히 미구현.
