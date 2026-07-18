@@ -30,6 +30,9 @@ export interface RegionMap {
   battleBg: Backdrop;  // 이 맵에서 배틀 걸리면 쓸 배경 (AR map_metadata의 battle_background)
   bgm: string;         // 이 맵의 BGM 키 (AR 맵 데이터의 @bgm 그대로)
   arMapId?: number;    // AR 원본 맵 번호 = encounters.json의 키. 없으면 그 맵엔 야생 조우가 없다.
+  // 전경(priority) 레이어 PNG가 있으면 true. AR의 나무 캐노피·지붕처럼 **캐릭터 위에** 그려지는 타일 모음
+  //  (extract-map.py가 <name>_over.png로 뽑는다). WorldScene이 캐릭터보다 높은 depth로 덮어 그린다.
+  overImg?: string;
 }
 
 // ⚠️ 이름 "pallet"은 바꾸지 말 것 — 기존 세이브(v3)의 loc.map 값이자 텍스처 키다.
@@ -39,17 +42,20 @@ export const REGION_MAPS: RegionMap[] = [
   {
     name: "viridian_city", label: "상록시티",
     img: "assets/world/viridian_city.png", data: "assets/world/viridian_city.json",
+    overImg: "assets/world/viridian_city_over.png",
     ox: 0, oy: 0, cols: 52, rows: 40, battleBg: "town", bgm: "bgm_viridian",
   },
   {
     name: "route1", label: "1번도로",
     img: "assets/world/route1.png", data: "assets/world/route1.json",
+    overImg: "assets/world/route1_over.png",
     ox: 0, oy: 40, cols: 52, rows: 40, battleBg: "route", bgm: "bgm_route1",
     arMapId: 10,   // 태초/상록은 풀숲이 없어 조우표도 없다(맵 JSON에 grass 키 자체가 없음).
   },
   {
     name: "pallet", label: "태초마을",
     img: "assets/world/pallet_town.png", data: "assets/world/pallet_town.json",
+    overImg: "assets/world/pallet_town_over.png",
     ox: 0, oy: 80, cols: 52, rows: 20, battleBg: "town", bgm: "bgm_town",
   },
 ];

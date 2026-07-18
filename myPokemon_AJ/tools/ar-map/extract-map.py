@@ -79,6 +79,7 @@ def extract(ar: str, mid: int, out: str):
     aimg = [Image.open(p).convert("RGBA") if p else None for p in autos]
     _, _, _, passg = parse_table(ts["@passages"])
     _, _, _, terrain = parse_table(ts["@terrain_tags"])
+    _, _, _, prio = parse_table(ts["@priorities"])
     tcols = tsimg.width // 32
 
     def tile(tid):
@@ -102,7 +103,13 @@ def extract(ar: str, mid: int, out: str):
         idx = tid if tid >= 384 else (tid // 48) * 48
         return table[idx] if 0 <= idx < len(table) else 0
 
-    canvas = Image.new("RGBA", (xs * 32, ys * 32), (0, 0, 0, 0))
+    # 바닥(ground)과 전경(over)을 나눠 그린다.
+    #  RPG Maker XP의 @priorities > 0인 타일 = **캐릭터보다 위에 그려지는 전경**(나무 캐노피·지붕·표지판 윗부분 등).
+    #  예전엔 전 레이어를 canvas 한 장에 평탄화해서, 인게임에서 캐릭터(depth 5)가 그 위를 덮어
+    #  "트레이너/플레이어가 나무 위에 선" 것처럼 보였다. → priority>0은 <out>_over.png로 따로 빼서
+    #  WorldScene이 캐릭터 위(depth)로 그린다(AR·정품 포켓몬과 같은 겹침).
+    ground = Image.new("RGBA", (xs * 32, ys * 32), (0, 0, 0, 0))
+    over = Image.new("RGBA", (xs * 32, ys * 32), (0, 0, 0, 0))
     blocked = [[0] * xs for _ in range(ys)]
     grass = [[0] * xs for _ in range(ys)]
 
@@ -114,7 +121,9 @@ def extract(ar: str, mid: int, out: str):
                 tid = vals[x + xs * y + xs * ys * z]
                 t = tile(tid)
                 if t:
-                    canvas.alpha_composite(t, (x * 32, y * 32))
+                    # @priorities > 0 = 캐릭터 위에 그려지는 전경(나무 캐노피 등) → over로 뺀다.
+                    dest = over if tbl_lookup(prio, tid) > 0 else ground
+                    dest.alpha_composite(t, (x * 32, y * 32))
                 # 사방(0x0f)이 다 막힌 타일 = 못 지나감
                 if (tbl_lookup(passg, tid) & 0x0f) == 0x0f:
                     cellblock = True
@@ -125,7 +134,14 @@ def extract(ar: str, mid: int, out: str):
 
     os.makedirs(OUT_DIR, exist_ok=True)
     png_path = os.path.join(OUT_DIR, f"{out}.png")
-    canvas.convert("RGB").save(png_path)
+    ground.convert("RGB").save(png_path)
+    # 전경 타일이 하나라도 있으면 투명 배경 PNG로 저장(없으면 파일을 안 만든다 — 씬이 flag로 판단).
+    over_path = os.path.join(OUT_DIR, f"{out}_over.png")
+    if over.getbbox() is not None:
+        over.save(over_path)
+        print(f"  전경 레이어: {over_path}")
+    elif os.path.isfile(over_path):
+        os.remove(over_path)   # 예전에 만든 전경이 이번엔 비었으면 지운다(오래된 파일 방지)
 
     data = {"cols": xs, "rows": ys, "blocked": blocked}
     grass_cells = sum(sum(r) for r in grass)

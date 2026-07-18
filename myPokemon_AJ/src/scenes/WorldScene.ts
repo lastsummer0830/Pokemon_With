@@ -116,6 +116,8 @@ export default class WorldScene extends Phaser.Scene {
       this.cache.json.remove(`${m.name}_col`);
       this.load.image(m.name, `${m.img}?v=` + Date.now());
       this.load.json(`${m.name}_col`, `${m.data}?v=` + Date.now());
+      // 전경(나무 캐노피·지붕) 레이어 — 있으면 캐릭터 위로 그리려고 따로 불러온다.
+      if (m.overImg) this.load.image(`${m.name}_over`, `${m.overImg}?v=` + Date.now());
     }
     preloadCommonAudio(this);
     const file = this.gender === "girl" ? "assets/characters/trainer_DAWN.png" : "assets/characters/trainer_RED.png";
@@ -141,6 +143,12 @@ export default class WorldScene extends Phaser.Scene {
         }
       this.textures.get(m.name).setFilter(Phaser.Textures.FilterMode.NEAREST);
       this.add.image(m.ox * this.tile, m.oy * this.tile, m.name).setOrigin(0, 0).setScale(SCALE).setDepth(0);
+      // 전경 레이어: 나무 캐노피·지붕 등 AR에서 priority>0였던 타일. depth를 캐릭터(5)보다 높여
+      //  플레이어·트레이너가 나무 뒤로 지나가게 한다(예전엔 캐릭터가 나무 위를 덮어 "나무 위에 선" 버그).
+      if (m.overImg && this.textures.exists(`${m.name}_over`)) {
+        this.textures.get(`${m.name}_over`).setFilter(Phaser.Textures.FilterMode.NEAREST);
+        this.add.image(m.ox * this.tile, m.oy * this.tile, `${m.name}_over`).setOrigin(0, 0).setScale(SCALE).setDepth(6);
+      }
     }
     // 워프(로컬로 적어둔 것)를 글로벌로 바꾼다.
     this.warps = this.warpDefs.map(w => {

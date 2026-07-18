@@ -101,5 +101,38 @@
 - 마트 상점(구매/판매) UI — AR 마트/가방 UI 조사 + Pick 후 구현(사용자가 이번엔 "점원 인사만"으로 합의). AR Map159 판매목록 우리 카탈로그 교집합 = 몬스터볼/슈퍼볼/상처약/좋은상처약/해독제/마비·잠깨는·화상·얼음치료제/기력의조각.
 - PC 보관함 BoxScene(6×5 그리드, AR Storage UI). · 상록 민가(Home door Map160~163) 워프.
 
-## 다음 세션 첫 프롬프트 제안
+## 다음 세션 첫 프롬프트 제안 (세션3에서 해결됨 — 아래 참고)
 "작업일지 세션2 읽고 **③ 트레이너 나무 위 배치 버그**부터 재조사·수정. 먼저 '상수숲'이 어느 맵인지 확인."
+
+---
+
+# 0718 세션3 — ③ 트레이너 나무 위 배치 버그 해결 (전경 priority 레이어 도입)
+
+## ✅ 완료·검증 — 근본원인 수정
+### 진단 (정적 추측 아님 — 런타임 + AR 원본으로 확정)
+- 사용자가 본 "나무 위 남자애" = **1번도로 `YOUNGSTER:한주`**(AR 원본 좌표 그대로 (25,13)=local). `유정`(LASS)은 priority 0 = 풀숲 정상 배치라 **버그 아님**(안 건드림).
+- **상수숲이라는 별도 맵은 없음**(forest는 타일셋 이미지 하나뿐) — 버그 맵은 1번도로가 맞고, 상록/1번도로가 오프셋0으로 이어붙어 사용자가 "상록시티"로 인식한 것.
+- 런타임 프로브(`window.__game`, WorldScene.trainers 실좌표) + AR `Map010` 타일 priority 판독: 한주 칸 z1 타일 **priority=3**(캐릭터 위에 그려지는 전경). 근본원인 = `extract-map.py`가 RMXP `@priorities`를 **안 읽고 전 레이어를 한 장으로 평탄화** → 나무 캐노피가 바닥 PNG에 구워져, 렌더러가 캐릭터(depth 5)로 그 위를 덮음. **플레이어도 나무 근처에서 동일 증상.**
+
+### 수정 (전경 레이어 제대로 — 사용자 확정 방식)
+**바꾼 파일**
+- `tools/ar-map/extract-map.py` — `@priorities` 읽어 **priority>0 타일을 `<맵>_over.png`로 분리** 추출(바닥은 `<맵>.png`). priority 판정은 기존 `tbl_lookup(prio,tid)` 재사용(리뷰 단순화).
+- `public/assets/world/{route1,viridian_city,pallet_town}.png` — 재추출(전경 제거된 바닥).
+- **신규** `public/assets/world/{route1,viridian_city,pallet_town}_over.png` — 전경(나무 캐노피·지붕).
+- `src/data/region.ts` — `RegionMap.overImg` 필드 + 3맵 경로.
+- `src/scenes/WorldScene.ts` — 전경 PNG preload + **depth 6**(캐릭터 5 < 6 < HUD 100 < 대화창 1000)로 렌더. create()에서 `textures.exists` 가드.
+
+### 검증 (playwright 실주행, 스샷 `.claude/.verify/`는 아니고 스크래치패드)
+- ✅ 한주가 나무 **뒤로**(모자만 빼꼼) · ✅ 플레이어도 나무 뒤로 · ✅ 풀숲/태초마을에서 **머리 안 잘림**(과거 분노 회피 — 전경은 나무 뒤일 때만 가림).
+- ✅ 충돌격자 JSON **바이트 동일**(재추출해도 blocked/grass 불변 — 조용한 붕괴 없음) · ✅ ground PNG 검은 halo 셀 **0** · ✅ route1/viridian_city/pallet_town.png는 **WorldScene만** 소비(BattleScene은 Backdrop 타입만 import) · ✅ 콘솔 에러 0.
+- ✅ `/code-review`(medium) 정정성 버그 0, 단순화 1건 적용 · ✅ tsc 통과.
+
+### 함정·팁 (다음 세션)
+1. **맵 재추출은 안전**하지만 반드시 재추출 후 `blocked/grass` JSON을 이전과 diff해 불변 확인(격자 조용히 안 깨지게).
+2. dev서버 실행 중 만든 **새 public 에셋(_over.png)은 서버 재시작 전까지 text/html** 응답 → `curl -w '%{content_type}'`가 image/png 될 때까지 재시작(세션2 팁 재확인).
+3. **playwright는 node쪽**(python playwright 미설치). 스크립트는 `myPokemon_AJ/`에서 실행해야 node_modules 해석됨. headless는 anti-throttle args 필수(세션2 팁).
+4. `.gitignore`(루트) M = **내 작업 아님**(python 실행 중 훅이 pycache 무시 추가). 이번 커밋에서 제외함.
+
+## 남은 후보 (세션2 미착수 그대로 + 우선순위)
+- ② **배틀 상태이상·기술UI·대사 미구현**(틀3, 별개 큰 작업 — `turn-battle-system`). 치료제 "효과 없음"도 같은 뿌리.
+- 마트 상점 UI · PC 보관함 BoxScene · 상록 민가 워프 · affinity 가구(집꾸미기→컨디션→배틀 차별점 미발동) · BedroomScene 진입경로 0.
