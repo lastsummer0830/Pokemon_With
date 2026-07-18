@@ -34,6 +34,7 @@ export interface Pokemon {
 
   moves: MoveSlot[];     // 최대 4개
   status: Status;        // 상태이상 (없으면 null)
+  sleepTurns?: number;   // 잠듦 남은 턴(status==="sleep"일 때만 의미. 규칙은 systems/status.ts)
 
   heldItem: string | null; // ★ 지닌 도구 (없으면 null)
   condition: number;       // ★ 유대(bond) — 포켓몬을 돌본 만큼 깊어져 배틀로 이어지는 값. 규칙은 systems/bond.ts

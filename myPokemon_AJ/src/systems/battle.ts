@@ -1,8 +1,9 @@
 // 배틀 계산·규칙 (화면과 분리 — 여기엔 데미지/상성/턴순서만).
 // 데이터: Another Red 추출본(src/data/ar). 표준 포켓몬 데미지 공식을 따른다.
-import { Pokemon, MoveSlot, displayName } from "../data/Pokemon";
+import { Pokemon, MoveSlot, Status, displayName } from "../data/Pokemon";
 import { getMove, typeMultiplier, MoveData } from "../data/ar";
 import { bondDamageMult } from "./bond";
+import { statusFromFunctionCode, canInflict, applyStatus, speedMult, burnAttackMult } from "./status";
 
 // 매직넘버는 상수로.
 const CRIT_CHANCE = 1 / 24;   // 급소 확률
@@ -21,6 +22,7 @@ export interface MoveResult {
   crit: boolean;         // 급소 여부
   defenderFainted: boolean;
   noPp: boolean;         // PP가 없어 못 씀
+  statusInflicted: Status; // 이 기술로 상대에게 새로 건 상태이상(없으면 null)
 }
 
 // 표준 데미지 공식.
@@ -35,7 +37,8 @@ function computeDamage(
 ): { damage: number; effectiveness: number; stab: boolean } {
   // 물리=공격/방어, 특수=특수공격/특수방어
   const isPhysical = move.category === "Physical";
-  const atk = isPhysical ? attacker.attack : attacker.spAttack;
+  // ★ 화상: 물리공격력 절반(특수는 영향 없음). 규칙은 systems/status.ts
+  const atk = Math.floor((isPhysical ? attacker.attack : attacker.spAttack) * burnAttackMult(attacker, isPhysical));
   const def = isPhysical ? defender.defense : defender.spDefense;
 
   const baseNum = Math.floor((2 * attacker.level) / 5) + 2;
@@ -79,14 +82,19 @@ export function performMove(
   }
   slot.pp -= 1;
 
-  // 변화기(위력 0)는 데미지 없음 — 지금은 메시지만(효과는 추후 구현)
-  if (!move || move.power <= 0) {
+  // 기술 데이터 자체가 없으면(미등록) 메시지만.
+  if (!move) {
     return baseResult(name, move, {});
   }
 
-  // 명중 판정 (accuracy 0 = 필중)
+  // 명중 판정 (accuracy 0 = 필중). 변화기·데미지기 모두 여기서 판정한다(전기자석파처럼 빗나가는 변화기 있음).
   if (move.accuracy > 0 && rng() * 100 >= move.accuracy) {
     return baseResult(name, move, { missed: true });
+  }
+
+  // 변화기(위력 0): 데미지 없음 — 상태이상 부여만 시도한다(그 외 효과는 아직 미구현).
+  if (move.power <= 0) {
+    return baseResult(name, move, { statusInflicted: rollStatus(move, defender, rng) });
   }
 
   const crit = rng() < CRIT_CHANCE;
@@ -94,6 +102,7 @@ export function performMove(
   const { damage, effectiveness, stab } = computeDamage(attacker, defender, move, crit, rand);
 
   defender.currentHp = Math.max(0, defender.currentHp - damage);
+  const fainted = defender.currentHp <= 0;
 
   return {
     moveName: name,
@@ -103,9 +112,24 @@ export function performMove(
     effectiveness,
     stab,
     crit,
-    defenderFainted: defender.currentHp <= 0,
+    defenderFainted: fainted,
     noPp: false,
+    // 데미지기의 부가 상태이상(effectChance %). 쓰러진 상대에겐 걸지 않는다.
+    statusInflicted: fainted ? null : rollStatus(move, defender, rng),
   };
+}
+
+// 이 기술이 상대에게 상태이상을 걸어야 하나? 걸리면 실제로 적용하고 그 상태를 돌려준다(없으면 null).
+//  발동 확률: 순수 변화기(위력0)는 확정(effectChance 0=100%), 데미지기의 부가효과는 effectChance %.
+function rollStatus(move: MoveData, defender: Pokemon, rng: () => number): Status {
+  const st = statusFromFunctionCode(move.functionCode);
+  if (!st) return null;
+  const chance = move.power <= 0 ? 100 : move.effectChance;
+  if (chance <= 0) return null;
+  if (rng() * 100 >= chance) return null;
+  if (!canInflict(defender, st)) return null;
+  applyStatus(defender, st, rng);
+  return st;
 }
 
 function baseResult(
@@ -123,6 +147,7 @@ function baseResult(
     crit: false,
     defenderFainted: false,
     noPp: false,
+    statusInflicted: null,
     ...over,
   };
 }
@@ -137,7 +162,10 @@ export function movesFirst(
   const pa = getMove(aMove.id)?.priority ?? 0;
   const pb = getMove(bMove.id)?.priority ?? 0;
   if (pa !== pb) return pa > pb;
-  if (a.speed !== b.speed) return a.speed > b.speed;
+  // 마비면 스피드 절반(systems/status.ts). 유효 스피드로 선공을 정한다.
+  const sa = a.speed * speedMult(a);
+  const sb = b.speed * speedMult(b);
+  if (sa !== sb) return sa > sb;
   return rng() < 0.5;
 }
 

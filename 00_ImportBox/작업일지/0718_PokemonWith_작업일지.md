@@ -173,3 +173,44 @@
 
 ## 다음 세션 첫 프롬프트 제안
 "작업일지 0718 세션4 읽고 **미커밋 5+1파일 유지/되돌림부터 판단**(bond.ts·battle.ts 단일화는 살리는 쪽 권장, 하트게이지는 보류). 그다음 사용자 지시대로 **토대 = 배틀 스탯랭크(stage)+상태이상** 부터 제대로. 유대→회피/명중 확장은 그 위에. 과한 질문 말고 만들어라."
+
+---
+
+# 0718 세션5 — 배틀 토대 1/2: **상태이상 시스템** 구현·검증 (⚠️ 미커밋 — 승인 대기)
+
+## 시작 상태 재확인 (단정 전 재검증)
+- 세션4의 "미커밋 5+1파일"은 **이미 커밋됨**(`02d6089` "0718" — bond.ts·battle.ts단일화·MenuScene하트게이지 전부 포함) → "유지" 결론난 상태였다. 그래서 이번 세션은 유지/되돌림 판단이 아니라 **다음 토대(상태이상)부터** 시작.
+- 사용자 선택(AskUserQuestion): 토대 첫 슬라이스 = **"상태이상 먼저"**(스탯랭크는 다음). 유대→회피/명중은 스탯랭크 위에 얹을 예정.
+
+## ✅ 완료·검증 — 상태이상 5종 (독/화상/마비/잠듦/얼음)
+**바꾼/추가 파일 (전부 working tree, 미커밋):**
+- **신규 `src/systems/status.ts`** — 상태이상 규칙 단일원천. `statusFromFunctionCode`(연속부분문자열 매칭, 오탐0 전수확인)·`canInflict`(타입면역: 불꽃×화상/얼음×냉동/전기×마비/독·강철×독 + 중첩불가)·`applyStatus`·`residualDamage`(화상1/16·독1/8)·`beforeMove`(잠듦감소·깨어남/얼음20%해동/마비25%행동불가 + 메시지)·`speedMult`(마비½)·`burnAttackMult`(화상 물리½)·`statusIconRow`.
+- `src/systems/battle.ts` — `MoveResult.statusInflicted` 추가 · `computeDamage`에 화상 물리½ · `movesFirst`에 마비 스피드½ · `performMove` 재구성(명중판정을 변화기에도 적용, `rollStatus`로 상태부여: 변화기=확정/데미지기=effectChance%, 쓰러진 상대엔 X).
+- `src/data/Pokemon.ts` — `sleepTurns?: number`(잠듦 카운터, 세이브 호환 옵셔널).
+- `src/scenes/BattleScene.ts` — doTurn에 **행동직전 게이트**(beforeMove) + **상태부여 알림** · 신규 `afterTurn()`(턴종료 화상/독 잔뎀, 빠른쪽부터, 쓰러지면 정리) → 턴 소비 4분기의 `resolveFaints()`를 `afterTurn()`로 교체 · preload에 `bt_statuses`.
+- `src/scenes/battleView.ts` — DataBox에 `refresh()` + **상태 아이콘**(AR statuses.png 행크롭, 이름아래 왼쪽).
+- **신규 에셋** `public/assets/ui/battle/statuses.png` — AR 원본 `Graphics/UI/statuses.png`(44×144=44×16 9행). 행순서 **0=잠듦 1=독 2=화상 3=마비 4=얼음**(한글 라벨 이미 구워짐).
+- **치료제는 안 건드림** — `BagScene.ts:231` cure맵(ANTIDOTE→poison 등)은 원래 정상, status를 set하는 코드가 없어 늘 "효과없음"이었을 뿐. 이제 자동 작동.
+
+**검증 (playwright, dev서버로 실TS모듈 동적import — 진짜 컴파일코드 구동):**
+- 로직 26/26 통과: 부여·면역·화상물리½·잔뎀수치·게이트·마비선공역전·오탐0.
+- 시각 5/5: DataBox 상태아이콘 정확 렌더(양쪽 박스, 행크롭). 스샷 `.claude/.verify/status_databox_*.png` + `_비교_montage.png`.
+- 통합 7/7: `afterTurn` 잔뎀 발동+메시지+정확HP감소 / 잠듦 게이트 행동불가. 스크립트=스크래치패드.
+- tsc 통과 · 콘솔에러 0 · `/code-review`(medium) **정정성 버그 0**.
+
+## ⚠️ 미커밋 — 사용자 승인 대기 + code-review 경미 3건(비차단, 미반영)
+1. **[convention·낮음]** status.ts 신규 메시지 문구를 AR 원문과 글자대조 안 함(시스템텍스트라 §1.5 위반강도 낮음). 추후 AR 메시지파일 대조.
+2. **[UX·낮음]** 상태기술이 면역/중첩으로 실패해도 "실패했다!" 안내 없음(기술명만 뜸). ← 하나만 고치면 나음.
+3. **[balance·낮음]** SLEEP_MIN=1이면 sleepTurns=1 굴렸을 때 0턴만 자고 바로 깸(AR/Essentials와는 대체로 부합).
+
+## 함정·팁 (다음 세션)
+- **dev서버 실행중 추가한 새 public에셋(statuses.png)은 서버 재시작 전까지 text/html** → 재시작 후 `image/png` 확인(세션2/3 트랩 재확인). 이번에 서버 kill 후 `npm run dev` 재기동함.
+- **playwright로 배틀 통합검증 시 confound**: 백그라운드 runBattle 루프가 `selectCommand`에서 Space 입력 대기중 → 검증용 Space가 가로채져 진짜 턴이 실행됨. 해결 = `scene.say`를 `()=>Promise.resolve()`로 패치해 입력대기 제거 후 씬 메서드(`afterTurn`/`doTurn`) 직접 호출.
+- 배틀 시작 = `window.__game.scene.start("BattleScene",{wild:true,testParty:true,backdrop:"route"})`. enemyBox는 "야생 XX 나타났다!" 대사 넘겨야(sendOutEnemy) 생성됨.
+- node playwright 사용(python 미설치). import는 `import pw from ".../playwright/index.js"; const {chromium}=pw;`(CJS라 named export X).
+
+## 다음 세션 시작 지점 — **배틀 토대 2/2: 스탯랭크(stat stage)**
+1. **먼저: 이번 상태이상 작업 커밋 여부 확정**(사용자 승인 대기중). 승인나면 커밋. 경미 3건은 반영/보류 사용자 결정.
+2. 스탯랭크: 공/방/특공/특방/스피드/명중/회피 stage(-6..+6) 필드 + 데미지·명중 반영 + 변화기 functionCode(RaiseUserAttack1·LowerTargetDefense1 등, moves.json 이미 있음) 작동. Pokemon에 stage 필드(배틀스코프, 세이브X — 배틀시작 리셋).
+3. **그 위에 사용자 최종 그림 = 유대→회피/명중 확장**(bond가 회피/명중 stage에 보너스). 이게 이 게임 차별점의 배틀쪽 심화.
+4. 그 밖 미구현(상태이상 후속): 혼란·풀죽음(Flinch)·맹독누적(BadPoison=현재 일반독 취급)·Fire/Ice Fang류 복합코드(BurnFlinchTarget 등 미부여).

@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { Pokemon, displayName } from "../data/Pokemon";
+import { statusIconRow } from "../systems/status";
 
 // ─────────────────────────────────────────────────────────────
 // 배틀 화면 그리기 (Another Red 원본 에셋 + 원본 좌표)
@@ -190,6 +191,7 @@ export class DataBox {
   }
 
   setMon(mon: Pokemon): void { this.mon = mon; this.displayHp = mon.currentHp; this.redraw(); }
+  refresh(): void { this.redraw(); } // 상태이상 등 HP 외 변화를 다시 그린다(HP는 그대로).
   destroy(): void { this.layer.destroy(); }
 
   redraw(): void {
@@ -233,6 +235,16 @@ export class DataBox {
       this.nums(X(nx + 54), v.Y(ny + 2), cur, "right");
       this.nums(X(nx + 54), v.Y(ny + 2), "/", "left");
       this.nums(X(nx + 70), v.Y(ny + 2), String(this.mon.maxHp), "left");
+    }
+
+    // 상태이상 아이콘 (AR statuses.png = 44x16 세로 시트, 이름 아래 왼쪽에). 없으면 안 그림.
+    const row = statusIconRow(this.mon.status);
+    if (row >= 0 && this.scene.textures.exists("bt_statuses")) {
+      const sx = boxX + baseX + 8, sy = boxY + 40;
+      const im = this.scene.add.image(X(sx), v.Y(sy), "bt_statuses").setOrigin(0).setScale(v.s);
+      im.setCrop(0, row * 16, 44, 16);                 // 해당 행만 보이게 자른다
+      im.setPosition(X(sx), v.Y(sy) - row * 16 * v.s); // 크롭 오프셋만큼 위로 보정(HP바와 같은 방식)
+      this.layer.add(im);
     }
   }
 

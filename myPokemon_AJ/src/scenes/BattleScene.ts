@@ -9,6 +9,7 @@ import type { TrainerDef } from "../data/ar";
 import { markSeen, markOwn } from "../data/Pokedex";
 import { removeItem, addMoney, getMoney } from "../data/Bag";
 import { performMove, movesFirst, isFainted, effectivenessText } from "../systems/battle";
+import { beforeMove, inflictMessage, residualDamage, residualMessage } from "../systems/status";
 import { captureShakes, SHAKE_FAIL_TEXT } from "../systems/capture";
 import { battleExpYield, gainExp } from "../systems/exp";
 import type { BagResult } from "./BagScene";
@@ -145,7 +146,8 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image("bb_bg", `assets/battlebacks/${this.backdrop}_bg.png`);
     this.load.image("bb_msg", `assets/battlebacks/${this.backdrop}_message.png`);
     for (const k of ["databox_normal", "databox_normal_foe", "overlay_command", "cursor_command",
-                     "overlay_message", "overlay_fight", "cursor_fight", "overlay_hp", "overlay_lv", "icon_numbers"]) {
+                     "overlay_message", "overlay_fight", "cursor_fight", "overlay_hp", "overlay_lv", "icon_numbers",
+                     "statuses"]) {
       if (!this.textures.exists(`bt_${k}`)) this.load.image(`bt_${k}`, `assets/ui/battle/${k}.png`);
     }
     // 타입 아이콘 시트(기술 선택 화면 오른쪽) — 배틀 UI가 아니라 공용 UI 폴더에 있다.
@@ -309,7 +311,7 @@ export default class BattleScene extends Phaser.Scene {
         if (pick < 0) continue;                     // 취소 → 턴이 지나가지 않는다
         await this.switchAlly(pick);
         await this.doTurn(this.enemy, this.ally, this.pickEnemyMove(), this.allyBox, false);
-        if (await this.resolveFaints()) break;
+        if (await this.afterTurn()) break;
         continue;
       }
 
@@ -324,13 +326,13 @@ export default class BattleScene extends Phaser.Scene {
           if (!thrown) continue;                    // 못 던진 경우(파티 만석) — 턴이 지나가지 않는다
           if (this.outcome === "catch") break;      // 잡았다
           await this.doTurn(this.enemy, this.ally, this.pickEnemyMove(), this.allyBox, false);
-          if (await this.resolveFaints()) break;
+          if (await this.afterTurn()) break;
           continue;
         }
         if (bag.text) await this.say(bag.text);     // "OO의 HP가 20 회복됐다!" — 가방이 만든 문장
         await this.allyBox.animateTo();                  // 회복된 HP를 HP바에 반영
         await this.doTurn(this.enemy, this.ally, this.pickEnemyMove(), this.allyBox, false);
-        if (await this.resolveFaints()) break;
+        if (await this.afterTurn()) break;
         continue;
       }
 
@@ -428,6 +430,15 @@ export default class BattleScene extends Phaser.Scene {
     defenderBox: DataBox, isAlly: boolean,
   ): Promise<void> {
     const who = isAlly ? displayName(attacker) : `상대 ${displayName(attacker)}`;
+    const attackerBox = isAlly ? this.allyBox : this.enemyBox;
+
+    // 행동 직전 상태이상 판정(잠듦 감소·깨어남 / 얼음 해동 / 마비 행동불가).
+    //  깨어남·해동으로 상태가 풀릴 수 있으니 알림 후 내 박스 아이콘을 갱신하고, 못 움직이면 여기서 턴 종료.
+    const gate = beforeMove(attacker, who);
+    for (const m of gate.messages) await this.say(m);
+    if (gate.messages.length) attackerBox.refresh();
+    if (!gate.canMove) return;
+
     const res = performMove(attacker, defender, slot);
 
     if (res.noPp) { await this.say(`${who}${josa(who, "은는")} 기술을 쓸 수 없다!`); return; }
@@ -445,6 +456,33 @@ export default class BattleScene extends Phaser.Scene {
     if (res.crit) await this.say("급소에 맞았다!");
     const eff = effectivenessText(res.effectiveness);
     if (eff) await this.say(eff);
+
+    // 상태이상을 걸었으면 알림 + 상대 박스 아이콘 갱신
+    if (res.statusInflicted) {
+      const foe = isAlly ? `상대 ${displayName(defender)}` : displayName(defender);
+      await this.say(inflictMessage(foe, res.statusInflicted));
+      defenderBox.refresh();
+    }
+  }
+
+  // 턴 종료 처리: 상태이상(화상·독) 데미지를 양쪽에 적용하고 쓰러진 쪽을 정리한다.
+  //  반환 true = 배틀 종료. (턴을 소비한 모든 분기에서 resolveFaints 대신 이걸 부른다.)
+  private async afterTurn(): Promise<boolean> {
+    // 빠른 쪽부터(본가 순서). 살아있고 화상/독인 포켓몬만.
+    const sides: [Pokemon, DataBox, boolean][] = this.ally.speed >= this.enemy.speed
+      ? [[this.ally, this.allyBox, true], [this.enemy, this.enemyBox, false]]
+      : [[this.enemy, this.enemyBox, false], [this.ally, this.allyBox, true]];
+    for (const [p, box, isAlly] of sides) {
+      if (isFainted(p)) continue;
+      const dmg = residualDamage(p);
+      if (dmg <= 0) continue;
+      p.currentHp = Math.max(0, p.currentHp - dmg);
+      const who = isAlly ? displayName(p) : `상대 ${displayName(p)}`;
+      await this.say(residualMessage(who, p.status));
+      await box.animateTo();
+      if (isFainted(p)) break; // 쓰러지면 나머지 잔뎀은 생략하고 정리로
+    }
+    return this.resolveFaints();
   }
 
   // 볼을 던진다 — 판정은 systems/capture.ts(AR 원본 공식), 여기선 연출·소비·파티 편입만.
