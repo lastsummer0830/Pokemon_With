@@ -2,6 +2,7 @@
 // 배틀에 필요한 실제 스탯(6종)·기술·상태이상까지 담는다.
 // 종족값·기술 데이터는 Another Red 추출본(src/data/ar)에서 온다.
 import { getSpecies, getMove, BaseStats } from "./ar";
+import type { StatStages } from "../systems/stages";
 
 // 상태이상
 export type Status = "burn" | "poison" | "paralysis" | "sleep" | "freeze" | null;
@@ -35,6 +36,7 @@ export interface Pokemon {
   moves: MoveSlot[];     // 최대 4개
   status: Status;        // 상태이상 (없으면 null)
   sleepTurns?: number;   // 잠듦 남은 턴(status==="sleep"일 때만 의미. 규칙은 systems/status.ts)
+  stages?: StatStages;   // 능력 변화 랭크(-6..+6, 배틀 스코프). 규칙은 systems/stages.ts. 세이브에 남겨도 배틀 시작 시 리셋됨.
 
   heldItem: string | null; // ★ 지닌 도구 (없으면 null)
   condition: number;       // ★ 유대(bond) — 포켓몬을 돌본 만큼 깊어져 배틀로 이어지는 값. 규칙은 systems/bond.ts

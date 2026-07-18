@@ -10,6 +10,7 @@ import { markSeen, markOwn } from "../data/Pokedex";
 import { removeItem, addMoney, getMoney } from "../data/Bag";
 import { performMove, movesFirst, isFainted, effectivenessText } from "../systems/battle";
 import { beforeMove, inflictMessage, residualDamage, residualMessage } from "../systems/status";
+import { resetStages, statChangeMessage } from "../systems/stages";
 import { captureShakes, SHAKE_FAIL_TEXT } from "../systems/capture";
 import { battleExpYield, gainExp } from "../systems/exp";
 import type { BagResult } from "./BagScene";
@@ -187,6 +188,7 @@ export default class BattleScene extends Phaser.Scene {
       const able = this.party.findIndex((p) => !isFainted(p));
       if (able >= 0) this.allyIdx = able;
     }
+    resetStages(this.ally); // 능력 변화 랭크는 배틀 스코프 — 진입 시 초기화(세이브에 남았던 값 무시)
 
     // 상대 팀 — 넘어온 팀 > AR 트레이너 정의 > 데모 1마리.
     //  trainerTeam()은 팀이 여러 버전이면(그린) 무작위로 하나를 고른다 → 여기서 딱 한 번만 부른다.
@@ -463,6 +465,14 @@ export default class BattleScene extends Phaser.Scene {
       await this.say(inflictMessage(foe, res.statusInflicted));
       defenderBox.refresh();
     }
+
+    // 능력 변화(공/방/명중/회피 등) 알림 — side가 user면 사용자, target이면 상대.
+    for (const sc of res.statChanges) {
+      const target = sc.side === "user"
+        ? who
+        : (isAlly ? `상대 ${displayName(defender)}` : displayName(defender));
+      await this.say(statChangeMessage(target, sc));
+    }
   }
 
   // 턴 종료 처리: 상태이상(화상·독) 데미지를 양쪽에 적용하고 쓰러진 쪽을 정리한다.
@@ -603,6 +613,7 @@ export default class BattleScene extends Phaser.Scene {
   // ── 내보내기 / 교체 ─────────────────────────────────────
   // 상대 포켓몬을 내보낸다. first = 배틀 시작(야생 조우 포함), false = 앞의 포켓몬이 쓰러져 다음 마리.
   private async sendOutEnemy(first: boolean): Promise<void> {
+    resetStages(this.enemy); // 내보내는 상대의 능력 변화 랭크 초기화(교체로 새로 나온 마리도 깨끗이)
     const e = displayName(this.enemy);
     if (this.isTrainerBattle) {
       const t = this.trainerName;
@@ -643,6 +654,7 @@ export default class BattleScene extends Phaser.Scene {
     this.allyIdx = next;
     this.allyTurns = 0;
     const p = this.ally;
+    resetStages(p); // 새로 나온 내 포켓몬의 능력 변화 랭크 초기화
     await this.ensureBattleSprite(backKey(p.speciesId), backPath(p.speciesId));
     this.allySprite = this.makeAllySprite();
     this.appear(this.allySprite);

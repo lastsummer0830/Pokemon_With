@@ -4,6 +4,7 @@ import { Pokemon, MoveSlot, Status, displayName } from "../data/Pokemon";
 import { getMove, typeMultiplier, MoveData } from "../data/ar";
 import { bondDamageMult } from "./bond";
 import { statusFromFunctionCode, canInflict, applyStatus, speedMult, burnAttackMult } from "./status";
+import { effectiveStat, accEvaMult, parseStatChange, applyStatChange, StatChangeResult } from "./stages";
 
 // 매직넘버는 상수로.
 const CRIT_CHANCE = 1 / 24;   // 급소 확률
@@ -23,6 +24,7 @@ export interface MoveResult {
   defenderFainted: boolean;
   noPp: boolean;         // PP가 없어 못 씀
   statusInflicted: Status; // 이 기술로 상대에게 새로 건 상태이상(없으면 null)
+  statChanges: StatChangeResult[]; // 이 기술로 생긴 능력 변화(사용자/상대). 규칙은 systems/stages.ts
 }
 
 // 표준 데미지 공식.
@@ -37,9 +39,11 @@ function computeDamage(
 ): { damage: number; effectiveness: number; stab: boolean } {
   // 물리=공격/방어, 특수=특수공격/특수방어
   const isPhysical = move.category === "Physical";
-  // ★ 화상: 물리공격력 절반(특수는 영향 없음). 규칙은 systems/status.ts
-  const atk = Math.floor((isPhysical ? attacker.attack : attacker.spAttack) * burnAttackMult(attacker, isPhysical));
-  const def = isPhysical ? defender.defense : defender.spDefense;
+  const atkKey = isPhysical ? "attack" : "spAttack";
+  const defKey = isPhysical ? "defense" : "spDefense";
+  // ★ 능력 변화 랭크를 반영한 유효 스탯(systems/stages.ts) × 화상 물리½(systems/status.ts).
+  const atk = Math.floor(effectiveStat(attacker, atkKey) * burnAttackMult(attacker, isPhysical));
+  const def = Math.floor(effectiveStat(defender, defKey));
 
   const baseNum = Math.floor((2 * attacker.level) / 5) + 2;
   let dmg = Math.floor((baseNum * move.power * atk) / def / 50) + 2;
@@ -88,13 +92,17 @@ export function performMove(
   }
 
   // 명중 판정 (accuracy 0 = 필중). 변화기·데미지기 모두 여기서 판정한다(전기자석파처럼 빗나가는 변화기 있음).
-  if (move.accuracy > 0 && rng() * 100 >= move.accuracy) {
+  //  명중랭크·회피랭크를 반영한다(필중기 accuracy 0에는 곱하지 않음 — systems/stages.ts).
+  if (move.accuracy > 0 && rng() * 100 >= move.accuracy * accEvaMult(attacker, defender)) {
     return baseResult(name, move, { missed: true });
   }
 
-  // 변화기(위력 0): 데미지 없음 — 상태이상 부여만 시도한다(그 외 효과는 아직 미구현).
+  // 변화기(위력 0): 데미지 없음 — 상태이상·능력변화만 시도한다(그 외 효과는 아직 미구현).
   if (move.power <= 0) {
-    return baseResult(name, move, { statusInflicted: rollStatus(move, defender, rng) });
+    return baseResult(name, move, {
+      statusInflicted: rollStatus(move, defender, rng),
+      statChanges: rollStatChanges(move, attacker, defender, rng),
+    });
   }
 
   const crit = rng() < CRIT_CHANCE;
@@ -114,9 +122,32 @@ export function performMove(
     crit,
     defenderFainted: fainted,
     noPp: false,
-    // 데미지기의 부가 상태이상(effectChance %). 쓰러진 상대에겐 걸지 않는다.
+    // 데미지기의 부가 상태이상·능력변화(effectChance %). 쓰러진 상대에겐 적용하지 않는다.
+    //  단 능력변화는 "쓰러뜨려도 사용자 자기강화는 적용"되므로 상대 대상만 스킵(rollStatChanges 내부에서 판정).
     statusInflicted: fainted ? null : rollStatus(move, defender, rng),
+    statChanges: rollStatChanges(move, attacker, defender, rng, fainted),
   };
+}
+
+// 이 기술이 능력 변화를 일으키나? 일으키면 실제로 적용하고 결과 목록을 돌려준다(없으면 빈 배열).
+//  발동 확률: 순수 변화기(위력0)는 확정(100%), 데미지기의 부가효과는 effectChance %.
+//  대상이 상대(target)여도 사용자(user)여도 여기서 처리.
+//  defenderFainted=true면 상대(target) 대상 변화만 스킵한다(쓰러진 상대는 못 깎지만, 사용자 자기강화는 유효).
+function rollStatChanges(
+  move: MoveData, attacker: Pokemon, defender: Pokemon, rng: () => number,
+  defenderFainted = false,
+): StatChangeResult[] {
+  const spec = parseStatChange(move.functionCode);
+  if (!spec) return [];
+  if (spec.target === "target" && defenderFainted) return [];
+  const chance = move.power <= 0 ? 100 : move.effectChance;
+  if (chance <= 0) return [];
+  if (rng() * 100 >= chance) return [];
+  const p = spec.target === "user" ? attacker : defender;
+  return spec.changes.map((c) => ({
+    side: spec.target, stat: c.stat, delta: c.delta,
+    outcome: applyStatChange(p, c.stat, c.delta),
+  }));
 }
 
 // 이 기술이 상대에게 상태이상을 걸어야 하나? 걸리면 실제로 적용하고 그 상태를 돌려준다(없으면 null).
@@ -148,6 +179,7 @@ function baseResult(
     defenderFainted: false,
     noPp: false,
     statusInflicted: null,
+    statChanges: [],
     ...over,
   };
 }
@@ -162,9 +194,9 @@ export function movesFirst(
   const pa = getMove(aMove.id)?.priority ?? 0;
   const pb = getMove(bMove.id)?.priority ?? 0;
   if (pa !== pb) return pa > pb;
-  // 마비면 스피드 절반(systems/status.ts). 유효 스피드로 선공을 정한다.
-  const sa = a.speed * speedMult(a);
-  const sb = b.speed * speedMult(b);
+  // 스피드 랭크(systems/stages.ts) × 마비 절반(systems/status.ts). 유효 스피드로 선공을 정한다.
+  const sa = effectiveStat(a, "speed") * speedMult(a);
+  const sb = effectiveStat(b, "speed") * speedMult(b);
   if (sa !== sb) return sa > sb;
   return rng() < 0.5;
 }
