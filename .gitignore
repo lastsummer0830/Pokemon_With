@@ -82,3 +82,7 @@ myPokemon_AJ/src/**/*.js.map
 # UI 렌더링 검증 증거(로컬 전용, .gitkeep만 추적)
 .claude/.verify/*
 !.claude/.verify/.gitkeep
+
+# Python 훅 캐시 (session-guard 등)
+__pycache__/
+*.py[cod]
