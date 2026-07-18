@@ -443,11 +443,11 @@ export default class InteriorScene extends Phaser.Scene {
     g.lineStyle(3, ok ? 0x53d769 : 0xff4d4d, 1);
     g.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
 
-    // 이 가구가 지금 파티에 무슨 의미인지 + 방 전체가 만드는 컨디션 상한을 함께 보여준다.
+    // 이 가구가 지금 파티에 무슨 의미인지 + 방 전체가 만드는 유대 상한을 함께 보여준다.
     const party = (this.registry.get("playerParty") as Pokemon[]) ?? [];
     const caps = party.map(p => `${p.name} ${conditionCap(p, this.house)}`).join(" / ");
     const capLine = party.length
-      ? `이 방의 컨디션 상한 → ${caps}  (최대 ${CONDITION_MAX})`
+      ? `이 방에서 재우면 오르는 유대 상한 → ${caps}  (최대 ${CONDITION_MAX})`
       : "포켓몬이 생기면 이 방의 효과가 나타난다.";
     // 왜 못 놓는지 알려준다(빨간 커서만 보여주면 이유를 모른다).
     //  ※ 는 Galmuri11에 있는 글자. ⚠ 같은 이모지·기호는 이 폰트에 없어 깨진 네모(▮)로 나온다.
@@ -458,7 +458,7 @@ export default class InteriorScene extends Phaser.Scene {
       .setPosition(this.scale.width / 2, this.scale.height - 12);
   }
 
-  // ─────────────────────── ★ 잠자기(컨디션 회복) ───────────────────────
+  // ─────────────────────── ★ 잠자기(유대↑ + 회복) ───────────────────────
   // 침대를 바라보고 Space → 파티 전원이 쉰다. 얼마나 오르는지는 '방을 어떻게 꾸몄나'가 정한다.
   private facingBed(): boolean {
     const bed = this.def.bed;
@@ -500,15 +500,15 @@ export default class InteriorScene extends Phaser.Scene {
     for (const r of results) {
       const p = r.pokemon;
       if (r.after > r.before) {
-        await this.say(`${p.name}의 컨디션이 올랐다!  ${r.before} → ${r.after}  (이 방의 한계 ${r.cap})`);
+        await this.say(`${p.name}${josa(p.name, "과와")}의 유대가 깊어졌다!  ${r.before} → ${r.after}  (이 방의 한계 ${r.cap})`);
       } else {
-        await this.say(`${p.name}${josa(p.name, "은는")} 이 방에서 낼 수 있는 최상의 컨디션이다.  ${r.after} / ${r.cap}`);
+        await this.say(`${p.name}${josa(p.name, "은는")} 이 방에서 쌓을 수 있는 최고의 유대다.  ${r.after} / ${r.cap}`);
       }
     }
-    // 방이 허전하면 힌트(집 꾸미기 → 배틀 고리를 플레이어가 알아채게)
+    // 방이 허전하면 힌트(집에서 재우기 → 유대 → 배틀 고리를 플레이어가 알아채게)
     const bestCap = Math.max(...results.map(r => r.cap));
     if (bestCap < CONDITION_MAX) {
-      await this.say("방을 더 꾸미면 포켓몬이 더 좋은 컨디션까지 갈 수 있을 것 같다. (F: 방 꾸미기)");
+      await this.say("방을 더 꾸미면 여기서 쌓을 수 있는 유대가 더 깊어질 것 같다. (F: 방 꾸미기)");
     }
     this.setDialogVisible(false);
     this.endBusySoon();

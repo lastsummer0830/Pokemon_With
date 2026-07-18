@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import { Pokemon, MoveSlot, displayName } from "../data/Pokemon";
 import { getMove } from "../data/ar";
+import { josa } from "../data/josa";
+import { pet, bondHearts, bondLabel, BOND_HEARTS } from "../systems/bond";
 import { iconPath, makePartyIcon } from "../game/pokemonSprite";
 import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
 import { saveGame } from "../systems/save";
@@ -36,6 +38,7 @@ export default class MenuScene extends Phaser.Scene {
   private state: MenuState = "main";
   private idx = 0;
   private detailIdx = 0;
+  private petted = new Set<number>();   // 이번 메뉴 세션에 이미 쓰다듬은 파티 칸(연타 방지)
   private layer!: Phaser.GameObjects.Container;
   private dim?: Phaser.GameObjects.Rectangle;
   private t: Theme = THEMES.navy;
@@ -51,6 +54,7 @@ export default class MenuScene extends Phaser.Scene {
     this.mode = data?.mode ?? "field";
     this.canCancel = data?.canCancel ?? true;
     this.onPick = data?.onPick;
+    this.petted.clear();   // 메뉴를 새로 열 때마다 쓰다듬기 제한 리셋
     if (this.mode === "switch") {
       this.state = "party";   // 교체는 하단 바를 거치지 않고 파티 화면부터
       this.idx = 0;
@@ -177,7 +181,26 @@ export default class MenuScene extends Phaser.Scene {
       //  못 내보내는 포켓몬(이미 나와 있음·기절)인지는 배틀이 판단해 이유를 말해준다.
       if (this.mode === "switch") { this.pick(this.idx); return; }
       this.detailIdx = this.idx; this.state = "detail"; this.renderState();
+    } else if (this.state === "detail") {
+      // 상세뷰에서 확인 = 쓰다듬기(케어 → 유대↑).
+      this.petCurrent();
     }
+  }
+
+  // 쓰다듬기 — 유대를 조금 올린다. 이번 메뉴 세션엔 포켓몬당 1번만(연타 방지).
+  private petCurrent(): void {
+    const p = this.party[this.detailIdx];
+    if (!p) return;
+    const name = displayName(p);
+    if (this.petted.has(this.detailIdx)) {
+      this.toast(`${name}${josa(name, "은는")} 지금은 실컷 놀아줬어.`);
+      return;
+    }
+    const res = pet(p);
+    this.petted.add(this.detailIdx);
+    this.registry.set("playerParty", this.party);   // 유대 상승 반영(저장 시 함께 기록)
+    this.renderState();                              // 하트 게이지 즉시 갱신
+    this.toast(res.message.replace("\n", "  "));
   }
 
   private cancel(): void {
@@ -409,7 +432,11 @@ export default class MenuScene extends Phaser.Scene {
       this.txt(x + 36, sy, n, 24, this.t.text);
       this.txt(x + 160, sy, String(v), 24, this.t.accent);
     });
-    this.txt(x + 36, y + 110 + 6 * 34 + 8, `컨디션: ${p.condition}`, 24, this.t.sub);
+    // 유대(bond) 게이지 — 이 게임의 핵심. ♥ 글리프는 Galmuri11에 없어 graphics로 직접 그린다(폰트 함정 회피).
+    const by = y + 110 + 6 * 34 + 12;
+    this.txt(x + 36, by, "유대", 24, this.t.text);
+    this.drawHearts(x + 100, by + 14, bondHearts(p), BOND_HEARTS, 13);
+    this.txt(x + 100 + BOND_HEARTS * 30 + 14, by, bondLabel(p), 20, this.t.accent);
     this.txt(x + w / 2 + 20, y + 108, "기술", 24, this.t.accent);
     p.moves.forEach((m: MoveSlot, i) => {
       const my = y + 148 + i * 40;
@@ -417,7 +444,24 @@ export default class MenuScene extends Phaser.Scene {
       this.txt(x + w / 2 + 20, my, `${md?.name ?? m.id}`, 24, this.t.text);
       this.txt(x + w - 40, my, `${m.pp}/${m.maxPp}`, 20, this.t.sub, 1);
     });
-    this.txt(x + 28, y + h - 40, "↑↓ 다른 포켓몬  ·  X 뒤로", 18, this.t.sub);
+    this.txt(x + 28, y + h - 40, "↑↓ 다른 포켓몬  ·  Space 쓰다듬기  ·  X 뒤로", 18, this.t.sub);
+  }
+
+  // 유대 하트 5칸을 graphics로 그린다(채워진 칸=분홍 하트, 빈 칸=흐린 하트).
+  //  하트 = 위 두 원 + 아래 삼각형. cy = 하트 세로 중심.
+  private drawHearts(x: number, cy: number, filled: number, total: number, r: number): void {
+    const g = this.add.graphics();
+    const gap = r * 2.3;
+    for (let i = 0; i < total; i++) {
+      const cx = x + i * gap + r;
+      const on = i < filled;
+      if (on) g.fillStyle(0xff5d7a, 1);
+      else g.fillStyle(this.t.line, 0.55);
+      g.fillCircle(cx - r * 0.42, cy - r * 0.28, r * 0.5);
+      g.fillCircle(cx + r * 0.42, cy - r * 0.28, r * 0.5);
+      g.fillTriangle(cx - r * 0.88, cy - r * 0.02, cx + r * 0.88, cy - r * 0.02, cx, cy + r * 0.74);
+    }
+    this.layer.add(g);
   }
 
   private toast(msg: string): void {

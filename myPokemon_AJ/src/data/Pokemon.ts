@@ -36,7 +36,7 @@ export interface Pokemon {
   status: Status;        // 상태이상 (없으면 null)
 
   heldItem: string | null; // ★ 지닌 도구 (없으면 null)
-  condition: number;       // ★ 컨디션(집에서 쉰 정도) — 집 꾸미기와 배틀을 잇는 값
+  condition: number;       // ★ 유대(bond) — 포켓몬을 돌본 만큼 깊어져 배틀로 이어지는 값. 규칙은 systems/bond.ts
   gender: "male" | "female" | null; // 성별(무성=null). 파티/상세창 ♀♂ 표시용.
 }
 

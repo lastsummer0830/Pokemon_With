@@ -2,6 +2,7 @@
 // 데이터: Another Red 추출본(src/data/ar). 표준 포켓몬 데미지 공식을 따른다.
 import { Pokemon, MoveSlot, displayName } from "../data/Pokemon";
 import { getMove, typeMultiplier, MoveData } from "../data/ar";
+import { bondDamageMult } from "./bond";
 
 // 매직넘버는 상수로.
 const CRIT_CHANCE = 1 / 24;   // 급소 확률
@@ -51,10 +52,9 @@ function computeDamage(
   // 급소
   if (crit) dmg *= CRIT_MULT;
 
-  // ★ 컨디션 보너스: 집에서 잘 쉰 포켓몬일수록 살짝 강하게(집 꾸미기 → 배틀 고리).
-  //   condition 100 기준 +10%. (homeBonus.ts가 채운 값을 읽기만 함)
-  const conditionMult = 1 + Math.min(attacker.condition, 200) / 1000;
-  dmg *= conditionMult;
+  // ★ 유대 보너스: 잘 돌봐 유대가 깊은 포켓몬일수록 살짝 강하게(케어 → 배틀 고리).
+  //   유대 100 기준 +10%. 계산은 systems/bond.ts 한 곳에 있고 여기선 읽기만 한다.
+  dmg *= bondDamageMult(attacker);
 
   // 데미지 난수(85~100%)
   dmg *= rand;
