@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { pauseBgm, resumeBgm } from "./bgm";
 
 // 공용 효과음(SFX) — Another Red 정품 효과음(public/assets/audio/sfx_*.ogg).
 //  BGM(루프)은 bgm.ts가, 일회성 효과음은 여기가 담당.
@@ -50,6 +51,17 @@ export function preloadCommonAudio(scene: Phaser.Scene): void {
 // 효과음 한 번 재생(파일 없으면 조용히 패스 — 게임 안 멈춤).
 export function playSfx(scene: Phaser.Scene, key: string, volume = 0.5): void {
   if (scene.cache.audio.exists(key)) scene.sound.play(key, { volume });
+}
+
+// ME(음악성 팡파레) 재생 — BGM과 겹치지 않게 BGM을 pause 했다가, ME가 끝나면 resume 한다.
+//  포켓몬 획득/배지 등 "짧은 곡"에 쓴다. 일반 효과음은 playSfx(겹쳐도 되는 짧은 소리).
+export function playMe(scene: Phaser.Scene, key: string, volume = 0.5): void {
+  if (!scene.cache.audio.exists(key)) return;
+  pauseBgm();
+  const me = scene.sound.add(key, { volume });
+  // 끝나면(또는 파괴돼도) BGM을 되살린다. once로 한 번만.
+  me.once(Phaser.Sound.Events.COMPLETE, () => { resumeBgm(); me.destroy(); });
+  me.play();
 }
 
 // BGM 키(bgm.ts와 함께 씀)

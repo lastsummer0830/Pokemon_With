@@ -2,7 +2,7 @@
 // 데이터: Another Red 추출본(src/data/ar). 표준 포켓몬 데미지 공식을 따른다.
 import { Pokemon, MoveSlot, Status, displayName } from "../data/Pokemon";
 import { getMove, typeMultiplier, MoveData } from "../data/ar";
-import { bondDamageMult } from "./bond";
+import { bondDamageMult, bondAccEvaBonus } from "./bond";
 import { statusFromFunctionCode, canInflict, applyStatus, speedMult, burnAttackMult } from "./status";
 import { effectiveStat, accEvaMult, parseStatChange, applyStatChange, StatChangeResult } from "./stages";
 
@@ -92,8 +92,10 @@ export function performMove(
   }
 
   // 명중 판정 (accuracy 0 = 필중). 변화기·데미지기 모두 여기서 판정한다(전기자석파처럼 빗나가는 변화기 있음).
-  //  명중랭크·회피랭크를 반영한다(필중기 accuracy 0에는 곱하지 않음 — systems/stages.ts).
-  if (move.accuracy > 0 && rng() * 100 >= move.accuracy * accEvaMult(attacker, defender)) {
+  //  명중랭크·회피랭크 + 유대 보너스를 반영한다(필중기 accuracy 0에는 곱하지 않음 — systems/stages.ts).
+  //  ★ 유대(bond): 잘 돌본 공격자는 더 잘 맞히고(명중↑), 잘 돌본 방어자는 더 잘 피한다(회피↑). 계산은 systems/bond.ts.
+  const accMult = accEvaMult(attacker, defender, bondAccEvaBonus(attacker), bondAccEvaBonus(defender));
+  if (move.accuracy > 0 && rng() * 100 >= move.accuracy * accMult) {
     return baseResult(name, move, { missed: true });
   }
 

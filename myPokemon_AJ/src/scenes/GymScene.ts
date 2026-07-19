@@ -3,7 +3,7 @@ import { Gender } from "../data/Player";
 import { josa } from "../data/josa";
 import DialogBox from "../ui/DialogBox";
 import { playBgm } from "../game/bgm";
-import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
+import { playSfx, playMe, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 import { GREEN_BADGE, hasBadge, giveBadge } from "../data/Badges";
 
 // 상록체육관(AR Map194) — 관장 그린과의 첫 체육관 배틀.
@@ -300,7 +300,7 @@ export default class GymScene extends Phaser.Scene {
     await this.dlg.say("이 그린 배지를 받아주세요.", "그린");
 
     giveBadge(this.registry, GREEN_BADGE);
-    playSfx(this, SFX.pkmnGet, 0.6);   // 원본은 ME 'Badge get' — 우리에겐 그 파일이 없어 획득 팡파레로 낸다
+    playMe(this, SFX.pkmnGet, 0.6);   // 원본은 ME 'Badge get' — 그 파일이 없어 획득 팡파레(ME)로. BGM 잠깐 멈췄다 되살림
     const you = this.playerName();
     await this.dlg.say(`${you}${josa(you, "은는")} 그린 배지를 얻었다!`);
     await this.dlg.say("혹시나 조사 중 기억 상실이나 차원 이동에 관한 걸 알게 되면 연락 드리도록 하겠습니다.", "그린");

@@ -58,3 +58,16 @@ export function pet(p: Pokemon): CareResult {
 export function bondDamageMult(p: Pokemon): number {
   return 1 + bondOf(p) / 1000;
 }
+
+// 유대 만점(100)일 때 명중/회피에 더해지는 능력랭크(stage) 상당량. 조절용 상수.
+//   1 = "유대 최대면 명중/회피 +1랭크 상당". 능력랭크(-6..+6)와 같은 축의 연속값이라 소수도 된다.
+export const BOND_ACC_EVA_MAX_STAGE = 1;
+
+// 유대→명중/회피 보너스(이 게임 차별점의 배틀쪽 심화).
+//   "잘 돌본(유대 깊은) 포켓몬은 더 잘 맞히고 더 잘 피한다."
+//   - 공격 시: 이 값을 자기 명중랭크에 더한다(더 잘 맞힌다).
+//   - 방어 시: 이 값을 자기 회피랭크에 더한다(더 잘 피한다).
+//   반환은 0..BOND_ACC_EVA_MAX_STAGE의 연속값(유대에 비례). stages.ts/battle.ts는 이 값을 '읽기만' 한다.
+export function bondAccEvaBonus(p: Pokemon): number {
+  return (bondOf(p) / BOND_MAX) * BOND_ACC_EVA_MAX_STAGE;
+}

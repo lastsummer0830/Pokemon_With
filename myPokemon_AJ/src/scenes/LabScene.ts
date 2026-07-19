@@ -6,7 +6,7 @@ import { markOwn } from "../data/Pokedex";
 import { josa } from "../data/josa";
 import DialogBox from "../ui/DialogBox";
 import { playBgm } from "../game/bgm";
-import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
+import { playSfx, playMe, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 
 // 포켓몬 연구소(오박사 랩) — 어나더레드 실제 내부맵(Map157) 추출본.
 //  실제 FRLG/AR 스타팅 방식: 탁자 위에 "포켓볼 3개"가 놓여 있고, 플레이어가 포켓볼 하나 앞에 서서
@@ -288,7 +288,7 @@ export default class LabScene extends Phaser.Scene {
     party.push(mon); this.registry.set("playerParty", party); this.registry.set("starterChosen", pick.key);
     markOwn(this.registry, pick.key);   // 첫 포켓몬 → 도감에 '잡음'으로 등록
     this.chosen = true;
-    playSfx(this, SFX.pkmnGet, 0.6); // 포켓몬 획득 팡파레
+    playMe(this, SFX.pkmnGet, 0.6); // 포켓몬 획득 팡파레(ME) — BGM 잠깐 멈췄다 되살림(겹침 방지)
     // 고른 포켓볼은 탁자에서 사라짐(플레이어가 가져감)
     this.tweens.add({ targets: this.balls[i], alpha: 0, duration: 250, onComplete: () => this.balls[i].setVisible(false) });
     this.closeWindow();

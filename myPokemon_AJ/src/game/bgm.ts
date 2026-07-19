@@ -26,6 +26,15 @@ export function playBgm(scene: Phaser.Scene, key: string, volume = 0.4): void {
   }
 }
 
+// ME(짧은 음악성 팡파레 — 예: 포켓몬 획득) 재생 동안 BGM을 잠깐 멈췄다 되살린다.
+//  원본 포켓몬처럼 "ME 나올 땐 BGM이 겹치지 않게" 한다. sfx.ts의 playMe가 이 짝을 쓴다.
+export function pauseBgm(): void {
+  if (current && current.isPlaying) current.pause();
+}
+export function resumeBgm(): void {
+  if (current && current.isPaused) current.resume();
+}
+
 export function stopBgm(): void {
   if (current) {
     current.stop();

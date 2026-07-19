@@ -56,8 +56,10 @@ export function effectiveStat(p: Pokemon, key: "attack" | "defense" | "spAttack"
 
 // 명중 판정용 최종 배율 = 공격자 명중랭크와 방어자 회피랭크를 합쳐 하나의 랭크로.
 //  본가와 동일: net = clamp(명중 - 회피, -6, 6) → 명중 배율표. 필중기(accuracy 0)에는 이걸 곱하지 않는다.
-export function accEvaMult(attacker: Pokemon, defender: Pokemon): number {
-  const net = stageOf(attacker, "accuracy") - stageOf(defender, "evasion");
+//  accBonus/evaBonus = 랭크 외에 더해질 연속 보너스(예: 유대→명중/회피, systems/bond.ts에서 계산).
+//    stages는 유대 개념을 알 필요 없어 값만 받는다(경계 유지) — 넘기지 않으면 순수 랭크 계산.
+export function accEvaMult(attacker: Pokemon, defender: Pokemon, accBonus = 0, evaBonus = 0): number {
+  const net = (stageOf(attacker, "accuracy") + accBonus) - (stageOf(defender, "evasion") + evaBonus);
   return accuracyMult(net);
 }
 
