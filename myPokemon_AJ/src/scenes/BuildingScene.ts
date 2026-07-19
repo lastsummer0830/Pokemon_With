@@ -46,6 +46,9 @@ interface MapData { cols: number; rows: number; blocked: number[][]; }
 interface BuildInit { building?: Building; testParty?: boolean; }
 
 const STEP_MS = 150; // 한 칸 걷는 시간 — 다른 씬(월드·연구소·체육관)과 같게
+// y-정렬 기준 depth. 맵=0, 대화창=1000+ 사이. 캐릭터 depth = BASE+발위치행, 전경 스트립 depth = BASE+행+0.5.
+//  → 같은 행/뒤(위)에 선 캐릭터는 그 행 전경(카운터 앞면)에 가려지고, 앞(아래) 캐릭터는 전경 위로 그려진다.
+const CHAR_DEPTH_BASE = 10;
 
 // 건물별 정의 — 좌표는 전부 AR Map158/159 이벤트에서 뽑은 소스 값(눈대중 아님).
 const BUILDINGS: Record<Building, BuildingDef> = {
@@ -90,7 +93,7 @@ export default class BuildingScene extends Phaser.Scene {
   private def!: BuildingDef;
   private map!: MapData;
   private mapImg!: Phaser.GameObjects.Image;
-  private overImg?: Phaser.GameObjects.Image; // 전경(카운터 앞면 등) — NPC 위, 플레이어 아래에 그린다
+  private overStrips: Phaser.GameObjects.Image[] = []; // 전경(카운터 앞면 등)을 행별로 쪼갠 스트립 — per-캐릭터 y정렬용
   private npcSprites: Phaser.GameObjects.Sprite[] = [];
 
   private player!: Phaser.GameObjects.Sprite;
@@ -151,11 +154,19 @@ export default class BuildingScene extends Phaser.Scene {
 
     playBgm(this, d.bgmKey, 0.4);
     this.mapImg = this.add.image(0, 0, d.imgKey).setOrigin(0, 0).setDepth(0);
-    // 전경(카운터 앞면 등 priority 타일) — NPC(depth 4) 위, 플레이어(depth 7) 아래.
-    //  이러면 카운터 뒤 NPC의 다리를 카운터가 가려 "뒤에 선" 것처럼 보이고(원본 동일),
-    //  카운터 앞에 선 플레이어는 그 위로 그려져 머리 안 잘린다.
-    if (this.textures.exists(d.overKey))
-      this.overImg = this.add.image(0, 0, d.overKey).setOrigin(0, 0).setDepth(6);
+    // 전경(카운터 앞면 등 priority 타일)을 '행별 스트립'으로 쪼갠다. 각 행 depth = BASE+행+0.5.
+    //  단일 고정 depth로는 위 카운터(checkout)와 아래 카운터(delivery)를 동시에 못 맞춘다
+    //  (플레이어가 아래카운터엔 뒤·위카운터엔 앞이어야 함) → 행별 y정렬만이 둘 다 옳게 그린다.
+    this.overStrips = [];
+    if (this.textures.exists(d.overKey)) {
+      const ow = this.textures.get(d.overKey).getSourceImage().width; // 전경 텍스처 폭(크롭 기준)
+      for (let r = 0; r < this.map.rows; r++) {
+        const strip = this.add.image(0, 0, d.overKey).setOrigin(0, 0)
+          .setCrop(0, r * 32, ow, 32)            // 그 행(32px 밴드)만 보이게 크롭
+          .setDepth(CHAR_DEPTH_BASE + r + 0.5);  // 같은 행 캐릭터(BASE+r)보다 살짝 위 → 카운터가 캐릭터를 가림
+        this.overStrips.push(strip);
+      }
+    }
 
     // 걷기 애니 — 게임 전역에 등록돼 재입장 시 이미 있을 수 있다 → exists로 중복 등록 경고를 막는다.
     const mk = (prefix: string, tex: string, key: string, frames: number[]) => {
@@ -165,10 +176,10 @@ export default class BuildingScene extends Phaser.Scene {
     mk("bld", this.texKey, "down", [0, 1, 2, 3]); mk("bld", this.texKey, "left", [4, 5, 6, 7]);
     mk("bld", this.texKey, "right", [8, 9, 10, 11]); mk("bld", this.texKey, "up", [12, 13, 14, 15]);
 
-    // NPC는 서서 한 방향만 본다(정지 프레임). 애니는 안 돌린다.
+    // NPC는 서서 한 방향만 본다(정지 프레임). 애니는 안 돌린다. depth는 layout()에서 행 기준으로 설정.
     this.npcSprites = d.npcs.map((npc) =>
-      this.add.sprite(0, 0, npc.key, this.idleFrame[npc.face]).setOrigin(0.5, 1).setDepth(4));
-    this.player = this.add.sprite(0, 0, this.texKey, this.idleFrame.up).setOrigin(0.5, 1).setDepth(7);
+      this.add.sprite(0, 0, npc.key, this.idleFrame[npc.face]).setOrigin(0.5, 1));
+    this.player = this.add.sprite(0, 0, this.texKey, this.idleFrame.up).setOrigin(0.5, 1);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.dlg = new DialogBox(this);
@@ -195,17 +206,19 @@ export default class BuildingScene extends Phaser.Scene {
     this.origin = { x: Math.round((W - w) / 2), y: Math.round((H - h) / 2) };
     this.tile = 32 * this.zoom;
     this.mapImg.setPosition(this.origin.x, this.origin.y).setScale(this.zoom);
-    this.overImg?.setPosition(this.origin.x, this.origin.y).setScale(this.zoom);
+    for (const strip of this.overStrips) strip.setPosition(this.origin.x, this.origin.y).setScale(this.zoom);
     this.npcSprites.forEach((spr, i) => {
       const [nx, ny] = this.def.npcs[i].tile;
-      spr.setPosition(this.cx(nx), this.cy(ny)).setScale(this.zoom * 0.92);
+      spr.setPosition(this.cx(nx), this.cy(ny)).setScale(this.zoom * 0.92).setDepth(this.charDepth(ny));
     });
-    this.player.setPosition(this.cx(this.tx), this.cy(this.ty)).setScale(this.zoom * 0.92);
+    this.player.setPosition(this.cx(this.tx), this.cy(this.ty)).setScale(this.zoom * 0.92).setDepth(this.charDepth(this.ty));
     this.dlg.layout();
   }
 
   private cx(tx: number): number { return this.origin.x + (tx + 0.5) * this.tile; }
   private cy(ty: number): number { return this.origin.y + (ty + 1) * this.tile; }
+  // 발이 놓인 행(row) 기준 depth. 아래 행일수록(=화면 앞) 크다 → 전경 스트립과 올바르게 앞뒤정렬.
+  private charDepth(row: number): number { return CHAR_DEPTH_BASE + row; }
 
   private walkable(tx: number, ty: number): boolean {
     if (tx < 0 || ty < 0 || tx >= this.map.cols || ty >= this.map.rows) return false;
@@ -232,6 +245,7 @@ export default class BuildingScene extends Phaser.Scene {
 
     this.moving = true;
     this.player.play(`bld-${this.facing}`, true);
+    this.player.setDepth(this.charDepth(nty)); // 이동 방향으로 즉시 y정렬(위로=뒤로 들어감, 아래로=앞으로 나옴)
     this.tweens.add({
       targets: this.player, x: this.cx(ntx), y: this.cy(nty), duration: STEP_MS,
       onComplete: () => { this.tx = ntx; this.ty = nty; this.moving = false; },
