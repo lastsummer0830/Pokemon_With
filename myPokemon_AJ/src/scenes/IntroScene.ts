@@ -55,8 +55,8 @@ export default class IntroScene extends Phaser.Scene {
     this.bg = this.add.graphics().setDepth(-10);
     this.darkBg = this.add.image(0, 0, "intro_dark").setOrigin(0.5).setDepth(-9);
 
-    // 도트 에셋은 또렷하게(픽셀 보존)
-    ["oak", "boy_red", "girl_dawn"].forEach((k) =>
+    // 도트 에셋은 또렷하게(픽셀 보존) — 스포트라이트 배경(intro_dark)·발판(intro_base)도 포함.
+    ["oak", "boy_red", "girl_dawn", "intro_dark", "intro_base"].forEach((k) =>
       this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST)
     );
 

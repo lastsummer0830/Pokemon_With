@@ -4,8 +4,8 @@
 import { getSpecies, getMove, BaseStats } from "./ar";
 import type { StatStages } from "../systems/stages";
 
-// 상태이상
-export type Status = "burn" | "poison" | "paralysis" | "sleep" | "freeze" | null;
+// 상태이상 (badpoison = 맹독: 턴마다 데미지가 누적된다)
+export type Status = "burn" | "poison" | "badpoison" | "paralysis" | "sleep" | "freeze" | null;
 
 // 배운 기술 한 칸 (id + 남은 PP)
 export interface MoveSlot {
@@ -36,6 +36,10 @@ export interface Pokemon {
   moves: MoveSlot[];     // 최대 4개
   status: Status;        // 상태이상 (없으면 null)
   sleepTurns?: number;   // 잠듦 남은 턴(status==="sleep"일 때만 의미. 규칙은 systems/status.ts)
+  toxicCounter?: number; // 맹독 누적 카운터(status==="badpoison"일 때만. 1부터 시작해 턴마다 +1)
+  // ── 휘발성 상태(배틀 중에만·교체하면 사라짐. 규칙은 systems/status.ts) ──
+  flinch?: boolean;      // 이번 턴 풀죽음(선공에게 맞으면 후공이 못 움직임). 턴 끝나면 해제.
+  confusionTurns?: number; // 혼란 남은 턴(>0이면 혼란. 매 턴 감소, 확률로 자기공격)
   stages?: StatStages;   // 능력 변화 랭크(-6..+6, 배틀 스코프). 규칙은 systems/stages.ts. 세이브에 남겨도 배틀 시작 시 리셋됨.
 
   heldItem: string | null; // ★ 지닌 도구 (없으면 null)

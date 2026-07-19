@@ -3,12 +3,12 @@
 import { Pokemon, MoveSlot, Status, displayName } from "../data/Pokemon";
 import { getMove, typeMultiplier, MoveData } from "../data/ar";
 import { bondDamageMult, bondAccEvaBonus } from "./bond";
-import { statusFromFunctionCode, canInflict, applyStatus, speedMult, burnAttackMult } from "./status";
+import { statusFromFunctionCode, canInflict, applyStatus, applyConfusion, speedMult, burnAttackMult } from "./status";
 import { effectiveStat, accEvaMult, parseStatChange, applyStatChange, StatChangeResult } from "./stages";
 
 // 매직넘버는 상수로.
-const CRIT_CHANCE = 1 / 24;   // 급소 확률
-const CRIT_MULT = 1.5;        // 급소 배율
+const CRIT_CHANCE = 1 / 16;   // 급소 확률 (5세대 기준)
+const CRIT_MULT = 2.0;        // 급소 배율 (5세대 기준 ×2.0)
 const STAB_MULT = 1.5;        // 자속(Same-Type Attack Bonus)
 const RAND_MIN = 0.85;        // 데미지 난수 하한(85~100%)
 
@@ -25,6 +25,9 @@ export interface MoveResult {
   noPp: boolean;         // PP가 없어 못 씀
   statusInflicted: Status; // 이 기술로 상대에게 새로 건 상태이상(없으면 null)
   statChanges: StatChangeResult[]; // 이 기술로 생긴 능력 변화(사용자/상대). 규칙은 systems/stages.ts
+  flinched: boolean;     // 이 기술로 상대를 풀죽게 했나(다음 행동이 후공일 때만 실제 효과)
+  confused: boolean;     // 이 기술로 상대를 혼란에 빠뜨렸나
+  healed: number;        // 이 기술로 사용자가 회복한 HP(회복기). 0이면 없음
 }
 
 // 표준 데미지 공식.
@@ -99,10 +102,12 @@ export function performMove(
     return baseResult(name, move, { missed: true });
   }
 
-  // 변화기(위력 0): 데미지 없음 — 상태이상·능력변화만 시도한다(그 외 효과는 아직 미구현).
+  // 변화기(위력 0): 데미지 없음 — 상태이상·혼란·능력변화·회복만 시도한다(그 외 효과는 아직 미구현).
   if (move.power <= 0) {
     return baseResult(name, move, {
       statusInflicted: rollStatus(move, defender, rng),
+      confused: rollConfuse(move, defender, rng),
+      healed: rollHeal(move, attacker),
       statChanges: rollStatChanges(move, attacker, defender, rng),
     });
   }
@@ -127,8 +132,43 @@ export function performMove(
     // 데미지기의 부가 상태이상·능력변화(effectChance %). 쓰러진 상대에겐 적용하지 않는다.
     //  단 능력변화는 "쓰러뜨려도 사용자 자기강화는 적용"되므로 상대 대상만 스킵(rollStatChanges 내부에서 판정).
     statusInflicted: fainted ? null : rollStatus(move, defender, rng),
+    // 데미지기의 부가 풀죽음·혼란(effectChance %). 쓰러진 상대에겐 의미 없으니 스킵.
+    flinched: fainted ? false : rollFlinch(move, rng),
+    confused: fainted ? false : rollConfuse(move, defender, rng),
+    healed: 0, // 데미지기의 흡수/반동은 아직 미구현
     statChanges: rollStatChanges(move, attacker, defender, rng, fainted),
   };
+}
+
+// 이 기술이 상대를 풀죽게 하나(effectChance %). functionCode에 "Flinch"가 있으면 대상 풀죽음.
+function rollFlinch(move: MoveData, rng: () => number): boolean {
+  if (!move.functionCode.includes("Flinch")) return false;
+  const chance = move.power <= 0 ? 100 : move.effectChance;
+  if (chance <= 0) return false;
+  return rng() * 100 < chance;
+}
+
+// 이 기술이 상대를 혼란에 빠뜨리나. functionCode에 "ConfuseTarget"이 있으면 대상 혼란(effectChance %).
+//  실제로 걸리면(이미 혼란이 아니면) true.
+function rollConfuse(move: MoveData, defender: Pokemon, rng: () => number): boolean {
+  if (!move.functionCode.includes("ConfuseTarget")) return false;
+  const chance = move.power <= 0 ? 100 : move.effectChance;
+  if (chance <= 0) return false;
+  if (rng() * 100 >= chance) return false;
+  return applyConfusion(defender, rng);
+}
+
+// 회복기: 위력0 변화기의 "HealUser…Half/Quarter…" 계열이면 사용자 HP를 정액 회복하고 회복량을 돌려준다.
+//  (데미지기의 HealUser…=흡수/반동 계열은 여기서 다루지 않는다 — 아직 미구현.)
+function rollHeal(move: MoveData, user: Pokemon): number {
+  if (move.power > 0) return 0;
+  const frac = move.functionCode.includes("HealUserHalfOfTotalHP") ? 0.5
+    : move.functionCode.includes("HealUserAndAlliesQuarterOfTotalHP") ? 0.25
+    : 0;
+  if (frac <= 0) return 0;
+  const heal = Math.min(user.maxHp - user.currentHp, Math.floor(user.maxHp * frac));
+  if (heal > 0) user.currentHp += heal;
+  return heal;
 }
 
 // 이 기술이 능력 변화를 일으키나? 일으키면 실제로 적용하고 결과 목록을 돌려준다(없으면 빈 배열).
@@ -182,6 +222,9 @@ function baseResult(
     noPp: false,
     statusInflicted: null,
     statChanges: [],
+    flinched: false,
+    confused: false,
+    healed: 0,
     ...over,
   };
 }

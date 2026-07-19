@@ -38,3 +38,29 @@ export const DEFAULT_DIFFICULTY: Difficulty = "normal";
 export function difficultyDef(d: Difficulty): DifficultyDef {
   return DIFFICULTIES[d] ?? DIFFICULTIES[DEFAULT_DIFFICULTY];
 }
+
+// 트레이너 타입 id로 관장/챔피언 레벨 보정을 정한다(위 공식의 +3/+5).
+export function leaderBonusForType(type: string): number {
+  const t = type.toUpperCase();
+  if (t.includes("CHAMPION")) return 5;
+  if (t.includes("LEADER")) return 3;
+  return 0;
+}
+
+// AR "Automatic Level Scaling" — 트레이너 각 포켓몬의 실제 레벨을 플레이어 파티 평균 기준으로 다시 계산한다.
+//  실제레벨 = 파티평균 - 2 + 난이도fixed + rand(0..random) + 관장/챔피언보정 + (원본레벨 - 원본팀평균)
+//  → 원본 팀 안의 레벨 격차는 보존되고(에이스가 여전히 제일 셈), 전체 높이는 내 파티에 맞춰 움직인다.
+//  clamp 2~100. rng는 테스트 주입용(기본 Math.random).
+export function scaledTrainerLevel(
+  origLevel: number,
+  partyAvg: number,
+  teamAvg: number,
+  leaderBonus: number,
+  diff: Difficulty,
+  rng: () => number = Math.random,
+): number {
+  const d = difficultyDef(diff);
+  const rand = d.random > 0 ? Math.floor(rng() * (d.random + 1)) : 0;
+  const lv = Math.round(partyAvg - 2 + d.fixed + rand + leaderBonus + (origLevel - teamAvg));
+  return Math.max(2, Math.min(100, lv));
+}

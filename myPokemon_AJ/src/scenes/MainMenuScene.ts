@@ -36,7 +36,7 @@ export default class MainMenuScene extends Phaser.Scene {
   }
 
   create(): void {
-    for (const k of ["menu_ball", "menu_bar", "menu_bar_sel"])
+    for (const k of ["menu_dither", "menu_ball", "menu_bar", "menu_bar_sel"])
       this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.cameras.main.roundPixels = true;
 

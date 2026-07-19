@@ -20,6 +20,10 @@ export default class TitleScene extends Phaser.Scene {
   create(): void {
     const { width, height } = this.scale;
 
+    // 도트 에셋은 또렷하게(픽셀 보존) — 전역 pixelArt가 꺼져 있어 텍스처마다 NEAREST 지정.
+    for (const k of ["title_bg", "title_logo"])
+      this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
+
     // 시작 BGM 재생(타이틀→메뉴→인트로까지 이어짐). 자동재생 잠김이면 첫 입력 때 소리남.
     playBgm(this, "bgm_title", 0.4);
 

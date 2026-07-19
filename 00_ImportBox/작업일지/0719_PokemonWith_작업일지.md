@@ -74,3 +74,45 @@
 
 ## 다음 세션 첫 프롬프트 제안
 "작업일지 0719 읽고 **①마트 플레이어-카운터 y정렬(올라타 보이는 것)**부터. 카운터 칸을 원본 PNG 격자로 실측하고, per-캐릭터 y-정렬 depth로 플레이어는 카운터 앞에선 위·뒤에선 아래로. 그다음 ②점원 실플레이 돌아봄 재현·수정, ③BGM/SFX 겹침(bgm.ts). 전부 playwright 스샷 검증 전엔 완료라 하지 말 것."
+
+---
+
+## ✅ 세션8 (0719 야간) — exe bake + 배틀시스템 대폭 확장 + 시각버그 (⚠️전부 미커밋)
+> "빨리 다 해놔 — 배틀로직·상태이상 등 기본 시스템 + UI·픽셀 렌더 모든 장면 어색한 것 싹 확인" 요청. 감사 서브에이전트 3종(배틀시스템/씬UI코드/실제렌더 스샷) 병렬로 현황 정밀 파악 후 우선순위대로 착수.
+
+### ②[clerk-turn] 해결 = exe bake (지난 세션 추정 확정)
+- **원인 확정:** exe의 `app.asar`(Jul 10)에 `attendant`·`counterTiles` 코드가 **아예 없었음**(asar 뜯어 grep 확인) → 점원 돌아봄 코드가 exe에 안 구워진 게 맞았다. `npm run app:bake` 실행 → 새 asar(Jul 19)에 counterTiles/attendant/me_pkmn_heal **모두 포함 확인**. ⚠️**사용자 실플레이 재확인 필요**(exe 껐다 켜서 마트/센터 카운터에서 A → 점원·간호순 돌아보는지).
+
+### 배틀 로직 / 상태이상 (코드완료 + tsc + 순수로직 유닛테스트 23/23, ⚠️in-game 통합검증은 아래)
+- **[실버그]** 독/화상 지속뎀이 **일반 공격 턴에 통째로 누락**되던 것 수정: `BattleScene.ts` 공격턴 종료가 `resolveFaints()`→**`afterTurn()`**(잔뎀+정리 유일 호출부). 감사B가 계약위반으로 확정.
+- **급소 5세대화:** `battle.ts` CRIT_CHANCE 1/24→**1/16**, CRIT_MULT 1.5→**2.0**.
+- **맹독(badpoison):** Status 유니온에 추가, `toxicCounter`(1부터 턴마다 +1), residualDamage= maxHp×n/16. `statusFromFunctionCode`에서 BadPoison을 Poison보다 **먼저** 매칭(문자열 포함관계). `advanceStatusTurn()`이 afterTurn에서 카운터 증가.
+- **풀죽음(flinch):** `Pokemon.flinch` 휘발성. 데미지기 functionCode에 "Flinch"면 effectChance로 `res.flinched` → BattleScene에서 `defender.flinch=true`. `beforeMove`가 맨 위에서 소비(못 움직임). afterTurn에서 양쪽 flinch=false.
+- **혼란(confusion):** `Pokemon.confusionTurns`(1~4). "ConfuseTarget"이면 `applyConfusion`. `beforeMove`가 감소·50% 자기공격(무속성 40위력, status.ts 안에서 자체 계산 — 순환import 회피) → `MoveGate.selfDamage` 반환 → BattleScene가 공격자 자신에게 적용.
+- **회복기(heal):** 위력0 변화기 "HealUserHalfOfTotalHP"(50%)/"...QuarterOfTotalHP"(25%)면 `rollHeal`이 사용자 HP 회복 → `res.healed` → BattleScene 메시지+HP바. (흡수/반동 계열은 여전히 미구현.)
+- **휘발성 리셋:** `clearVolatileStatus()`(flinch/confusion) — 배틀진입·교체(내/상대) 3곳, resetStages 옆에 함께 호출.
+- **난이도 스케일링(그동안 무효였음):** `difficulty.ts`에 `scaledTrainerLevel()`(주석 명세 그대로: 파티평균-2+fixed+rand+관장/챔피언보정+(원본레벨-원본팀평균), clamp2~100) + `leaderBonusForType`(LEADER +3/CHAMPION +5). `BattleScene.buildScaledTrainerTeam()`가 트레이너 팀 생성 시 적용(야생·넘어온 팀은 스케일 안 함 = AR 중립). 계산검증 6/6.
+
+### 시각/렌더
+- **파이리 뒷모습:** AR 원본 `Graphics/Pokemon/Back/CHARMANDER.png` **자체가 앞모습**(전 프레임 얼굴·꼬리불꽃, 다른 스타터 back은 정상). PokeAPI **5세대 BW animated back**(id 4, `.../generation-v/black-white/animated/back/4.gif`, 정상 뒷모습)을 가로 애니시트 PNG(2530×46, 55프레임)로 변환해 `public/assets/pokemon/back/CHARMANDER.png` 교체. 로더(pokemonSprite.makeStillFront=정사각 프레임0 크롭)와 포맷 호환 확인. **원본 백업**: 스크래치패드 `CHARMANDER_back_OLD.png`.
+- **NEAREST 픽셀 블러 4건**(서브에이전트): TitleScene(title_bg/logo, setFilter 아예 없었음)·IntroScene(intro_dark/base)·PokedexScene(발자국 dexfoot_ prefix 누락)·MainMenuScene(menu_dither). 각 씬 기존 idiom대로 최소수정. tsc통과.
+
+### 검증 상태 (정직)
+- **tsc 통과** + status.ts 순수로직 **23/23** + difficulty 6/6.
+- **in-game 통합검증(playwright, 실렌더 스냅샷) 완료 — 스크래치패드 `verify/`:**
+  - ✅ **파이리 ally 뒷모습 정상**(`battle_ally_backsprite.png` — 등/나페가 뒤로, 꼬리불꽃 앞으로. 앞모습 아님).
+  - ✅ **배틀 무크래시**: 새 상태이상 코드(풀죽음/혼란/맹독/회복) 경로 포함 ~40턴·3회 반복, **JS 예외 0**, HP변화·메시지·전투종료 정상.
+  - ✅ **NEAREST 4씬**(Title/Intro/Pokedex/MainMenu) 또렷하게 렌더 확인.
+- ⚠️ **아직 눈으로 특정 안 한 것**(로직·무크래시는 통과, 수치 확인만 남음): (c)독/화상 걸고 **공격턴마다 잔뎀** 실제 들어오는지, (d)난이도 **easy vs insane 트레이너 레벨 실제 차이**, 혼란 자기공격/회복기 메시지 실물. 다음 세션에서 상태이상기 강제로 걸어 눈 확인 권장(로직 유닛테스트는 통과).
+- **exe 미반영:** 이 세션 변경 전부 dev소스만. 사용자 실플레이(exe) 확인하려면 `npm run app:bake` 다시 필요(bake는 exe 껐다).
+
+### 남은 것 (다음 세션, 우선순위)
+1. **위 in-game 검증부터**(완료라 못 박기 전 필수). 문제 있으면 수정.
+2. **진화(레벨업)** — 데이터형식 파악완료(`species.json` evolutions: `{species,method:"Level",param:레벨}`. 파이리16/꼬부기16/구구18 등). exp.gainExp 레벨업 뒤 Level진화 param<=레벨이면 speciesId/name/types 교체+recomputeStats+메시지. 배틀중 스프라이트 스왑 or 전투후 처리 택1.
+3. **씬 폴리시(감사B/C 지적):** DialogBox 줄/높이 상한 없음→긴대사 박스밖 넘침(Gym/Intro/Battle 공통)·MenuScene 하단바 하드코드색(테마무시)·실내 씬 카메라 줌 불일치(침실 vs 거실 레터박스)·BedroomScene(미도달 레거시인데 `this.scale.off("resize")`가 전역 resize리스너 전부 제거 = 위험).
+4. **판단 필요(사용자 결정):** 그린 관장 이름창 첫대면부터 노출 — 규칙은 "자기소개 전 ???"인데 AR에서 그린이 자기소개 안 함. 규칙충실 vs AR충실 어느쪽?
+
+### 함정·메모
+- 배틀 시스템 파일(battle/status 등)은 BattleScene가 import → 편집 시 dev 핫리로드 → **playwright 검증 에이전트 돌 때 소스 편집 금지**(캡처 오염). 감사·검증 서브에이전트 병렬 시 이 순서 주의.
+- status.ts 순수함수는 ar 데이터 불필요 → esbuild 번들로 node 단위테스트 가능(스크래치패드 `test-status.mjs`, `createRequire(프로젝트/package.json)`로 esbuild 해결).
+- 파이리 back 첫 판단 때 작은 크기로 앞/뒤 오판했다 → front vs back 나란히 비교로 확정(스크래치패드 `front_vs_back.png`). **작은 스프라이트 방향판단은 반드시 대조.**

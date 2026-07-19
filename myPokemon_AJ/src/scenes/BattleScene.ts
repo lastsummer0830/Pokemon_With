@@ -9,10 +9,12 @@ import type { TrainerDef } from "../data/ar";
 import { markSeen, markOwn } from "../data/Pokedex";
 import { removeItem, addMoney, getMoney } from "../data/Bag";
 import { performMove, movesFirst, isFainted, effectivenessText } from "../systems/battle";
-import { beforeMove, inflictMessage, residualDamage, residualMessage } from "../systems/status";
+import { beforeMove, inflictMessage, confusionMessage, residualDamage, residualMessage, advanceStatusTurn, clearVolatileStatus } from "../systems/status";
 import { resetStages, statChangeMessage } from "../systems/stages";
 import { captureShakes, SHAKE_FAIL_TEXT } from "../systems/capture";
 import { battleExpYield, gainExp } from "../systems/exp";
+import { scaledTrainerLevel, leaderBonusForType, DEFAULT_DIFFICULTY } from "../systems/difficulty";
+import type { Difficulty } from "../systems/difficulty";
 import type { BagResult } from "./BagScene";
 import {
   BattleView, DataBox, CMD_SLOTS,
@@ -189,11 +191,12 @@ export default class BattleScene extends Phaser.Scene {
       if (able >= 0) this.allyIdx = able;
     }
     resetStages(this.ally); // 능력 변화 랭크는 배틀 스코프 — 진입 시 초기화(세이브에 남았던 값 무시)
+    clearVolatileStatus(this.ally); // 풀죽음·혼란은 배틀 스코프 — 진입 시 초기화
 
-    // 상대 팀 — 넘어온 팀 > AR 트레이너 정의 > 데모 1마리.
+    // 상대 팀 — 넘어온 팀 > AR 트레이너 정의(난이도로 레벨 스케일) > 데모 1마리.
     //  trainerTeam()은 팀이 여러 버전이면(그린) 무작위로 하나를 고른다 → 여기서 딱 한 번만 부른다.
     this.enemyTeam = this.pendingEnemyTeam
-      ?? (this.trainerDef ? trainerTeam(this.trainerDef).map((m) => createFromSpecies(m.id, m.level)) : null)
+      ?? (this.trainerDef ? this.buildScaledTrainerTeam(this.trainerDef) : null)
       ?? [createFromSpecies(this.enemySpecies, 3)];
     this.enemyIdx = 0;
 
@@ -352,7 +355,9 @@ export default class BattleScene extends Phaser.Scene {
         // 누가 쓰러지면 남은 행동은 취소된다(쓰러진 포켓몬은 못 때리고, 못 맞는다).
         if (isFainted(this.enemy) || isFainted(this.ally)) break;
       }
-      if (await this.resolveFaints()) break;
+      // 턴 종료 처리(독·화상 잔뎀 + 기절 정리). resolveFaints가 아니라 afterTurn을 부른다 —
+      //  afterTurn만이 residualDamage를 돌린다(L479 계약). 가장 흔한 공격 턴에서 잔뎀이 빠지던 버그 수정.
+      if (await this.afterTurn()) break;
     }
 
     await this.endBattle();
@@ -392,6 +397,18 @@ export default class BattleScene extends Phaser.Scene {
     }
     await this.switchAlly(await this.choosePartyIdx(false));
     return false;
+  }
+
+  // AR 트레이너 팀을 난이도로 레벨 스케일해 만든다(계산은 systems/difficulty.ts).
+  //  야생·넘어온 팀은 스케일 대상이 아니다(AR도 난이도 중립) — 오직 트레이너 정의 팀만.
+  private buildScaledTrainerTeam(def: TrainerDef): Pokemon[] {
+    const team = trainerTeam(def); // 여러 버전이면 무작위 하나(그린) — 딱 한 번 호출
+    const diff = (this.registry.get("difficulty") as Difficulty) ?? DEFAULT_DIFFICULTY;
+    const partyAvg = this.party.reduce((s, p) => s + p.level, 0) / Math.max(1, this.party.length);
+    const teamAvg = team.reduce((s, m) => s + m.level, 0) / Math.max(1, team.length);
+    const leaderBonus = leaderBonusForType(def.type);
+    return team.map((m) =>
+      createFromSpecies(m.id, scaledTrainerLevel(m.level, partyAvg, teamAvg, leaderBonus, diff)));
   }
 
   // 배틀 종료 처리: 패배=파티 전체 회복 후 집으로(화이트아웃) / 승리·도망=원위치 월드 복귀.
@@ -439,6 +456,12 @@ export default class BattleScene extends Phaser.Scene {
     const gate = beforeMove(attacker, who);
     for (const m of gate.messages) await this.say(m);
     if (gate.messages.length) attackerBox.refresh();
+    // 혼란 자기공격: 이번 턴은 못 움직이고 자신에게 데미지(gate.selfDamage). 자기 HP바에 반영.
+    if (gate.selfDamage && gate.selfDamage > 0) {
+      attacker.currentHp = Math.max(0, attacker.currentHp - gate.selfDamage);
+      this.flash(isAlly ? this.allySprite : this.enemySprite);
+      await attackerBox.animateTo();
+    }
     if (!gate.canMove) return;
 
     const res = performMove(attacker, defender, slot);
@@ -466,6 +489,21 @@ export default class BattleScene extends Phaser.Scene {
       defenderBox.refresh();
     }
 
+    // 상대를 혼란에 빠뜨렸으면 알림(혼란은 DataBox 아이콘 없음 — 메시지만)
+    if (res.confused) {
+      const foe = isAlly ? `상대 ${displayName(defender)}` : displayName(defender);
+      await this.say(confusionMessage(foe));
+    }
+
+    // 풀죽음 부여 — 상대가 이번 턴 아직 행동 안 했을 때만 실효(후공이면 beforeMove가 막는다). 메시지는 그때 뜬다.
+    if (res.flinched) defender.flinch = true;
+
+    // 회복기 — 사용자 HP 회복 후 HP바에 반영
+    if (res.healed > 0) {
+      await this.say(`${who}의 HP가 회복됐다!`);
+      await attackerBox.animateTo();
+    }
+
     // 능력 변화(공/방/명중/회피 등) 알림 — side가 user면 사용자, target이면 상대.
     for (const sc of res.statChanges) {
       const target = sc.side === "user"
@@ -478,7 +516,10 @@ export default class BattleScene extends Phaser.Scene {
   // 턴 종료 처리: 상태이상(화상·독) 데미지를 양쪽에 적용하고 쓰러진 쪽을 정리한다.
   //  반환 true = 배틀 종료. (턴을 소비한 모든 분기에서 resolveFaints 대신 이걸 부른다.)
   private async afterTurn(): Promise<boolean> {
-    // 빠른 쪽부터(본가 순서). 살아있고 화상/독인 포켓몬만.
+    // 이번 턴의 풀죽음 플래그는 여기서 소멸(다음 턴으로 새어나가지 않게).
+    this.ally.flinch = false;
+    this.enemy.flinch = false;
+    // 빠른 쪽부터(본가 순서). 살아있고 화상/독/맹독인 포켓몬만.
     const sides: [Pokemon, DataBox, boolean][] = this.ally.speed >= this.enemy.speed
       ? [[this.ally, this.allyBox, true], [this.enemy, this.enemyBox, false]]
       : [[this.enemy, this.enemyBox, false], [this.ally, this.allyBox, true]];
@@ -487,6 +528,7 @@ export default class BattleScene extends Phaser.Scene {
       const dmg = residualDamage(p);
       if (dmg <= 0) continue;
       p.currentHp = Math.max(0, p.currentHp - dmg);
+      advanceStatusTurn(p); // 맹독이면 누적 카운터 +1 (다음 턴 데미지가 커진다)
       const who = isAlly ? displayName(p) : `상대 ${displayName(p)}`;
       await this.say(residualMessage(who, p.status));
       await box.animateTo();
@@ -614,6 +656,7 @@ export default class BattleScene extends Phaser.Scene {
   // 상대 포켓몬을 내보낸다. first = 배틀 시작(야생 조우 포함), false = 앞의 포켓몬이 쓰러져 다음 마리.
   private async sendOutEnemy(first: boolean): Promise<void> {
     resetStages(this.enemy); // 내보내는 상대의 능력 변화 랭크 초기화(교체로 새로 나온 마리도 깨끗이)
+    clearVolatileStatus(this.enemy); // 새로 나온 마리의 풀죽음·혼란 초기화
     const e = displayName(this.enemy);
     if (this.isTrainerBattle) {
       const t = this.trainerName;
@@ -655,6 +698,7 @@ export default class BattleScene extends Phaser.Scene {
     this.allyTurns = 0;
     const p = this.ally;
     resetStages(p); // 새로 나온 내 포켓몬의 능력 변화 랭크 초기화
+    clearVolatileStatus(p); // 풀죽음·혼란 초기화(교체하면 사라짐)
     await this.ensureBattleSprite(backKey(p.speciesId), backPath(p.speciesId));
     this.allySprite = this.makeAllySprite();
     this.appear(this.allySprite);

@@ -62,7 +62,7 @@ export default class PokedexScene extends Phaser.Scene {
 
   create(): void {
     for (const k of this.textures.getTextureKeys())
-      if (k.startsWith("dex_") || k.startsWith("dexfront_"))
+      if (k.startsWith("dex_") || k.startsWith("dexfront_") || k.startsWith("dexfoot_"))
         this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
 
     const kb = this.input.keyboard!;
