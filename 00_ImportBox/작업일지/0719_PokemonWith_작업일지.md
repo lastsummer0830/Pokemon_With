@@ -28,9 +28,16 @@
 
 ---
 
-## ⚠️ 남은 문제 2건 (다음 세션 최우선 — 사용자가 마트 스샷으로 재지적, 미해결)
+## ✅ 완료·검증 (세션7, 0719 후반) — 회복음 교체 + 카운터 y정렬
+- **[커밋 e2aa753] 포켓몬센터 회복음 교체:** 회복 연출이 획득 팡파레(`me_pkmn_get`)를 임시로 쓰던 걸(어색), AR 원본 `Audio/ME/Pkmn healing.ogg`(실제 센터 회복 징글, 2.42s)를 `me_pkmn_heal`로 추가해 교체. `sfx.ts`(키+FILES) · `BuildingScene.ts:277`(healParty). 사용자가 실제 듣고 "저 소리 맞아" 확인. playwright로 healParty 직접호출 → 재생키=me_pkmn_heal(획득음 아님)·BGM pause→resume·실회복 검증. 바꾼파일: `public/assets/audio/me_pkmn_heal.ogg`(신규)·`sfx.ts`·`BuildingScene.ts`.
+- **[커밋 f339197] ① player-on-counter 해결:** 아래 ① 문제를 per-캐릭터 y정렬로 해결(전경 overlay를 행별 스트립으로 쪼개 depth=BASE+행+0.5, 캐릭터 depth=BASE+발위치행). 마트 배달/체크아웃·센터 회복카운터 4케이스 playwright 스샷 검증 — 올라탐 없음·머리 안 잘림·NPC 다리 카운터 뒤. 바꾼파일: `BuildingScene.ts`(overStrips[]·charDepth()·layout depth·tween시 depth갱신).
+- **② clerk-turn 조사결과 = 코드 정상, exe 미반영 추정:** 실제 SPACE 키로 (2,5)에서 상호작용 → 점원 프레임 8(right)→0(down) **돌아봄** + "어서 오세요!" 확인(스샷 `clerk_after.png`). dev에선 정상. 사용자 실플레이 "안 돌아봄"은 **플레이 중인 `build_win/win-unpacked/PokemonWith.exe`에 지난 세션(0719 세션3)의 attendant-turn 수정이 아직 안 구워진 것**으로 보임 → **`npm run app:bake` 필요**(exe 재굽기, 굽기 전 exe 종료). ⚠️ 확정 아님 — 다음 세션에서 bake 후 사용자 실플레이 재확인.
 
-### ① [player-on-counter] **플레이어(RED)가 마트 유리 카운터 "위"에 올라가 보임**
+---
+
+## ⚠️ 남은 문제 (원래 2건 중 ①해결 — 아래는 원문 보존)
+
+### ① [player-on-counter] ✅**해결됨(커밋 f339197)** — **플레이어(RED)가 마트 유리 카운터 "위"에 올라가 보임**
 - 사용자 스샷: 마트 좌하단 유리(하늘색 체크) 카운터에 **주인공이 올라간 것처럼** 렌더.
 - **근본원인(내 이번 수정의 부작용):** 전경 오버레이를 **depth6(플레이어 depth7 아래)**로 뒀다. NPC(카운터 뒤, 늘 뒤)엔 맞지만, **플레이어가 카운터에 인접해 서면 카운터 앞면 위로 플레이어가 그려져** "위에 올라간" 것처럼 보인다. (반대로 depth를 플레이어 위로 올리면 카운터 앞에 설 때 **머리 잘림** = 사용자 격노 재발.)
 - **진짜 해결 = per-캐릭터 y-정렬 depth(RMXP식).** 고정 depth 오버레이로는 움직이는 플레이어를 카운터와 올바르게 앞뒤정렬 못 함. 이게 "priority 타일" 난제의 본질(세션3 나무와 동류지만 실내는 플레이어가 카운터 바로 앞에 서서 더 까다로움).
