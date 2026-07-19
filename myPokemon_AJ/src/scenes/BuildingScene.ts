@@ -272,9 +272,9 @@ export default class BuildingScene extends Phaser.Scene {
     await this.dlg.say("그럼, 잠시 포켓몬을 맡아 드리겠습니다.", "간호순");
     this.dlg.hide();
 
-    // 회복 연출 — 화면을 잠깐 어둡게 하고 회복 챠임(전용 파일이 없어 획득 팡파레로 대체 — 체육관 배지와 같은 처리).
+    // 회복 연출 — 화면을 잠깐 어둡게 하고 포켓몬센터 회복 징글(AR "Pkmn healing").
     await this.fade(true);
-    playMe(this, SFX.pkmnGet, 0.5); // 회복 팡파레(ME) — BGM 잠깐 멈췄다 되살림(겹침 방지)
+    playMe(this, SFX.pkmnHeal, 0.5); // 회복 징글(ME) — BGM 잠깐 멈췄다 되살림(겹침 방지)
     for (const p of party) {
       p.currentHp = p.maxHp;
       p.status = null;
