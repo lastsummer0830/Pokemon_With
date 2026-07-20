@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { Pokemon, MoveSlot, displayName } from "../data/Pokemon";
+import { Pokemon, MoveSlot, displayName, caughtBallOf } from "../data/Pokemon";
 import { getMove } from "../data/ar";
 import { josa } from "../data/josa";
 import { pet, bondHearts, bondLabel, BOND_HEARTS } from "../systems/bond";
@@ -70,6 +70,10 @@ export default class MenuScene extends Phaser.Scene {
     for (const p of this.party) {
       const key = "icon_" + p.speciesId;
       if (!this.textures.exists(key)) this.load.image(key, iconPath(p.speciesId));
+      // 잡은 볼 아이콘(파티 마커용) — item_<ball>. 볼 아이콘 뜨는 곳에 그 포켓몬을 담은 볼로 표시(태스크4).
+      const ball = caughtBallOf(p);
+      const bk = "item_" + ball;
+      if (!this.textures.exists(bk)) this.load.image(bk, `assets/items/${ball}.png`);
     }
     // AR 파티 UI 원본 에셋을 그대로 합성한다(눈대중 재현 금지 — game-ui.md 3번).
     //  bg=512x384 배경(6칸 홈 구워짐), panel_*=256x98 컬러패널, overlay_*=HP바/Lv 태그, icon_ball=44x56.
@@ -96,7 +100,7 @@ export default class MenuScene extends Phaser.Scene {
 
     // 도트(픽셀) UI 텍스처는 NEAREST로 — 안 하면 확대 시 뭉개져서 테두리가 지저분해진다(스킬 지침).
     this.textures.getTextureKeys().forEach((k) => {
-      if (k.startsWith("pui_") || k.startsWith("icon_") || k.startsWith("ic_")) this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      if (k.startsWith("pui_") || k.startsWith("icon_") || k.startsWith("ic_") || k.startsWith("item_")) this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
     });
 
     const kb = this.input.keyboard!;
@@ -355,8 +359,11 @@ export default class MenuScene extends Phaser.Scene {
         : (lead ? "pui_panel_round" : "pui_panel_rect");
     if (this.textures.exists(key)) this.layer.add(this.add.image(x, y, key).setOrigin(0).setScale(s));
 
-    // 몬스터볼(44x56) — 좌측 하단에. 선택 시 열린 볼. (AR 레퍼런스 실측: 볼은 아래로 내려가 있고 위엔 포켓몬이 얹힌다)
-    const ballKey = sel ? "pui_icon_ball_sel" : "pui_icon_ball";
+    // 볼 마커(좌측 하단, 위에 포켓몬이 얹힘) — 그 포켓몬을 '담은 볼'(caughtBall) 종류로 표시(태스크4).
+    //  선택 표시는 패널 색(swap_sel2)이 담당하므로, 볼은 선택과 무관하게 항상 잡은 볼을 보여준다.
+    //  잡은 볼 아이콘(item_*, 48x48)이 없으면 옛 AR 파티 볼(pui_icon_ball)로 폴백.
+    const ballItemKey = "item_" + caughtBallOf(p);
+    const ballKey = this.textures.exists(ballItemKey) ? ballItemKey : (sel ? "pui_icon_ball_sel" : "pui_icon_ball");
     // 볼: 좌하단. 선두는 라운드(좌측 곡선)라 조금 더 안쪽으로.
     const ballX = lead ? 34 : 28;
     if (this.textures.exists(ballKey)) {

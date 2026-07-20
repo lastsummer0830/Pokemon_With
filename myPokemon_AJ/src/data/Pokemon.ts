@@ -45,11 +45,18 @@ export interface Pokemon {
   heldItem: string | null; // ★ 지닌 도구 (없으면 null)
   condition: number;       // ★ 유대(bond) — 포켓몬을 돌본 만큼 깊어져 배틀로 이어지는 값. 규칙은 systems/bond.ts
   gender: "male" | "female" | null; // 성별(무성=null). 파티/상세창 ♀♂ 표시용.
+  caughtBall?: string;     // ★ 잡을 때 쓴 볼 id(예: "POKEBALL","ULTRABALL"). 볼 아이콘이 뜨는 곳에서 이 볼로 표시. 없으면 몬스터볼로 취급.
 }
 
 // 표시 이름(별명 우선)
 export function displayName(p: Pokemon): string {
   return p.nickname ?? p.name;
+}
+
+// 이 포켓몬을 담은 볼 id — 볼 아이콘이 뜨는 모든 곳(파티창 등)이 이걸 본다.
+//  기록이 없으면(옛 세이브·기본 지급 포켓몬) 몬스터볼로 취급한다.
+export function caughtBallOf(p: Pokemon): string {
+  return p.caughtBall ?? "POKEBALL";
 }
 
 // ── 스탯 계산 (표준 포켓몬 공식, 개체값·노력치=0 단순화) ──

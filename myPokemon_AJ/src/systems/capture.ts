@@ -6,7 +6,6 @@
 //    상태이상 배율이 잠듦/얼음 ×2.5(3세대는 ×2), 흔들림 임계값도 y = 65536 / (255/x)^0.1875 다.)
 //
 // 원본에서 뺀 것:
-//   · 울트라비스트·마스터볼(isUnconditional?) — 그런 볼·종족이 이 게임에 없다.
 //   · 크리티컬 캡처 — 원본은 켜져 있지만 dex_modifier가 "잡은 종족 30종 초과"부터라 지금은 항상 0이다.
 //     (도감이 30종을 넘기면 그때 붙인다. 지금 넣으면 절대 안 도는 코드가 된다.)
 
@@ -14,11 +13,17 @@ import { Pokemon } from "../data/Pokemon";
 import { getSpecies } from "../data/ar";
 
 // 볼별 포획률 배율 — 원본 Battle::PokeBallEffects::ModifyCatchRate 에 등록된 값.
-//  몬스터볼은 핸들러가 아예 없다 = 배율 없음(×1). 슈퍼볼만 ×1.5로 등록돼 있다.
+//  몬스터볼은 핸들러가 아예 없다 = 배율 없음(×1). 여기에 볼을 추가하면(그리고 items.json·볼 스프라이트를
+//  넣으면) 그 볼이 그대로 던질 수 있는 볼이 된다(데이터 주도 — isBall이 이 표를 본다).
 const BALL_RATE: Record<string, number> = {
   POKEBALL: 1,
-  GREATBALL: 1.5,
+  GREATBALL: 1.5,   // 슈퍼볼
+  ULTRABALL: 2,     // 하이퍼볼
+  MASTERBALL: 255,  // 마스터볼 — 아래 UNCONDITIONAL_BALLS로 확정포획 처리(배율은 참고용)
 };
+
+// 무조건 잡히는 볼(원본 isUnconditional) — HP·상태·확률 무시하고 흔들림 4 = 즉시 성공.
+const UNCONDITIONAL_BALLS = new Set(["MASTERBALL"]);
 
 export function isBall(itemId: string): boolean {
   return itemId.toUpperCase() in BALL_RATE;
@@ -33,6 +38,9 @@ export function isBall(itemId: string): boolean {
  * @param rnd 난수원(테스트에서 고정값을 넣으려고 뺐다)
  */
 export function captureShakes(target: Pokemon, ballId: string, rnd: () => number = Math.random): number {
+  // 마스터볼류는 계산 없이 확정 포획(원본 pbCaptureCalc의 isUnconditional 분기).
+  if (UNCONDITIONAL_BALLS.has(ballId.toUpperCase())) return 4;
+
   const species = getSpecies(target.speciesId);
   const baseRate = species?.catchRate ?? 255;   // 데이터가 없으면 가장 잘 잡히는 값으로(게임이 멈추는 것보다 낫다)
   const catchRate = baseRate * (BALL_RATE[ballId.toUpperCase()] ?? 1);

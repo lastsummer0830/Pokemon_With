@@ -553,20 +553,11 @@ export default class BattleScene extends Phaser.Scene {
     await this.say(`${me}${josa(me, "은는")} ${itemName}${josa(itemName, "을를")} 던졌다!`);
 
     const shakes = captureShakes(this.enemy, itemId);
-    // 볼에 들어가는 연출 — 전용 볼 스프라이트가 아직 없어서 상대가 사라졌다 흔들림만큼 기다린다.
-    playSfx(this, SFX.decision, 0.4);
-    this.fadeOutSprite(this.enemySprite);
-    for (let i = 0; i < Math.max(1, shakes); i++) {
-      await new Promise<void>((r) => this.time.delayedCall(450, r));
-      playSfx(this, SFX.cursor, 0.5);
-    }
+    // 실제 볼 연출: 선택한 볼이 날아가 → 열려 상대를 빨아들이고 → 닫혀 떨어져 흔들림.
+    //  성공(4)이면 터짐 이펙트, 실패면 볼이 열리며 상대가 다시 나온다(스프라이트 복구까지 이 안에서 처리).
+    await this.playBallCapture(itemId, shakes);
 
     if (shakes < 4) {
-      // 빠져나온다 — 스프라이트를 되돌린다.
-      //  ⚠️ 먼저 트윈을 죽여야 한다: fadeOutSprite의 500ms 트윈이 아직 돌고 있으면
-      //     alpha를 1로 되돌려도 트윈이 그 값을 다시 0으로 끌고 가 상대가 사라진 채로 배틀이 계속된다.
-      this.tweens.killTweensOf(this.enemySprite);
-      this.enemySprite.setAlpha(1).setY(this.view.Y(ENEMY_VY));
       await this.say(SHAKE_FAIL_TEXT[shakes] ?? SHAKE_FAIL_TEXT[0]);
       return true;
     }
@@ -574,6 +565,8 @@ export default class BattleScene extends Phaser.Scene {
     const foe = displayName(this.enemy);
     playSfx(this, SFX.decision, 0.5);
     await this.say(`좋았어! ${foe}${josa(foe, "을를")} 잡았다!`);
+    // ★ 잡은 볼을 기록한다 — 파티창 등 볼 아이콘이 뜨는 모든 곳이 caughtBallOf로 이걸 읽는다.
+    this.enemy.caughtBall = itemId.toUpperCase();
     // 도감 등록 + 파티 편입. 도감번호(id)는 칸토 도감에 있는 종족만 채운다(9세대 종족은 0으로 남는다).
     markOwn(this.registry, this.enemy.speciesId);
     const dexNo = dexKanto().indexOf(this.enemy.speciesId.toUpperCase());
@@ -584,6 +577,120 @@ export default class BattleScene extends Phaser.Scene {
     // 경험치는 주지 않는다(잡으면 경험치가 없던 5세대까지의 규칙 — 별명 짓기도 아직 없다).
     this.outcome = "catch";
     return true;
+  }
+
+  // 스프라이트시트를 런타임 로드(볼 스핀 시트 등). 이미 있으면 그대로.
+  private ensureBattleSheet(key: string, path: string, fw: number, fh: number): Promise<void> {
+    if (this.textures.exists(key)) return Promise.resolve();
+    return new Promise((resolve) => {
+      this.load.spritesheet(key, path, { frameWidth: fw, frameHeight: fh });
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());
+      this.load.start();
+    });
+  }
+
+  // 트윈 하나를 프로미스로 감싼다(연출을 async로 순서대로 잇기 위함).
+  private tweenP(cfg: Phaser.Types.Tweens.TweenBuilderConfig): Promise<void> {
+    return new Promise((resolve) => this.tweens.add({ ...cfg, onComplete: () => resolve() }));
+  }
+
+  // ── 포획 볼 연출 ─────────────────────────────────────────
+  //  선택한 볼(ballId)이 날아가 상대를 빨아들이고, 닫혀 떨어져 shakes번 흔들린다.
+  //  shakes===4면 성공(터짐 이펙트), 미만이면 볼이 열리며 상대가 다시 나온다(스프라이트 복구까지 여기서).
+  //  볼 스프라이트는 AR Battle animations 원본(닫힘=64x64 4프레임 스핀, 열림=32x64 단일).
+  private async playBallCapture(ballId: string, shakes: number): Promise<void> {
+    const v = this.view;
+    const BALL = ballId.toUpperCase();
+    const closedKey = `ball_${BALL}`;
+    const openKey = `ball_${BALL}_open`;
+    // 없는 볼(스프라이트 미복사)이면 몬스터볼로 폴백 — 연출이 통째로 빠지지 않게.
+    //  (로더는 404여도 COMPLETE만 발화하고 reject 안 하므로, 존재검사로 폴백을 결정한다.)
+    await this.ensureBattleSheet(closedKey, `assets/battle/${closedKey}.png`, 64, 64);
+    if (!this.textures.exists(closedKey))
+      await this.ensureBattleSheet("ball_POKEBALL", "assets/battle/ball_POKEBALL.png", 64, 64);
+    const okClosed = this.textures.exists(closedKey) ? closedKey : "ball_POKEBALL";
+    await this.ensureBattleSprite(openKey, `assets/battle/${openKey}.png`);
+    if (!this.textures.exists(openKey))
+      await this.ensureBattleSprite("ball_POKEBALL_open", "assets/battle/ball_POKEBALL_open.png");
+    const okOpen = this.textures.exists(openKey) ? openKey : "ball_POKEBALL_open";
+    for (const k of [okClosed, okOpen]) this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
+
+    // 스핀 애니(볼별 1회만 등록)
+    const spinKey = `spin_${okClosed}`;
+    if (!this.anims.exists(spinKey)) {
+      this.anims.create({ key: spinKey, frames: this.anims.generateFrameNumbers(okClosed, { start: 0, end: 3 }),
+        frameRate: 16, repeat: -1 });
+    }
+
+    // 상대 스프라이트 중심(빨려들어갈 목표점)
+    const es = this.enemySprite;
+    const targetX = es.x, targetY = es.y - 40 * v.s;
+    const startX = v.XC(150), startY = v.Y(300);
+
+    // 1) 볼 등장 + 스핀하며 상대에게 포물선으로 날아간다
+    const ball = this.add.sprite(startX, startY, okClosed, 0).setDepth(60).setScale(v.s * 2);
+    ball.play(spinKey);
+    playSfx(this, SFX.decision, 0.4);
+    // 포물선: x 선형 + y는 위로 솟았다 내려오게 두 트윈
+    const peakY = Math.min(startY, targetY) - 60 * v.s;
+    await this.tweenP({ targets: ball, x: (startX + targetX) / 2, y: peakY, duration: 200, ease: "Quad.out" });
+    await this.tweenP({ targets: ball, x: targetX, y: targetY, duration: 180, ease: "Quad.in" });
+    ball.stop();
+
+    // 2) 볼이 열리고 상대가 빨려들어간다(open 프레임 + 상대 축소·페이드)
+    ball.setTexture(okOpen);
+    playSfx(this, SFX.hitNormal, 0.4);
+    this.flash(es);
+    await this.tweenP({ targets: es, x: targetX, y: targetY, scaleX: 0, scaleY: 0, alpha: 0.2, duration: 220, ease: "Sine.in" });
+    es.setVisible(false);
+
+    // 3) 볼이 닫혀 바닥으로 떨어진다
+    ball.setTexture(okClosed, 0);
+    await this.tweenP({ targets: ball, y: es.y - 6 * v.s, duration: 220, ease: "Bounce.out" });
+
+    // 4) 흔들림 — 좌우로 갸웃(각 흔들림마다 소리)
+    const wob = Math.max(1, shakes);
+    for (let i = 0; i < wob; i++) {
+      await new Promise<void>((r) => this.time.delayedCall(200, r));
+      playSfx(this, SFX.cursor, 0.5);
+      const dir = i % 2 === 0 ? -1 : 1;
+      await this.tweenP({ targets: ball, angle: 16 * dir, duration: 120, yoyo: true, ease: "Sine.inOut" });
+    }
+
+    if (shakes >= 4) {
+      // 5a) 성공 — "찰칵" + 터짐(별·링) 이펙트
+      await new Promise<void>((r) => this.time.delayedCall(150, r));
+      playSfx(this, SFX.decision, 0.6);
+      await this.ballBurst(ball.x, ball.y - 4 * v.s);
+      await new Promise<void>((r) => this.time.delayedCall(250, r));
+      ball.destroy();
+    } else {
+      // 5b) 실패 — 볼이 열리고 상대가 다시 나온다
+      ball.setTexture(okOpen);
+      playSfx(this, SFX.hitNormal, 0.4);
+      es.setVisible(true);
+      this.tweens.killTweensOf(es);
+      es.setPosition(v.XC(384), v.Y(ENEMY_VY)).setAlpha(0).setScale(0);
+      await this.tweenP({ targets: es, scaleX: v.s * SPRITE_ZOOM, scaleY: v.s * SPRITE_ZOOM, alpha: 1, duration: 250, ease: "Back.out" });
+      ball.destroy();
+    }
+  }
+
+  // 포획 성공 터짐 — AR ballBurst 이펙트(별·링)를 잠깐 확대·페이드.
+  private async ballBurst(x: number, y: number): Promise<void> {
+    const v = this.view;
+    const parts: Phaser.GameObjects.Image[] = [];
+    for (const [key, path] of [["ballBurst_ring1", "assets/battle/ballBurst_ring1.png"],
+      ["ballBurst_star", "assets/battle/ballBurst_star.png"]] as const) {
+      await this.ensureBattleSprite(key, path).catch(() => {});
+      if (!this.textures.exists(key)) continue;
+      this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      const img = this.add.image(x, y, key).setDepth(61).setScale(0.2 * v.s).setAlpha(0.95);
+      parts.push(img);
+    }
+    if (!parts.length) return;
+    await this.tweenP({ targets: parts, scale: v.s * 2.2, alpha: 0, duration: 420, ease: "Quad.out" });
+    parts.forEach((p) => p.destroy());
   }
 
   // 상대 한 마리를 쓰러뜨릴 때마다 경험치를 준다(지금 나와 있는 포켓몬에게만 — 참전 분배는 미구현).

@@ -87,7 +87,8 @@ export default class DebugMenuScene extends Phaser.Scene {
         if (!this.registry.get("money")) this.registry.set("money", START_MONEY);
         if (!(this.registry.get("bag") as unknown[])?.length)
           this.registry.set("bag", [...START_BAG, { itemId: "SUPERPOTION", count: 2 }, { itemId: "ANTIDOTE", count: 1 },
-            { itemId: "GREATBALL", count: 3 }, { itemId: "REVIVE", count: 1 }]);
+            { itemId: "GREATBALL", count: 3 }, { itemId: "ULTRABALL", count: 3 }, { itemId: "MASTERBALL", count: 1 },
+            { itemId: "REVIVE", count: 1 }]);
         if (!(this.registry.get("dexSeen") as unknown[])?.length) {
           // 초반 진행 느낌으로: 스타터 3종은 잡았고, 1번도로 야생 몇 종은 본 상태
           for (const id of ["CHARMANDER", "SQUIRTLE", "BULBASAUR"]) markOwn(this.registry, id);

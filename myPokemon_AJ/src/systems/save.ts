@@ -12,7 +12,8 @@ import { emptyHouse } from "./homeBonus";
 const SAVE_KEY = "myPokemon.save";
 //  v2: houseLayout(집 꾸미기 배치) 추가.
 //  v3: 가방·도감·소지금·뱃지 추가. 옛 저장은 아래 마이그레이션이 기본값을 채워 그대로 이어할 수 있다.
-const SAVE_VERSION = 3;
+//  v4: 파티 포켓몬에 caughtBall(잡은 볼) 추가. 옛 저장은 몬스터볼로 채운다.
+const SAVE_VERSION = 4;
 
 // 새 게임 시작 시 기본 소지금·지급품 (v2 이하 저장을 v3으로 올릴 때도 이 값을 쓴다)
 export const START_MONEY = 3000;
@@ -93,7 +94,10 @@ export function loadGame(reg: Reg): SaveData | null {
   try { data = JSON.parse(raw) as SaveData; } catch { return null; }
   reg.set("playerName", data.name);
   reg.set("playerGender", data.gender);
-  reg.set("playerParty", data.party ?? []);
+  // v3 이하 저장의 파티엔 caughtBall이 없다 → 몬스터볼로 채운다(볼 아이콘 표시가 비지 않게).
+  const party = data.party ?? [];
+  for (const p of party) if (!p.caughtBall) p.caughtBall = "POKEBALL";
+  reg.set("playerParty", party);
   reg.set("starterChosen", data.starterChosen ?? null);
   reg.set("rivalBattlePending", !!data.rivalBattlePending);
   reg.set("rivalEnemySpecies", data.rivalEnemySpecies ?? null);
