@@ -53,6 +53,8 @@
 3. **playwright에서 Math.random 상수 덮어쓰기 금지** — Phaser UUID가 깨져 "Texture key already in use"·null context 유령에러. 결정성이 필요하면 마스터볼(무난수) 쓰거나 실난수로 반복.
 4. `say()`는 ENTER/Z/SPACE 대기 → afterTurn/doTurn/throwBall 검증 시 `scene.say`를 즉시-resolve로 몽키패치. box.animateTo도 즉시-resolve.
 5. **MenuScene 메인=아이콘 바**(도감/볼/가방/저장/설정), 파티 패널은 '볼' 아이콘 확인(Enter) 후 열림.
+6. ⚠️**UI 검증 png는 repo 루트 `.claude/.verify/`에 저장**(enforce-ui-verify 훅이 CLAUDE_PROJECT_DIR=repo루트 기준으로 검사). `myPokemon_AJ/.claude/.verify/`가 아님. 파일명에 '비교'.
+7. ⚠️**실수 기록:** `myPokemon_AJ/.claude/.verify/`를 내가 만든 줄 알고 `rm -rf` → 7/18 검증물(status_databox_*·일부 bond_*) 소실(gitignore라 복구불가). **`.claude/.verify`는 세션간 공유 폴더 → 통째 삭제 금지, 지우기 전 내용 확인.** 소실=스샷뿐(작업은 커밋됨), 재생성 가능.
 
 ## 검증물 위치
 - git: `myPokemon_AJ/.claude/.verify/party_ball_비교.png`.
