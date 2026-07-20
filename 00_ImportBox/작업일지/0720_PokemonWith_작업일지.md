@@ -65,3 +65,37 @@
 
 ## 다음 세션 첫 프롬프트 제안
 "작업일지 0720 읽고 이어서. **Summary(상세) 씬**부터 — AR Graphics/UI/Summary 에셋으로 잡은볼+스탯+기술, game-ui.md STOP 준수(side-by-side 검증). 그다음 Phase B(내보내기 볼 연출) → 맵 태스크2·3 → Phase C(기술 애니 엔진). Phase A(볼 시스템)·파티 표시는 0720에 완료·커밋됨."
+
+---
+
+# 0720 (세션2) — Summary(상세) 씬 신규 ✅ 검증완료 / ⚠️미커밋
+
+## 한 것 (태스크4 "둘 다" 중 나머지 = Summary)
+- **신규 `src/scenes/SummaryScene.ts`** — AR `Graphics/UI/Summary/bg_{info,skills,moves}.png`(각 512×384) 원본 3페이지 위에 데이터를 얹음. **PokedexScene과 동일 관용구**(가상 512×384 + contain 스케일, `X/Y/img/txt/crop` 헬퍼, `layer` 컨테이너 rebuild, resize 재렌더). NEAREST는 `sum_*`·`sumfront_*` 키에만.
+  - 조작: **← → 페이지**(정보/능력치/기술), **↑ ↓ 파티 내 포켓몬**, **X/ESC 닫기**(from 씬 resume/start).
+  - 좌측 공통: 초상(`makeStillFront`) + 이름/성별(♂파랑♀분홍, 이름 텍스트 실제 width 뒤에 배치=겹침방지) + Lv + **잡은볼 아이콘(`icon_ball_<BALL>`) + 볼 한글명**.
+  - 정보(파랑): 종족명·도감번호·**타입 뱃지**(types.png 행=`TYPE_POS`, PokedexScene과 동일표)·지닌도구·성별 + 경험치/다음레벨 + **EXP 바**(`expForLevel`=L³로 현재레벨 진행도, Lv100은 "최고 레벨"·바 가득).
+  - 능력치(초록): **HP 바**(잔량색, 수치는 바 위 y72=스탯행 겹침회피) + 공격/방어/특공/특방/스피드(회색 라벨칸↔흰 값칸) + **유대 하트**(bond, 이 게임 차별점).
+  - 기술(빨강): 4칸 각 **타입+분류 뱃지**(category.png 행 물리0/특수1/변화2, AR 상자쌍 x248/x281·슬롯중심 y=142+i·64) + 기술명 + PP(잔량색).
+- **에셋**: `public/assets/ui/summary/`(신규) = AR bg 3장·overlay_hp/exp·category·icon_ball_×4. 타입아이콘은 기존 `ui/types.png` 재사용.
+- **`src/main.ts`**: 씬 등록. **`src/scenes/DebugMenuScene.ts`**: `O키` 진입 항목 + keyNames에 U·I·O 추가(겸사 기존 미바인딩이던 센터U/마트I도 키 동작하게 됨).
+
+## 검증 (game-ui.md 하드게이트 충족)
+- Playwright로 3페이지 실제 렌더 캡처 → **콘솔 에러 0**. AR 원본↔내게임 **side-by-side 몽타주 = `.claude/.verify/summary_비교.png`**(3행, 좌AR/우내게임). 레이아웃·뱃지·바 정렬 일치 확인. tsc 통과.
+- `/code-review` medium 지적 2건 수정: ①Lv100 EXP 표시 오류(→"최고 레벨"), ②경계 헛움직임 SFX(→무변화시 early return).
+
+## ⚠️ 안 한 것 · 결정 대기 (다음 세션 먼저 처리)
+1. **파티창(MenuScene)→Summary 배선 안 함(의도적).** 이유: §6.5 "look은 사용자 승인 먼저" + 기존 MenuScene 인메뉴 detail의 **쓰다듬기(pet=유대↑) 회귀 방지**. 현재 Summary는 **DebugMenu O키로만** 접근. → 승인 시: 파티 ENTER→`scene.pause()+launch("SummaryScene",{party,index,from})`, 인메뉴 pet을 Summary로 이식(Space=쓰다듬기)할지 결정.
+2. **커밋 안 함(승인 필요).** git status: main.ts·DebugMenuScene.ts 수정 / SummaryScene.ts·public/assets/ui/summary/ 신규.
+3. **기술 페이지**: AR 상자가 슬롯당 2×2인데 위 2칸(타입·분류)만 채우고 **아래 2칸 비움**(원본 템플릿 여백). / **정보**: bg 행슬롯이 내용보다 많아 성별↔경험치 사이 빈 행. → 그냥 둘지 결정.
+
+## 이어서 (우선순위 그대로)
+- (Summary look 승인·커밋 후) **Phase B 등장 연출**(sendOut도 잡은볼에서 튀어나오게, Phase A 볼자산 재사용) → **맵 태스크 2·3**(라이벌집(27,7) 워프 + 건물크기) → **Phase C 기술 애니 엔진**(rxrender.py 확장).
+
+## 함정 (이번에 실제로 걸림)
+- **타이틀에서 D키만 DebugMenu行**(다른 키·Enter는 MainMenuScene로 감) → playwright 네비 첫 키를 Enter로 하면 메뉴로 새서 Summary 못 감. **D 먼저**.
+- **AR bg_moves 슬롯 상자는 2×2**(4칸), 슬롯 중심 y≈142+i·64 (첫 시도서 뱃지가 ~14px 위로 떠 상자와 어긋남 → 8px격자 재측정으로 교정).
+- Stop훅(enforce-ui-verify)은 **UI 씬 편집 이후 시점**의 .verify png를 요구 → 마지막 코드수정 뒤 재캡처·몽타주 갱신 필요(리뷰 수정 후 한번 더 캡처함).
+
+## memory 갱신
+- `capture-ball-animations.md`에 Summary 완료 반영 예정(다음 세션). MEMORY.md 인덱스는 유지.

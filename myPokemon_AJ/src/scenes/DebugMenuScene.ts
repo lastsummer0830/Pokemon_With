@@ -67,6 +67,8 @@ export default class DebugMenuScene extends Phaser.Scene {
       // 상록시티 실내 건물 — 센터(회복)·마트(점원). testParty로 회복 확인용 파티 채움.
       ["U. 포켓몬 센터(회복)", "BuildingScene", { building: "pc", testParty: true }],
       ["I. 프렌들리 숍(마트)", "BuildingScene", { building: "mart", testParty: true }],
+      // 포켓몬 상세정보(Summary) — 파티에서 열리는 오버레이. testParty로 채운 파티의 첫 마리를 연다.
+      ["O. 상세정보(Summary)", "SummaryScene", { testParty: true, from: "DebugMenuScene" }],
     ];
     const go = (key: string, data?: object) => {
       // 테스트용 기본값 — 인트로를 건너뛰어도 씬이 동작하도록
@@ -111,7 +113,7 @@ export default class DebugMenuScene extends Phaser.Scene {
     };
 
     // 숫자 10개로는 모자라 알파벳까지 쓴다(항목 순서 = 이 배열 순서).
-    const keyNames = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "ZERO", "Q", "W", "E", "R", "T", "Y"];
+    const keyNames = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "ZERO", "Q", "W", "E", "R", "T", "Y", "U", "I", "O"];
     // 항목 수에 맞춰 자동으로 화면 안에 다 들어오게(캔버스라 스크롤 없음).
     const startY = height * 0.30;
     const gap = Math.min(height * 0.07, (height * 0.66) / scenes.length);
