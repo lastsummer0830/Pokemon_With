@@ -29,7 +29,7 @@ const DEBUG_COLLISION = false;
 // climb = 계단을 밟았을 때 전환 전 "올라서는" 이동칸 오프셋 [dx,dy]. (거실 계단은 오른쪽→왼쪽 위로 = [-1,-1] 식)
 // climb = 워프 칸 기준 오르는 경로. 한 칸이면 [dx,dy], 여러 칸이면 [[dx,dy],[dx,dy],...] (계단 발판을 따라).
 // climbFace = 계단을 오르는 동안 바라보는 방향(기본 "up" = 계단을 정면으로 바라봄).
-interface Warp { x: number; y: number; to: string; ax?: number; ay?: number; kind?: string; dir?: Dir; face?: Dir; climb?: number[] | number[][]; climbFace?: Dir }
+interface Warp { x: number; y: number; to: string; ax?: number; ay?: number; kind?: string; dir?: Dir; face?: Dir; climb?: number[] | number[][]; climbFace?: Dir; map?: string; spawn?: [number, number] }
 // bed = 침대 사각형 [x, y, w, h] — 앞에서 Space를 누르면 잠자기(컨디션 회복). 침실에만 있다.
 interface RoomDef { img: string; cols: number; rows: number; blocked: number[][]; start: [number, number]; warps: Warp[]; bed?: number[] }
 type Rooms = Record<string, RoomDef>;
@@ -98,6 +98,11 @@ export default class InteriorScene extends Phaser.Scene {
 
   // scene.start("InteriorScene", { room: "living", skipIntro: true }) 로 특정 방부터 시작 가능
   init(data: { room?: string; skipIntro?: boolean }): void {
+    // ⚠️ Phaser는 씬을 다시 시작해도 **같은 인스턴스**를 쓴다 → 클래스 필드(= 위의 `busy = false`)는 다시 초기화되지 않는다.
+    //    문으로 마을에 나갈 때 켜둔 busy를 여기서 안 되돌리면 다시 집에 들어왔을 때 켜진 채로 남아 **플레이어가 영영 얼어붙는다**
+    //    (update()가 busy면 입력을 통째로 무시한다). init은 scene.start마다 도는 유일한 자리다.
+    this.busy = false;
+    this.moving = false;
     this.startRoom = data?.room ?? "bedroom";
     this.skipIntro = !!data?.skipIntro || this.startRoom !== "bedroom";
   }
@@ -112,6 +117,7 @@ export default class InteriorScene extends Phaser.Scene {
     this.load.json("rooms", "assets/house/rooms.json" + v);
     this.load.image("room_bedroom", "assets/house/red_room_2f.png" + v);
     this.load.image("room_living", "assets/house/red_living_1f_stairs.png" + v);
+    this.load.image("room_rival", "assets/house/rival_house_1f.png" + v);   // 라이벌(그린)의 집 1F
     this.load.image("stairs_living", "assets/house/stairs_living.png");
     preloadCommonAudio(this);
     const file = this.gender === "girl"
@@ -129,7 +135,7 @@ export default class InteriorScene extends Phaser.Scene {
     this.rooms = this.cache.json.get("rooms") as Rooms;
 
     // 도트는 또렷하게(픽셀 보존) — 화질 개선의 핵심
-    for (const k of ["room_bedroom", "room_living", "stairs_living", "nemona", this.texKey, ...FURNITURE.map(f => f.sprite)]) {
+    for (const k of ["room_bedroom", "room_living", "room_rival", "stairs_living", "nemona", this.texKey, ...FURNITURE.map(f => f.sprite)]) {
       if (this.textures.exists(k)) this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
     }
 
@@ -172,9 +178,8 @@ export default class InteriorScene extends Phaser.Scene {
         .setName("dbgpos").setScrollFactor(0).setDepth(200);
     }
 
-    // 안내(컷신 동안엔 숨김)
-    const name = this.playerName();
-    this.add.text(12, 12, `${name ? name + "  |  " : ""}방향키: 이동  |  침대 앞 Space: 잠자기  |  F: 방 꾸미기  |  문: 마을로`, {
+    // 안내(컷신 동안엔 숨김). 문구는 방마다 다르므로 바로 아래 enterRoom()에서 채운다.
+    this.add.text(12, 12, "", {
       fontFamily: "Galmuri11, sans-serif", fontSize: "16px", color: "#ffffff",
       backgroundColor: "#00000077", padding: { x: 8, y: 4 },
     }).setName("hud").setScrollFactor(0).setDepth(100);
@@ -197,6 +202,22 @@ export default class InteriorScene extends Phaser.Scene {
   }
 
   private playerName(): string { return (this.registry.get("playerName") as string) ?? "너"; }
+
+  // 방마다 '실제로 되는 조작'만 안내한다.
+  //  잠자기(facingBed: 침대가 있는 방=내 방)와 꾸미기(toggleDecorate: roomKey==="bedroom")는 내 방에서만 동작하므로
+  //  거실·라이벌집에 그대로 띄우면 안 되는 조작을 알려주는 셈이 된다(문/계단도 rooms.json의 워프를 따라간다).
+  private hintFor(key: string): string {
+    const name = this.playerName();
+    const head = name ? name + "  |  " : "";
+    if (key === "bedroom") return `${head}방향키: 이동  |  침대 앞 Space: 잠자기  |  F: 방 꾸미기  |  계단: 1층으로`;
+    if (key === "living") return `${head}방향키: 이동  |  계단: 내 방으로  |  문: 마을로`;
+    return `${head}방향키: 이동  |  문: 마을로`;   // 라이벌집 등 (문 하나뿐인 방)
+  }
+
+  private updateHud(): void {
+    const hud = this.children.getByName("hud") as Phaser.GameObjects.Text | null;
+    hud?.setText(this.hintFor(this.roomKey));
+  }
 
   // 인게임 메뉴 열기(오버레이) — WorldScene.openMenu와 동일 패턴. 이 씬을 멈추고 MenuScene을 띄운다.
   private openMenu(): void {
@@ -223,7 +244,8 @@ export default class InteriorScene extends Phaser.Scene {
   private enterRoom(key: string, tx: number, ty: number, face: Dir = "down"): void {
     this.roomKey = key;
     this.def = this.rooms[key];
-    this.roomImg.setTexture(key === "bedroom" ? "room_bedroom" : "room_living");
+    // 방 키 → 텍스처. 모르는 키는 침실로 폴백하지 않도록 라이벌집도 명시한다.
+    this.roomImg.setTexture(key === "bedroom" ? "room_bedroom" : key === "rival" ? "room_rival" : "room_living");
     this.tx = tx; this.ty = ty;
     this.facing = face;
     this.player.stop();
@@ -231,6 +253,7 @@ export default class InteriorScene extends Phaser.Scene {
     this.moving = false;
     if (this.decorating) this.exitDecorate();   // 방을 옮기면 꾸미기 모드는 닫는다
     this.renderFurniture();                     // 놓아둔 가구 다시 그리기(침실에서만 보인다)
+    this.updateHud();                           // 안내 문구도 이 방에서 되는 것만 남긴다
     this.layout();
   }
 
@@ -693,7 +716,13 @@ export default class InteriorScene extends Phaser.Scene {
     this.player.stop();
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.time.delayedCall(320, () => {
-      if (w.to === "world") { this.scene.start("WorldScene"); return; }
+      if (w.to === "world") {
+        // 문 워프에 나갈 위치(spawn)가 지정돼 있으면 그 칸으로 내보낸다(예: 라이벌집 → 라이벌집 문 앞).
+        //  지정이 없으면(우리집 거실 문) 기존대로 기본 시작칸으로 나간다.
+        if (w.spawn) this.scene.start("WorldScene", { map: w.map, spawn: w.spawn, face: w.face });
+        else this.scene.start("WorldScene");
+        return;
+      }
       this.enterRoom(w.to, w.ax ?? this.rooms[w.to].start[0], w.ay ?? this.rooms[w.to].start[1], w.face ?? "down");
       this.cameras.main.fadeIn(300, 0, 0, 0);
       this.busy = false;

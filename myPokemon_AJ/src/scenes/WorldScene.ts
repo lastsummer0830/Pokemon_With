@@ -68,6 +68,7 @@ export default class WorldScene extends Phaser.Scene {
   private warpDefs: (Warp & { map: string })[] = [
     { map: "pallet", x: 28, y: 14, to: "lab", dir: "up" },                    // 포켓몬 연구소
     { map: "pallet", x: 17, y: 7, to: "house", room: "living", dir: "up" },   // 우리집(거실로)
+    { map: "pallet", x: 27, y: 7, to: "house", room: "rival", dir: "up" },    // 라이벌(그린)의 집
     // 상록체육관 — 문 칸·도착 좌표 전부 AR 원본 Map56 이벤트(Home door)의 transfer 값이다(눈대중 아님).
     { map: "viridian_city", x: 35, y: 9, to: "gym", dir: "up" },
     // 상록 포켓몬센터(AR Map158)·프렌들리 숍(AR Map159) — 문 칸도 Map56 transfer 값 그대로.

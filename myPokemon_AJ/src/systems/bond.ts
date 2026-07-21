@@ -40,8 +40,15 @@ export interface CareResult {
   message: string;  // 표시 문구
 }
 
+// 쓰다듬기 제한(포켓몬당 1회) 세트를 담아 두는 registry 키. 값 = Set<Pokemon>(포켓몬 객체 그대로 담는다).
+//   ⚠️ 왜 registry인가: 상세화면(SummaryScene)은 X로 닫으면 scene.stop()으로 통째로 사라지고
+//      MenuScene이 Enter마다 새로 launch 한다. 그래서 씬 필드에 두면 X→Enter 반복만으로 제한이 풀려
+//      유대를 무한히 올릴 수 있었다(파밍 구멍). registry는 씬이 죽어도 남는다.
+//   비우는 시점 = '메뉴 세션' 시작(MenuScene.init) → 메뉴 한 번 여는 동안 포켓몬당 1회.
+export const PETTED_KEY = "pettedThisMenu";
+
 // 쓰다듬기 — 가장 기본적인 케어. 유대를 조금 올린다.
-//   실제 연타 제한(세션당 1회 등)은 호출부(MenuScene)가 관리한다. 여기선 값만 올린다.
+//   실제 연타 제한(세션당 1회 등)은 호출부(MenuScene·SummaryScene)가 PETTED_KEY로 관리한다. 여기선 값만 올린다.
 export function pet(p: Pokemon): CareResult {
   const before = bondOf(p);
   const gained = Math.min(PET_GAIN, BOND_MAX - before);

@@ -1,8 +1,9 @@
 import Phaser from "phaser";
 import { Pokemon, MoveSlot, displayName, caughtBallOf } from "../data/Pokemon";
+import { josa } from "../data/josa";
 import { frontPath, makeStillFront } from "../game/pokemonSprite";
 import { getMove } from "../data/ar";
-import { bondHearts, bondLabel, BOND_HEARTS } from "../systems/bond";
+import { pet, bondHearts, bondLabel, BOND_HEARTS, PETTED_KEY } from "../systems/bond";
 import { expForLevel } from "../systems/exp";
 import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
 
@@ -34,6 +35,12 @@ const BALL_KR: Record<string, string> = {
 };
 const BALL_KEYS = ["POKEBALL", "GREATBALL", "ULTRABALL", "MASTERBALL"];
 
+// 상태이상 id → 한글(정보 페이지 '상태' 행). null(이상 없음) = "정상". 값은 data/Pokemon.ts의 Status 타입 그대로.
+const STATUS_KR: Record<string, string> = {
+  none: "정상", burn: "화상", poison: "독", badpoison: "맹독",
+  paralysis: "마비", sleep: "수면", freeze: "얼음",
+};
+
 const PAGES = ["info", "skills", "moves"] as const;
 type Page = typeof PAGES[number];
 const PAGE_TITLE: Record<Page, string> = { info: "정보", skills: "능력치", moves: "기술" };
@@ -45,6 +52,8 @@ export default class SummaryScene extends Phaser.Scene {
   private party: Pokemon[] = [];
   private idx = 0;          // 파티에서 보고 있는 포켓몬
   private page = 0;         // PAGES 인덱스
+  // ⚠️ 쓰다듬은 목록은 이 씬에 두지 않는다 — X로 닫으면 씬이 통째로 stop 되어 리셋되기 때문(무한 파밍).
+  //    registry(PETTED_KEY)에 두고, 비우는 건 메뉴 세션 시작(MenuScene.init)이 한다. 아래 pettedSet() 참고.
   private layer!: Phaser.GameObjects.Container;
   private s = 1; private offX = 0; private offY = 0;
 
@@ -55,6 +64,7 @@ export default class SummaryScene extends Phaser.Scene {
     this.party = data?.party ?? (this.registry.get("playerParty") as Pokemon[]) ?? [];
     this.idx = Math.max(0, Math.min((this.party.length || 1) - 1, data?.index ?? 0));
     this.page = 0;
+    // (쓰다듬기 제한은 여기서 비우지 않는다 — 세션 단위라 MenuScene이 관리한다.)
   }
 
   preload(): void {
@@ -79,6 +89,9 @@ export default class SummaryScene extends Phaser.Scene {
     kb.on("keydown-RIGHT", () => this.turnPage(1));
     kb.on("keydown-UP", () => this.switchMon(-1));
     kb.on("keydown-DOWN", () => this.switchMon(1));
+    kb.on("keydown-ENTER", () => this.petCurrent());
+    kb.on("keydown-Z", () => this.petCurrent());
+    kb.on("keydown-SPACE", () => this.petCurrent());
     kb.on("keydown-X", () => this.cancel());
     kb.on("keydown-ESC", () => this.cancel());
 
@@ -109,6 +122,42 @@ export default class SummaryScene extends Phaser.Scene {
     this.scene.stop();
     if (this.scene.isPaused(this.from)) this.scene.resume(this.from);
     else if (!this.scene.isActive(this.from)) this.scene.start(this.from);
+  }
+
+  // 이번 메뉴 세션에 이미 쓰다듬은 포켓몬 목록(registry 공용). 없으면 만들어 둔다.
+  //   파티 칸 번호가 아니라 '포켓몬 객체 자체'를 담는다 → 파티 순서가 바뀌어도 같은 개체로 알아본다.
+  private pettedSet(): Set<Pokemon> {
+    let s = this.registry.get(PETTED_KEY) as Set<Pokemon> | undefined;
+    if (!s) { s = new Set<Pokemon>(); this.registry.set(PETTED_KEY, s); }
+    return s;
+  }
+
+  // 쓰다듬기 — 유대를 조금 올린다. 이번 '메뉴 세션' 동안 포켓몬당 1번만(연타·재입장 방지). MenuScene과 동일 규칙.
+  private petCurrent(): void {
+    const p = this.party[this.idx];
+    if (!p) return;
+    const name = displayName(p);
+    const petted = this.pettedSet();
+    if (petted.has(p)) {
+      playSfx(this, SFX.cancel, 0.4);
+      this.toast(`${name}${josa(name, "은는")} 지금은 실컷 놀아줬어.`);
+      return;
+    }
+    playSfx(this, SFX.decision, 0.4);
+    const res = pet(p);
+    petted.add(p);
+    this.registry.set("playerParty", this.party);   // 유대 상승 반영(저장 시 함께 기록)
+    this.render();                                   // 하트 게이지 즉시 갱신
+    this.toast(res.message.replace("\n", "  "));
+  }
+
+  private toast(msg: string): void {
+    const { width, height } = this.scale;
+    const t = this.add.text(width / 2, height - 60, msg, {
+      fontFamily: FONT, fontSize: "22px", color: "#ffffff",
+      backgroundColor: "#000000cc", padding: { x: 16, y: 10 },
+    }).setOrigin(0.5).setDepth(100);
+    this.tweens.add({ targets: t, alpha: 0, delay: 900, duration: 400, onComplete: () => t.destroy() });
   }
 
   // ── 좌표 변환·그리기 헬퍼 (PokedexScene과 동일 관용구) ─────────────
@@ -199,7 +248,7 @@ export default class SummaryScene extends Phaser.Scene {
     // 상단 바 페이지 제목 + 하단 조작 힌트
     this.txt(240, 7, PAGE_TITLE[page], 20, "#ffffff");
     this.txt(486, 8, `${this.page + 1}/${PAGES.length}`, 16, "#ffffff", "right");
-    this.txt(12, 366, "← → 페이지  ·  ↑ ↓ 포켓몬  ·  X 닫기", 15, "#5b6470");
+    this.txt(12, 366, "← → 페이지  ·  ↑ ↓ 포켓몬  ·  Space 쓰다듬기  ·  X 닫기", 15, "#5b6470");
   }
 
   // 좌측 공통 패널 — 모든 페이지에서 같다.
@@ -239,12 +288,22 @@ export default class SummaryScene extends Phaser.Scene {
     label(2, "타입"); this.typeBadges(p.types, 380, rowY[2] - 2, 0.72);
     label(3, "지닌 도구"); value(3, p.heldItem ?? "없음");
     label(4, "성별"); value(4, p.gender === "male" ? "♂ 수컷" : p.gender === "female" ? "♀ 암컷" : "—");
-    // 하단 넓은 행 2개 = 경험치. 레벨 100은 만렙이라 '다음 레벨' 개념이 없다.
-    const maxed = p.level >= 100;
-    this.txt(244, 268, "경험치", 18, "#f4f4f4"); this.txt(492, 268, String(p.exp), 18, "#3a3a3a", "right");
+    // ★ 하단 4행 — 원본 bg_info의 칸 경계는 y = 238/270/302/334/366 (픽셀에서 측정).
+    //   전엔 성별과 경험치 사이(240~269)와 맨 아래 칸(336~365)이 빈 채로 남아 어색했다.
+    //   가진 데이터만으로 채운다: 트레이너(플레이어 이름) · 경험치 · 다음 레벨까지 · 상태(상태이상).
+    //   (특성·성격·만난 장소는 Pokemon 데이터에 없으므로 지어내지 않는다.)
+    const rowTop = (y: number) => y - 4;   // 위 5행과 같은 여백(칸 위선 -4)
+    const trainer = (this.registry.get("playerName") as string) || "———";
+    this.txt(244, rowTop(240), "트레이너", 18, "#f4f4f4");
+    this.txt(492, rowTop(240), trainer, 18, "#3a3a3a", "right");
+    const maxed = p.level >= 100;   // 레벨 100은 만렙이라 '다음 레벨' 개념이 없다.
+    this.txt(244, rowTop(272), "경험치", 18, "#f4f4f4");
+    this.txt(492, rowTop(272), String(p.exp), 18, "#3a3a3a", "right");
     const next = expForLevel(p.level + 1);
-    this.txt(244, 302, "다음 레벨까지", 18, "#f4f4f4");
-    this.txt(492, 302, maxed ? "최고 레벨" : String(Math.max(0, next - p.exp)), 18, "#3a3a3a", "right");
+    this.txt(244, rowTop(304), "다음 레벨까지", 18, "#f4f4f4");
+    this.txt(492, rowTop(304), maxed ? "최고 레벨" : String(Math.max(0, next - p.exp)), 18, "#3a3a3a", "right");
+    this.txt(244, rowTop(336), "상태", 18, "#f4f4f4");
+    this.txt(492, rowTop(336), STATUS_KR[p.status ?? "none"] ?? "정상", 18, "#3a3a3a", "right");
     // EXP 바(하단, 원본 "EXP" 라벨 오른쪽). L³ 곡선으로 현재 레벨 진행도(만렙이면 가득).
     const cur = expForLevel(p.level);
     const ratio = maxed ? 1 : next > cur ? (p.exp - cur) / (next - cur) : 0;
@@ -269,29 +328,50 @@ export default class SummaryScene extends Phaser.Scene {
       this.txt(244, y, n, 18, "#f4f4f4");
       this.txt(492, y, String(v), 18, "#3a3a3a", "right");
     });
-    // 하단 = 유대(이 게임의 핵심 지표)
+    // 하단 = 유대(이 게임의 핵심 지표) + 쓰다듬기 안내
     this.txt(244, 292, "유대", 18, "#3a3a3a");
     this.drawHearts(300, 303, bondHearts(p), BOND_HEARTS);
     this.txt(300 + BOND_HEARTS * 18 + 12, 292, bondLabel(p), 16, "#c56a1a");
+    this.txt(244, 318, "Space 쓰다듬기 → 유대 ↑", 14, "#8a7a5a");
   }
 
   // ── 기술 페이지(bg_moves) ───────────────────────────
   private drawMoves(): void {
     const p = this.party[this.idx];
     if (!p) return;
-    // 원본 bg_moves 슬롯 중심 = y≈142 + i·64 (좌측에 타입·분류 상자쌍 x248/x281).
+    // 원본 bg_moves 슬롯 중심 = y≈142 + i·64.
+    //  ★ 원본 배경엔 기술 한 칸마다 작은 상자가 2×2로 구워져 있다(bg_moves.png 픽셀에서 측정):
+    //     왼쪽 상자 x248..275 · 오른쪽 상자 x280..307 (각 28px 폭),
+    //     윗줄 y = yc-10..yc+1 · 아랫줄 y = yc+4..yc+15 (각 12px 높이).
+    //   윗줄 둘 = 타입·분류 배지, 아랫줄 둘 = 위력·명중. (전엔 아랫줄 두 칸이 빈 상자로 남아 어색했다.)
+    const BOX_L = 248, BOX_R = 280, BOX_W = 28;
     for (let i = 0; i < 4; i++) {
       const yc = 142 + i * 64;
       const slot: MoveSlot | undefined = p.moves[i];
       if (!slot) { this.txt(322, yc - 11, "———", 19, "#9aa0a8"); continue; }
       const md = getMove(slot.id);
-      // 타입·분류 배지(원본 좌측 상자 위치에 얹는다)
+      // 타입·분류 배지 — 원본 상자(28x12)에 딱 맞게(64x28 시트 → 28/64 = 0.4375배).
       if (md) {
         const trow = TYPE_POS[md.type] ?? TYPE_POS.QMARKS;
-        this.crop("sum_types", 248, yc - 6, 0, trow * TYPE_H, TYPE_W, TYPE_H, 0.5);
+        this.crop("sum_types", BOX_L, yc - 10, 0, trow * TYPE_H, TYPE_W, TYPE_H, BOX_W / TYPE_W);
         const crow = CAT_POS[md.category] ?? 2;
-        this.crop("sum_category", 281, yc - 6, 0, crow * CAT_H, CAT_W, CAT_H, 0.5);
+        this.crop("sum_category", BOX_R, yc - 10, 0, crow * CAT_H, CAT_W, CAT_H, BOX_W / CAT_W);
       }
+      // 아랫줄 상자 = 위력 / 명중. AR 데이터에서 0 = "위력 없음(변화기)" / "필중" → 빈칸 대신 "—".
+      //  ⚠️ 원본 bg의 이 상자 4개 중 하나는 칸마다 위치가 도는 '빨강 강조'다(1칸=좌상, 2칸=우상, 3칸=좌하, 4칸=우하).
+      //    그대로 두면 글씨가 빨강 위에 얹혀 안 읽힌다 → 같은 원본 색(테두리 #607888 / 안쪽 #c8d0d8)으로
+      //    28x12 칩을 덮어 그린 뒤 숫자를 올린다(윗줄 배지도 상자를 꽉 덮으므로 짝이 맞는다).
+      //  상자 안쪽 폭이 24px뿐이라 글씨는 9px("100" ≈ 22px). 작은 글씨는 흰 그림자가 뭉개므로 끈다.
+      const num = (v: number | undefined) => (v && v > 0 ? String(v) : "—");
+      const chip = (vx: number, s2: string) => {
+        const g = this.add.graphics();
+        g.fillStyle(0x607888, 1); g.fillRect(this.X(vx), this.Y(yc + 4), BOX_W * this.s, 12 * this.s);
+        g.fillStyle(0xc8d0d8, 1); g.fillRect(this.X(vx + 2), this.Y(yc + 6), (BOX_W - 4) * this.s, 8 * this.s);
+        this.layer.add(g);
+        this.txt(vx + BOX_W / 2, yc + 4, s2, 9, "#2c3440", "center").setShadow(0, 0, "#ffffff", 0, false, false);
+      };
+      chip(BOX_L, num(md?.power));
+      chip(BOX_R, num(md?.accuracy));
       // 기술명 + PP (한 줄, 구분선 안쪽)
       this.txt(322, yc - 11, md?.name ?? slot.id, 19, "#3a3a3a");
       const ppR = slot.maxPp > 0 ? slot.pp / slot.maxPp : 0;

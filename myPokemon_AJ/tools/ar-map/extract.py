@@ -1,7 +1,16 @@
-import struct, os, glob, json
+import struct, os, glob, json, sys
 from rubymarshal.reader import loads
-from PIL import Image
-AR="/mnt/c/Users/ONE/Desktop/Pokemon Another Red_PWT_250829"
+from PIL import Image, ImageDraw
+# AR 원본 위치는 PC마다 다르다(D드라이브 회사PC / C드라이브 집PC). 하드코딩하면 다른 PC에서 죽으므로
+# 후보를 훑어 실제 존재하는 폴더를 고른다(extract-map.py와 동일 방식). 못 찾으면 명확히 죽는다.
+AR_CANDIDATES = [
+    "/mnt/d/Pokemon Another Red_PWT_250829",
+    "/mnt/c/Users/ONE/Desktop/Pokemon Another Red_PWT_250829",
+]
+AR = next((p for p in AR_CANDIDATES if os.path.isdir(p)), None)
+if AR is None:
+    sys.exit("AR 원본을 못 찾았다. 후보: " + " / ".join(AR_CANDIDATES) +
+             "\n찾는 법: find /mnt/d /mnt/c/Users/*/Desktop -maxdepth 4 -iname '*Another*Red*' -type d")
 # 리포 폴더명/경로가 PC·이사에 따라 바뀌므로 스크립트 위치 기준 상대경로로 잡는다.
 PUB=os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),"..","..","public","assets","house"))
 os.makedirs(PUB, exist_ok=True)
@@ -54,24 +63,98 @@ def process(mid, outpng):
     canvas.convert('RGB').save(outpng)
     return xs,ys,blocked
 
-# 방(155), 거실(067)
-r1x,r1y,b1=process(155, f'{PUB}/red_room_2f.png')
-r2x,r2y,b2=process(67,  f'{PUB}/red_living_1f.png')
-rooms={
- "bedroom":{"img":"assets/house/red_room_2f.png","cols":r1x,"rows":r1y,"blocked":b1,
-            "start":[9,6],"warps":[{"x":10,"y":3,"to":"living","ax":9,"ay":10}]},
- "living": {"img":"assets/house/red_living_1f.png","cols":r2x,"rows":r2y,"blocked":b2,
-            "start":[9,10],"warps":[{"x":9,"y":11,"to":"bedroom","ax":10,"ay":4}]},
-}
-json.dump(rooms, open(f'{PUB}/rooms.json','w'), ensure_ascii=False)
-print("방", r1x,r1y, "거실", r2x,r2y)
-# 충돌 오버레이(검증용)
-SCR="/tmp/claude-1000/-mnt-d-dev-AJ-Proj-vcPortfolio-AJ/a2ca6ebd-a8cd-4f7b-b46a-106c004cbd2b/scratchpad"
-for nm,png,bl,wp in [("room",f'{PUB}/red_room_2f.png',b1,rooms['bedroom']['warps']),("living",f'{PUB}/red_living_1f.png',b2,rooms['living']['warps'])]:
-    im=Image.open(png).convert('RGBA'); ov=Image.new('RGBA',im.size,(0,0,0,0))
-    from PIL import ImageDraw; d=ImageDraw.Draw(ov)
-    for y,row in enumerate(bl):
-        for x,v in enumerate(row):
-            if v: d.rectangle([x*32,y*32,x*32+31,y*32+31],fill=(255,0,0,90))
-    for w in wp: d.rectangle([w['x']*32,w['y']*32,w['x']*32+31,w['y']*32+31],fill=(0,150,255,140))
-    im.alpha_composite(ov); im.convert('RGB').save(f'{SCR}/overlay_{nm}.png')
+# ─────────────────────────────────────────────────────────────────────────────
+# 라이벌(그린)의 집 = AR Map156 "그린의집" (태초마을 27,7 문으로 들어가는 집).
+#  ⚠️ 예전엔 이 스크립트가 rooms.json을 통째로 다시 써서 손으로 다듬은 bedroom/living
+#     (계단·침대·문 워프)을 날렸다 → 이제는 156만 뽑아 rooms.json에 rival 키만 **병합**한다.
+#     bedroom/living PNG·JSON은 절대 건드리지 않는다.
+#  ⚠️ rival 키도 이미 rooms.json에 있으면 **덮어쓰지 않는다**(충돌격자는 손으로 다듬는 데이터 —
+#     프로젝트 규칙: 맵 충돌격자는 눈대중·재생성 금지). AR 원본에서 정말 다시 뽑아야 할 때만
+#     `--force-rival` 인자(또는 FORCE_RIVAL=1 환경변수)로 강제한다.
+#
+# 디버그 오버레이 저장 폴더. 예전엔 세션 임시폴더(/tmp/.../<세션uuid>/scratchpad)를 하드코딩해서
+# 다른 PC·다른 세션에서 재실행하면 FileNotFoundError로 죽었다. 그것도 rival PNG는 이미 덮어쓴
+# 뒤·rooms.json 병합 전이라 리포가 반쯤 갱신된 상태로 남았다. → 이제 스크립트 옆 `_debug/`(리포
+# 상대경로)를 기본으로 쓰고, 환경변수 AR_MAP_DEBUG_DIR로 바꿀 수 있다.
+DBG = os.environ.get("AR_MAP_DEBUG_DIR") or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "_debug")
+
+# rival 강제 덮어쓰기 플래그(둘 중 아무거나): python3 extract.py --force-rival  /  FORCE_RIVAL=1 python3 extract.py
+FORCE_RIVAL = ("--force-rival" in sys.argv) or (os.environ.get("FORCE_RIVAL", "").lower() not in ("", "0", "false"))
+
+
+def save_debug(img, name):
+    """디버그 오버레이 저장(선택 사항). 실패해도 절대 예외를 밖으로 던지지 않는다 —
+    오버레이는 '눈으로 보려고' 만드는 부가물일 뿐이고, 뒤의 rooms.json 병합이 항상 실행돼야 하기 때문."""
+    try:
+        os.makedirs(DBG, exist_ok=True)
+        p = os.path.join(DBG, name)
+        img.convert('RGB').save(p)
+        print("오버레이 저장:", p)
+        return p
+    except Exception as e:
+        print(f"[경고] 오버레이 저장 실패({name}): {e} — 무시하고 계속 진행한다(병합은 그대로 수행).")
+        return None
+
+# 배치 좌표(칸). None이면 "추출 + 격자 오버레이만" 하고 rooms.json은 안 건드린다.
+#  → 오버레이(overlay_rival_labeled.png)로 문/시작칸을 눈으로 찍은 뒤 값을 채우고 재실행한다.
+RIVAL_START = [6, 10]         # 문 바로 안쪽 시작칸(오버레이 확인: row10 전부 walkable)
+RIVAL_EXIT  = [6, 11]         # 나가는 문칸 = blocked grid의 유일한 walkable(6,11) 도어매트
+
+rx, ry, br = process(156, f'{PUB}/rival_house_1f.png')
+print("그린의집(rival)", rx, ry, "blocked칸", sum(sum(r) for r in br))
+print("blocked grid:")
+for r in br:
+    print("".join("#" if v else "." for v in r))
+
+# 32px 격자 + 칸좌표 라벨 오버레이(눈대중 금지 — 원본 PNG에 좌표를 얹어 문/시작을 찍는다)
+im = Image.open(f'{PUB}/rival_house_1f.png').convert('RGBA')
+ov = Image.new('RGBA', im.size, (0, 0, 0, 0)); d = ImageDraw.Draw(ov)
+for y, row in enumerate(br):
+    for x, v in enumerate(row):
+        if v:
+            d.rectangle([x*32, y*32, x*32+31, y*32+31], fill=(255, 0, 0, 80))
+for x in range(0, im.width+1, 32):
+    d.line([(x, 0), (x, im.height)], fill=(0, 0, 0, 120))
+for y in range(0, im.height+1, 32):
+    d.line([(0, y), (im.width, y)], fill=(0, 0, 0, 120))
+for y in range(len(br)):
+    for x in range(len(br[0])):
+        d.text((x*32+2, y*32+1), f"{x},{y}", fill=(255, 255, 0, 255))
+im.alpha_composite(ov)
+save_debug(im, 'overlay_rival_labeled.png')
+
+if RIVAL_START is not None and RIVAL_EXIT is not None:
+    rooms_path = f'{PUB}/rooms.json'
+    rooms = json.load(open(rooms_path, encoding='utf-8')) if os.path.isfile(rooms_path) else {}
+    if "rival" in rooms and not FORCE_RIVAL:
+        # 손으로 다듬은 blocked/start/warps 보호 — 자동 재추출 값으로 덮어쓰지 않는다.
+        print("rooms.json에 rival 키가 이미 있다 → 덮어쓰지 않고 건너뛴다.")
+        print("  (충돌격자·시작칸·워프는 손으로 다듬는 데이터라 자동 재생성으로 날리면 안 된다.)")
+        print("  정말 AR 원본 값으로 다시 덮어쓰려면: python3 tools/ar-map/extract.py --force-rival")
+        print("  (또는 FORCE_RIVAL=1 python3 tools/ar-map/extract.py)")
+    else:
+        rooms["rival"] = {
+            "img": "assets/house/rival_house_1f.png", "cols": rx, "rows": ry, "blocked": br,
+            "start": RIVAL_START,
+            "warps": [{"x": RIVAL_EXIT[0], "y": RIVAL_EXIT[1], "to": "world",
+                       "dir": "down", "kind": "door",
+                       "map": "pallet", "spawn": [27, 8], "face": "down"}],
+        }
+        with open(rooms_path, 'w', encoding='utf-8') as f:
+            json.dump(rooms, f, ensure_ascii=False)
+        print(("rooms.json rival 강제 덮어쓰기 완료" if FORCE_RIVAL else "rooms.json 병합 완료")
+              + " — 키: " + ", ".join(rooms.keys()))
+    # 확정 배치(시작=초록, 문=파랑) 확인용 오버레이
+    im2 = Image.open(f'{PUB}/rival_house_1f.png').convert('RGBA')
+    ov2 = Image.new('RGBA', im2.size, (0, 0, 0, 0)); d2 = ImageDraw.Draw(ov2)
+    for y, row in enumerate(br):
+        for x, v in enumerate(row):
+            if v: d2.rectangle([x*32, y*32, x*32+31, y*32+31], fill=(255, 0, 0, 90))
+    sx, sy = RIVAL_START; ex, ey = RIVAL_EXIT
+    d2.rectangle([sx*32, sy*32, sx*32+31, sy*32+31], fill=(0, 220, 0, 150))
+    d2.rectangle([ex*32, ey*32, ex*32+31, ey*32+31], fill=(0, 150, 255, 150))
+    im2.alpha_composite(ov2)
+    save_debug(im2, 'overlay_rival_placed.png')
+else:
+    print("RIVAL_START/RIVAL_EXIT 미설정 → rooms.json 미변경(오버레이만).")

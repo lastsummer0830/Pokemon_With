@@ -1,14 +1,13 @@
 import Phaser from "phaser";
-import { Pokemon, MoveSlot, displayName, caughtBallOf } from "../data/Pokemon";
-import { getMove } from "../data/ar";
-import { josa } from "../data/josa";
-import { pet, bondHearts, bondLabel, BOND_HEARTS } from "../systems/bond";
+import { Pokemon, displayName, caughtBallOf } from "../data/Pokemon";
+import { PETTED_KEY } from "../systems/bond";
 import { iconPath, makePartyIcon } from "../game/pokemonSprite";
 import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
 import { saveGame } from "../systems/save";
 
 // 인게임 스타트 메뉴 (오버레이). 필드(WorldScene 등)에서 Enter/X로 연다.
-//  상태: main(포켓몬/가방/저장/닫기) → party(파티 목록) → detail(한 마리 상세).
+//  상태: main(하단 바: 도감/포켓몬/가방/저장/설정) → party(파티 목록).
+//  한 마리 상세는 이 씬이 아니라 별도 오버레이 씬(SummaryScene)이 담당한다.
 const FONT = "Galmuri11";
 
 // UI 테마(사용자가 Pick에서 고른 뒤 registry 'uiTheme'로 고정). 기본 = navy(HGSS).
@@ -19,7 +18,7 @@ const THEMES: Record<string, Theme> = {
   dark:  { border: 0x3a4560, body: 0x161b28, line: 0x5a6a8a, accent: "#7ec7ff", text: "#e8edf7", sub: "#9fb3d8" }, // 다크 슬레이트+시안
 };
 
-type MenuState = "main" | "party" | "detail";
+type MenuState = "main" | "party";
 interface MenuInit {
   from?: string;
   // "switch" = 배틀에서 교체할 포켓몬 고르기. 파티 화면으로 바로 들어가고, 고르면 onPick으로 그 칸을 돌려준다.
@@ -37,8 +36,6 @@ export default class MenuScene extends Phaser.Scene {
   private party: Pokemon[] = [];
   private state: MenuState = "main";
   private idx = 0;
-  private detailIdx = 0;
-  private petted = new Set<number>();   // 이번 메뉴 세션에 이미 쓰다듬은 파티 칸(연타 방지)
   private layer!: Phaser.GameObjects.Container;
   private dim?: Phaser.GameObjects.Rectangle;
   private t: Theme = THEMES.navy;
@@ -54,7 +51,8 @@ export default class MenuScene extends Phaser.Scene {
     this.mode = data?.mode ?? "field";
     this.canCancel = data?.canCancel ?? true;
     this.onPick = data?.onPick;
-    this.petted.clear();   // 메뉴를 새로 열 때마다 쓰다듬기 제한 리셋
+    // 쓰다듬기 제한(연타 방지)은 상세화면(SummaryScene)과 공유한다. 메뉴를 새로 열 때만 여기서 리셋(세션 단위).
+    this.registry.set(PETTED_KEY, new Set<Pokemon>());
     if (this.mode === "switch") {
       this.state = "party";   // 교체는 하단 바를 거치지 않고 파티 화면부터
       this.idx = 0;
@@ -129,28 +127,14 @@ export default class MenuScene extends Phaser.Scene {
   private renderState(): void {
     if (this.layer) this.layer.destroy();
     this.layer = this.add.container(0, 0).setDepth(10);
-    // 하단 바(main)는 시안 A대로 월드를 딤 없이 그대로 보여준다. 전체화면 파티/상세만 딤.
+    // 하단 바(main)는 시안 A대로 월드를 딤 없이 그대로 보여준다. 전체화면 파티만 딤.
     this.dim?.setVisible(this.state !== "main");
     if (this.state === "main") this.renderMain();
-    else if (this.state === "party") this.renderParty();
-    else this.renderDetail();
+    else this.renderParty();
   }
 
-  private countFor(state: MenuState): number {
-    if (state === "main") return this.MAIN_ITEMS.length;
-    if (state === "party") return Math.max(1, this.party.length);
-    return 1;
-  }
-
-  // 방향 이동. 파티는 2열 그리드(좌우=열 이동, 상하=행 이동), 메인/상세는 세로.
+  // 방향 이동. 파티는 2열 그리드(좌우=열 이동, 상하=행 이동), 메인(하단 바)은 좌우.
   private nav(dir: "up" | "down" | "left" | "right"): void {
-    if (this.state === "detail") {
-      if (this.party.length <= 1) return;
-      if (dir === "up") this.detailIdx = (this.detailIdx - 1 + this.party.length) % this.party.length;
-      else if (dir === "down") this.detailIdx = (this.detailIdx + 1) % this.party.length;
-      else return;
-      playSfx(this, SFX.cursor, 0.4); this.renderState(); return;
-    }
     if (this.state === "main") {
       const n = this.MAIN_ITEMS.length;
       if (dir === "left") this.idx = (this.idx - 1 + n) % n;   // 하단 바 = 좌우 이동
@@ -184,42 +168,23 @@ export default class MenuScene extends Phaser.Scene {
       // 교체 모드 — 상세로 안 들어가고 고른 칸을 배틀에 돌려준다.
       //  못 내보내는 포켓몬(이미 나와 있음·기절)인지는 배틀이 판단해 이유를 말해준다.
       if (this.mode === "switch") { this.pick(this.idx); return; }
-      this.detailIdx = this.idx; this.state = "detail"; this.renderState();
-    } else if (this.state === "detail") {
-      // 상세뷰에서 확인 = 쓰다듬기(케어 → 유대↑).
-      this.petCurrent();
+      // 필드 모드 = 고른 포켓몬 상세(Summary) 오버레이를 연다(도감·가방과 같은 pause+launch 관용구).
+      this.scene.pause(); this.scene.launch("SummaryScene", { party: this.party, index: this.idx, from: "MenuScene" });
     }
-  }
-
-  // 쓰다듬기 — 유대를 조금 올린다. 이번 메뉴 세션엔 포켓몬당 1번만(연타 방지).
-  private petCurrent(): void {
-    const p = this.party[this.detailIdx];
-    if (!p) return;
-    const name = displayName(p);
-    if (this.petted.has(this.detailIdx)) {
-      this.toast(`${name}${josa(name, "은는")} 지금은 실컷 놀아줬어.`);
-      return;
-    }
-    const res = pet(p);
-    this.petted.add(this.detailIdx);
-    this.registry.set("playerParty", this.party);   // 유대 상승 반영(저장 시 함께 기록)
-    this.renderState();                              // 하트 게이지 즉시 갱신
-    this.toast(res.message.replace("\n", "  "));
   }
 
   private cancel(): void {
+    // 교체 모드는 파티 화면 하나뿐이라, 취소 = 배틀에 "안 고름(-1)"을 돌려주는 것.
     if (this.mode === "switch") {
       // 기절해서 강제로 교체하는 중이면 취소가 안 된다(반드시 골라야 한다).
-      if (this.state === "party" && !this.canCancel) return;
+      if (!this.canCancel) return;
       playSfx(this, SFX.cancel, 0.4);
-      if (this.state === "party") { this.pick(-1); return; }
-      this.state = "party"; this.idx = this.detailIdx; this.renderState();
+      this.pick(-1);
       return;
     }
     playSfx(this, SFX.cancel, 0.4);
-    if (this.state === "main") { this.close(); }
-    else if (this.state === "party") { this.state = "main"; this.idx = 1; this.renderState(); }
-    else { this.state = "party"; this.idx = this.detailIdx; this.renderState(); }
+    if (this.state === "main") this.close();
+    else { this.state = "main"; this.idx = 1; this.renderState(); }   // 파티 → 하단 바로 되돌아감
   }
 
   // 교체 모드에서 결과를 돌려주고 닫는다.
@@ -236,15 +201,6 @@ export default class MenuScene extends Phaser.Scene {
     else if (!this.scene.isActive(this.from)) this.scene.start(this.from);
   }
 
-  // 크림/남색 대신 테마 색으로 패널을 그린다.
-  private panel(x: number, y: number, w: number, h: number, r = 16): void {
-    const g = this.add.graphics();
-    g.fillStyle(0x000000, 0.3); g.fillRoundedRect(x + 4, y + 6, w, h, r);
-    g.fillStyle(this.t.border, 1); g.fillRoundedRect(x, y, w, h, r);
-    g.fillStyle(this.t.body, 1); g.fillRoundedRect(x + 5, y + 5, w - 10, h - 10, r - 3);
-    g.lineStyle(2, this.t.line, 0.9); g.strokeRoundedRect(x + 9, y + 9, w - 18, h - 18, r - 6);
-    this.layer.add(g);
-  }
   private txt(x: number, y: number, s: string, size: number, color?: string, origin = 0): Phaser.GameObjects.Text {
     const t = this.add.text(x, y, s, { fontFamily: FONT, fontSize: `${size}px`, color: color ?? this.t.text }).setOrigin(origin, 0);
     this.layer.add(t); return t;
@@ -359,22 +315,28 @@ export default class MenuScene extends Phaser.Scene {
         : (lead ? "pui_panel_round" : "pui_panel_rect");
     if (this.textures.exists(key)) this.layer.add(this.add.image(x, y, key).setOrigin(0).setScale(s));
 
-    // 볼 마커(좌측 하단, 위에 포켓몬이 얹힘) — 그 포켓몬을 '담은 볼'(caughtBall) 종류로 표시(태스크4).
-    //  선택 표시는 패널 색(swap_sel2)이 담당하므로, 볼은 선택과 무관하게 항상 잡은 볼을 보여준다.
-    //  잡은 볼 아이콘(item_*, 48x48)이 없으면 옛 AR 파티 볼(pui_icon_ball)로 폴백.
-    const ballItemKey = "item_" + caughtBallOf(p);
-    const ballKey = this.textures.exists(ballItemKey) ? ballItemKey : (sel ? "pui_icon_ball_sel" : "pui_icon_ball");
-    // 볼: 좌하단. 선두는 라운드(좌측 곡선)라 조금 더 안쪽으로.
+    // 포켓몬 아이콘 — AR처럼 패널 좌측을 '크게' 채우며 세로 중앙쯤.
+    //  로컬 62px 박스: 선두(round)는 중심 x=48(→17..79), 나머지는 중심 x=42(→11..73). 세로 17..79.
     const ballX = lead ? 34 : 28;
-    if (this.textures.exists(ballKey)) {
-      const [bx, by] = L(ballX, 58);
-      this.layer.add(this.add.image(bx, by, ballKey).setOrigin(0.5).setScale(s));
-    }
-    // 포켓몬 아이콘 — AR처럼 패널 좌측을 '크게' 채우며 세로 중앙쯤(볼과 겹쳐 볼 아랫부분 살짝 드러남).
     const ik = "icon_" + p.speciesId;
     if (this.textures.exists(ik)) {
       const [ix, iy] = L(ballX + 14, 48);
       const ic = makePartyIcon(this, ik, ix, iy, s * 62 / 64); ic.setOrigin(0.5); this.layer.add(ic);
+    }
+
+    // 볼 마커 — 그 포켓몬을 '담은 볼'(caughtBall) 종류. 전엔 아이콘 뒤(좌하단)라 선두 칸에선 거의 안 보였다.
+    //  → 패널 하단의 실제 빈 구역으로 옮긴다(눈대중 아님, 원본 패널 256x98 픽셀로 측정):
+    //    Lv 태그/숫자는 x≤50, 포켓몬 아이콘은 x≤79, HP 수치("999 / 999"도) 는 x≥133에서 시작 →
+    //    x 82..108 · y 64..90 이 어느 요소와도 안 겹치는 자리. Lv 태그(y70~84)와 높이도 맞는다.
+    //  아이콘 다음에 그려 항상 위로 오게 하고, 26px로 맞춰 볼 색이 바로 구분되게 한다.
+    //  잡은 볼 아이콘(item_*, 48x48)이 없으면 옛 AR 파티 볼(pui_icon_ball, 44x56)로 폴백.
+    const ballItemKey = "item_" + caughtBallOf(p);
+    const ballKey = this.textures.exists(ballItemKey) ? ballItemKey : (sel ? "pui_icon_ball_sel" : "pui_icon_ball");
+    if (this.textures.exists(ballKey)) {
+      const [bx, by] = L(95, 77);
+      const src = this.textures.get(ballKey).getSourceImage() as HTMLImageElement;
+      const bs = s * 26 / Math.max(1, src.width, src.height);   // 긴 변을 26 로컬px에 맞춤
+      this.layer.add(this.add.image(bx, by, ballKey).setOrigin(0.5).setScale(bs));
     }
 
     // 이름(상단, 포켓몬 오른쪽) + 성별(우상). 상단 여백 두고 안쪽에(튀어나오지 않게).
@@ -405,70 +367,6 @@ export default class MenuScene extends Phaser.Scene {
       this.layer.add(this.add.image(vx, vy, "pui_overlay_lv").setOrigin(0).setScale(s));
     }
     this.otext(x + 32 * s, y + 68 * s, `${p.level}`, 15 * s);
-  }
-
-  private hpBar(x: number, y: number, w: number, p: Pokemon): void {
-    const g = this.add.graphics();
-    const barH = 12;
-    g.fillStyle(0x101820, 1); g.fillRoundedRect(x - 2, y - 2, w + 4, barH + 4, 5);
-    const ratio = Math.max(0, p.currentHp / p.maxHp);
-    const col = ratio > 0.5 ? 0x6ede6a : ratio > 0.2 ? 0xf2d24b : 0xe85b4b;
-    g.fillStyle(col, 1); g.fillRoundedRect(x, y, Math.max(0, w * ratio), barH, 4);
-    this.layer.add(g);
-    this.txt(x + w, y + barH + 4, `${p.currentHp}/${p.maxHp}`, 16, this.t.text, 1);
-  }
-
-  private renderDetail(): void {
-    const { width, height } = this.scale;
-    const p = this.party[this.detailIdx];
-    const w = Math.min(width * 0.7, 820);
-    const x = (width - w) / 2;
-    const y = Math.max(height * 0.06, 24);
-    const h = Math.min(height * 0.86, 620);
-    this.panel(x, y, w, h);
-    this.txt(x + 28, y + 20, `${displayName(p)}  Lv.${p.level}`, 30, this.t.accent);
-    this.txt(x + 28, y + 60, `타입: ${p.types.join(" / ")}`, 24, this.t.sub);
-    const key = "icon_" + p.speciesId;
-    if (this.textures.exists(key)) { const ic = makePartyIcon(this, key, x + w - 80, y + 60, 1.2); ic.setOrigin(0.5); this.layer.add(ic); }
-    const stats: [string, number][] = [
-      ["HP", p.maxHp], ["공격", p.attack], ["방어", p.defense],
-      ["특공", p.spAttack], ["특방", p.spDefense], ["스피드", p.speed],
-    ];
-    stats.forEach(([n, v], i) => {
-      const sy = y + 110 + i * 34;
-      this.txt(x + 36, sy, n, 24, this.t.text);
-      this.txt(x + 160, sy, String(v), 24, this.t.accent);
-    });
-    // 유대(bond) 게이지 — 이 게임의 핵심. ♥ 글리프는 Galmuri11에 없어 graphics로 직접 그린다(폰트 함정 회피).
-    const by = y + 110 + 6 * 34 + 12;
-    this.txt(x + 36, by, "유대", 24, this.t.text);
-    this.drawHearts(x + 100, by + 14, bondHearts(p), BOND_HEARTS, 13);
-    this.txt(x + 100 + BOND_HEARTS * 30 + 14, by, bondLabel(p), 20, this.t.accent);
-    this.txt(x + w / 2 + 20, y + 108, "기술", 24, this.t.accent);
-    p.moves.forEach((m: MoveSlot, i) => {
-      const my = y + 148 + i * 40;
-      const md = getMove(m.id);
-      this.txt(x + w / 2 + 20, my, `${md?.name ?? m.id}`, 24, this.t.text);
-      this.txt(x + w - 40, my, `${m.pp}/${m.maxPp}`, 20, this.t.sub, 1);
-    });
-    this.txt(x + 28, y + h - 40, "↑↓ 다른 포켓몬  ·  Space 쓰다듬기  ·  X 뒤로", 18, this.t.sub);
-  }
-
-  // 유대 하트 5칸을 graphics로 그린다(채워진 칸=분홍 하트, 빈 칸=흐린 하트).
-  //  하트 = 위 두 원 + 아래 삼각형. cy = 하트 세로 중심.
-  private drawHearts(x: number, cy: number, filled: number, total: number, r: number): void {
-    const g = this.add.graphics();
-    const gap = r * 2.3;
-    for (let i = 0; i < total; i++) {
-      const cx = x + i * gap + r;
-      const on = i < filled;
-      if (on) g.fillStyle(0xff5d7a, 1);
-      else g.fillStyle(this.t.line, 0.55);
-      g.fillCircle(cx - r * 0.42, cy - r * 0.28, r * 0.5);
-      g.fillCircle(cx + r * 0.42, cy - r * 0.28, r * 0.5);
-      g.fillTriangle(cx - r * 0.88, cy - r * 0.02, cx + r * 0.88, cy - r * 0.02, cx, cy + r * 0.74);
-    }
-    this.layer.add(g);
   }
 
   private toast(msg: string): void {

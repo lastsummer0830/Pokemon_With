@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { frontPath, backPath, makeStillFront } from "../game/pokemonSprite";
-import { Pokemon, MoveSlot, createFromSpecies, displayName } from "../data/Pokemon";
+import { Pokemon, MoveSlot, createFromSpecies, displayName, caughtBallOf } from "../data/Pokemon";
 import { josa } from "../data/josa";
 import { loadArDb, getMove, getType, getItem, dexKanto, getTrainer, trainerFullName, trainerTeam } from "../data/ar";
 import { Backdrop } from "../data/region";
@@ -246,8 +246,9 @@ export default class BattleScene extends Phaser.Scene {
     //  상대는 아직 안 보인다(alpha 0) — sendOutEnemy()가 "나타났다/내보냈다" 대사와 함께 띄운다.
     this.enemySprite = this.makeEnemySprite();
     this.enemySprite.setAlpha(0);
+    // 내 포켓몬도 아직 안 보인다 — runBattle에서 잡은 볼로 내보내는 연출(playBallSendOut)이 띄운다.
     this.allySprite = this.makeAllySprite();
-    this.appear(this.allySprite);
+    this.allySprite.setVisible(false);
     // 트레이너 배틀이면 상대 자리에 트레이너가 먼저 서 있는다(포켓몬은 내보낸 뒤에 나온다).
     const tf = this.trainerSpriteFile;
     if (tf) {
@@ -270,11 +271,12 @@ export default class BattleScene extends Phaser.Scene {
     return makeStillFront(this, backKey(this.ally.speciesId), v.XC(128), v.Y(304), v.s * SPRITE_ZOOM)
       .setOrigin(0.5, 1).setDepth(50);
   }
-  // 살짝 떠오르며 등장
-  private appear(s: Phaser.GameObjects.Image): void {
+  // 살짝 떠오르며 등장. 등장이 끝나면 끝나는 Promise를 돌려준다
+  //  → 뒤에 이어지는 연출(볼 던지기 등)이 겹치지 않게 기다릴 수 있다. 안 기다리고 그냥 불러도 된다.
+  private appear(s: Phaser.GameObjects.Image): Promise<void> {
     const v = this.view, y = s.y;
     s.y = y - 10 * v.s; s.alpha = 0;
-    this.tweens.add({ targets: s, y, alpha: 1, duration: 350, ease: "Back.out" });
+    return this.tweenP({ targets: s, y, alpha: 1, duration: 350, ease: "Back.out" });
   }
 
   // 텍스처를 지금 받는다. 교체·다음 상대의 종족은 preload 시점에 알 수 없어서 런타임 로드가 필요하다.
@@ -299,7 +301,8 @@ export default class BattleScene extends Phaser.Scene {
       const t = this.trainerName;
       await this.say(`${t}${josa(t, "이가")} 승부를 걸어왔다!`);
     }
-    await this.sendOutEnemy(true);
+    await this.sendOutEnemy(true);   // 상대가 대사와 함께 등장하고, 등장 트윈까지 끝난 뒤에 돌아온다
+    await this.playBallSendOut(this.allySprite, caughtBallOf(this.ally)); // 그 다음 내 첫 포켓몬이 잡은 볼에서 튀어나온다
 
     while (true) {
       const cmd = await this.selectCommand();
@@ -597,7 +600,7 @@ export default class BattleScene extends Phaser.Scene {
   // ── 포획 볼 연출 ─────────────────────────────────────────
   //  선택한 볼(ballId)이 날아가 상대를 빨아들이고, 닫혀 떨어져 shakes번 흔들린다.
   //  shakes===4면 성공(터짐 이펙트), 미만이면 볼이 열리며 상대가 다시 나온다(스프라이트 복구까지 여기서).
-  //  볼 스프라이트는 AR Battle animations 원본(닫힘=64x64 4프레임 스핀, 열림=32x64 단일).
+  //  볼 스프라이트는 AR Battle animations 원본(닫힘=32x64 8프레임 스핀, 열림=32x64 단일).
   private async playBallCapture(ballId: string, shakes: number): Promise<void> {
     const v = this.view;
     const BALL = ballId.toUpperCase();
@@ -605,9 +608,9 @@ export default class BattleScene extends Phaser.Scene {
     const openKey = `ball_${BALL}_open`;
     // 없는 볼(스프라이트 미복사)이면 몬스터볼로 폴백 — 연출이 통째로 빠지지 않게.
     //  (로더는 404여도 COMPLETE만 발화하고 reject 안 하므로, 존재검사로 폴백을 결정한다.)
-    await this.ensureBattleSheet(closedKey, `assets/battle/${closedKey}.png`, 64, 64);
+    await this.ensureBattleSheet(closedKey, `assets/battle/${closedKey}.png`, 32, 64);
     if (!this.textures.exists(closedKey))
-      await this.ensureBattleSheet("ball_POKEBALL", "assets/battle/ball_POKEBALL.png", 64, 64);
+      await this.ensureBattleSheet("ball_POKEBALL", "assets/battle/ball_POKEBALL.png", 32, 64);
     const okClosed = this.textures.exists(closedKey) ? closedKey : "ball_POKEBALL";
     await this.ensureBattleSprite(openKey, `assets/battle/${openKey}.png`);
     if (!this.textures.exists(openKey))
@@ -618,7 +621,7 @@ export default class BattleScene extends Phaser.Scene {
     // 스핀 애니(볼별 1회만 등록)
     const spinKey = `spin_${okClosed}`;
     if (!this.anims.exists(spinKey)) {
-      this.anims.create({ key: spinKey, frames: this.anims.generateFrameNumbers(okClosed, { start: 0, end: 3 }),
+      this.anims.create({ key: spinKey, frames: this.anims.generateFrameNumbers(okClosed, { start: 0, end: 7 }),
         frameRate: 16, repeat: -1 });
     }
 
@@ -674,6 +677,56 @@ export default class BattleScene extends Phaser.Scene {
       await this.tweenP({ targets: es, scaleX: v.s * SPRITE_ZOOM, scaleY: v.s * SPRITE_ZOOM, alpha: 1, duration: 250, ease: "Back.out" });
       ball.destroy();
     }
+  }
+
+  // ── 내 포켓몬 내보내기 볼 연출 ───────────────────────────
+  //  잡은 볼(ballId)이 포물선으로 날아와 내 자리에 떨어지고, 열리며 포켓몬이 자라나 나온다.
+  //  playBallCapture(포획)의 역재생 — 같은 AR 볼 스프라이트(닫힘=32x64 8프레임 스핀, 열림=32x64)를 쓴다.
+  private async playBallSendOut(sprite: Phaser.GameObjects.Image, ballId: string): Promise<void> {
+    const v = this.view;
+    const BALL = ballId.toUpperCase();
+    const closedKey = `ball_${BALL}`;
+    const openKey = `ball_${BALL}_open`;
+    // 없는 볼(스프라이트 미복사)이면 몬스터볼로 폴백 — playBallCapture와 동일.
+    await this.ensureBattleSheet(closedKey, `assets/battle/${closedKey}.png`, 32, 64);
+    if (!this.textures.exists(closedKey))
+      await this.ensureBattleSheet("ball_POKEBALL", "assets/battle/ball_POKEBALL.png", 32, 64);
+    const okClosed = this.textures.exists(closedKey) ? closedKey : "ball_POKEBALL";
+    await this.ensureBattleSprite(openKey, `assets/battle/${openKey}.png`);
+    if (!this.textures.exists(openKey))
+      await this.ensureBattleSprite("ball_POKEBALL_open", "assets/battle/ball_POKEBALL_open.png");
+    const okOpen = this.textures.exists(openKey) ? openKey : "ball_POKEBALL_open";
+    for (const k of [okClosed, okOpen]) this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
+
+    // 스핀 애니(볼별 1회만 등록)
+    const spinKey = `spin_${okClosed}`;
+    if (!this.anims.exists(spinKey)) {
+      this.anims.create({ key: spinKey, frames: this.anims.generateFrameNumbers(okClosed, { start: 0, end: 7 }),
+        frameRate: 16, repeat: -1 });
+    }
+
+    // 내 포켓몬 자리(볼이 떨어질 목표점) — 발밑보다 조금 위. 출발점은 포획과 같은 손 위치.
+    const targetX = v.XC(128), targetY = v.Y(304) - 40 * v.s;
+    const startX = v.XC(150), startY = v.Y(300);
+
+    // 1) 볼이 스핀하며 포물선으로 내 자리로 날아와 통 떨어진다
+    const ball = this.add.sprite(startX, startY, okClosed, 0).setDepth(60).setScale(v.s * 2);
+    ball.play(spinKey);
+    playSfx(this, SFX.decision, 0.4);
+    const peakY = Math.min(startY, targetY) - 60 * v.s;
+    await this.tweenP({ targets: ball, x: (startX + targetX) / 2, y: peakY, duration: 200, ease: "Quad.out" });
+    await this.tweenP({ targets: ball, x: targetX, y: targetY, duration: 180, ease: "Bounce.out" });
+    ball.stop();
+
+    // 2) 볼이 열리고 포켓몬이 자라나 나온다(포획 실패 복귀와 같은 트윈)
+    ball.setTexture(okOpen);
+    playSfx(this, SFX.hitNormal, 0.4);
+    sprite.setVisible(true);
+    this.tweens.killTweensOf(sprite);
+    sprite.setPosition(v.XC(128), v.Y(304)).setAlpha(0).setScale(0);
+    this.ballBurst(ball.x, ball.y - 4 * v.s); // 열리는 순간 터짐(등장과 겹쳐 재생)
+    await this.tweenP({ targets: sprite, scaleX: v.s * SPRITE_ZOOM, scaleY: v.s * SPRITE_ZOOM, alpha: 1, duration: 250, ease: "Back.out" });
+    ball.destroy();
   }
 
   // 포획 성공 터짐 — AR ballBurst 이펙트(별·링)를 잠깐 확대·페이드.
@@ -765,21 +818,17 @@ export default class BattleScene extends Phaser.Scene {
     resetStages(this.enemy); // 내보내는 상대의 능력 변화 랭크 초기화(교체로 새로 나온 마리도 깨끗이)
     clearVolatileStatus(this.enemy); // 새로 나온 마리의 풀죽음·혼란 초기화
     const e = displayName(this.enemy);
-    if (this.isTrainerBattle) {
-      const t = this.trainerName;
-      await this.say(`${t}${josa(t, "은는")} ${e}${josa(e, "을를")} 내보냈다!`);
-    } else if (first) {
-      await this.say(`앗! 야생 ${e}${josa(e, "이가")} 나타났다!`);
-    }
     markSeen(this.registry, this.enemy.speciesId);   // 마주친 종족 → 도감 '본 적 있음'
 
     // 트레이너 그림은 첫 포켓몬을 낼 때 물러난다(승부가 끝나면 다시 나온다).
+    //  포켓몬이 트레이너와 같은 자리(384)에 나오므로, 다 물러난 뒤에 등장시킨다(둘이 겹쳐 보이지 않게).
     if (first && this.trainerImg) {
-      this.tweens.add({
-        targets: this.trainerImg, alpha: 0, x: this.trainerImg.x + 60 * this.view.s,
+      const img = this.trainerImg;
+      await this.tweenP({
+        targets: img, alpha: 0, x: img.x + 60 * this.view.s,
         duration: 300, ease: "Sine.in",
-        onComplete: () => this.trainerImg?.setVisible(false),
       });
+      img.setVisible(false);
     }
     if (!first) {
       // 종족이 바뀌었다 → 텍스처를 받아 스프라이트를 새로 만든다(쓰러진 그림은 버린다).
@@ -788,9 +837,21 @@ export default class BattleScene extends Phaser.Scene {
       this.enemySprite.destroy();
       this.enemySprite = this.makeEnemySprite();
     }
-    this.appear(this.enemySprite);
+
+    // ★ 상대는 대사보다 '먼저' 나타난다 — say()는 키를 누를 때까지 기다리므로,
+    //   대사 뒤에 등장시키면 "앗! 야생 OO가 나타났다!"를 읽는 동안 필드가 텅 빈다(내 포켓몬도 아직 볼 안).
+    //   등장(페이드인)이 '끝난 뒤' 대사를 띄운다 → 대사가 떠 있는 동안 필드가 비는 순간이 없다.
+    //   (원작도 야생 포켓몬이 먼저 나타나고 그다음 문장이 뜬다.)
     // HP박스는 낼 때마다 새로 만든다 — 쓰러질 때 치우므로(onEnemyFainted) 되살려 쓸 게 없다.
     this.enemyBox = new DataBox(this, this.view, this.enemy, false);
+    await this.appear(this.enemySprite);
+
+    if (this.isTrainerBattle) {
+      const t = this.trainerName;
+      await this.say(`${t}${josa(t, "은는")} ${e}${josa(e, "을를")} 내보냈다!`);
+    } else if (first) {
+      await this.say(`앗! 야생 ${e}${josa(e, "이가")} 나타났다!`);
+    }
   }
 
   // 내 포켓몬을 파티의 next번째로 바꾼다(기절해서 강제로 바꾸는 경우 포함).
@@ -808,9 +869,10 @@ export default class BattleScene extends Phaser.Scene {
     clearVolatileStatus(p); // 풀죽음·혼란 초기화(교체하면 사라짐)
     await this.ensureBattleSprite(backKey(p.speciesId), backPath(p.speciesId));
     this.allySprite = this.makeAllySprite();
-    this.appear(this.allySprite);
+    this.allySprite.setVisible(false);
     this.allyBox.setMon(p);
     await this.say(this.sendOutText(displayName(p)));
+    await this.playBallSendOut(this.allySprite, caughtBallOf(p)); // 교체로 나오는 포켓몬도 잡은 볼에서 나온다
   }
 
   // 거둬들일 때 — HP가 적을수록 격려, 오래 싸웠으면 수고. (AR pbMessageOnRecall)

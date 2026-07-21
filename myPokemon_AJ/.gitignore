@@ -26,3 +26,6 @@ src/**/*.js.map
 
 # UI 검증 산출물(로컬 전용)
 .claude/.verify/
+
+# AR 맵 추출 디버그 오버레이(extract.py가 만드는 확인용 PNG — 커밋 대상 아님)
+tools/ar-map/_debug/
