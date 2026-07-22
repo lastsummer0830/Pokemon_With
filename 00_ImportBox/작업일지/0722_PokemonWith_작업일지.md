@@ -268,3 +268,69 @@ python3 tools/ar-anim/extract-animations.py --se        # + 효과음(ffmpeg로 
 2. 애니 근사 유지분: 색 보정=틴트 / 감산 블렌드→곱셈 / 시트 hue 회전 무시.
 3. 타이밍 2·4 스크롤 보간이 **원본 실행화면과 같은지 미대조**(원본 지진 애니와 눈으로 비교 필요).
 4. 1·2부에서 남은 것 그대로: 라이벌집 마감(NPC 없음·워프 누락·현관 매트) · Summary 빈 기술칸 · 도감번호 `———`.
+
+---
+---
+
+# 0722 (4부) — 디버그 "확인 항목" 페이지 (3부 지시 1순위 처리)
+
+> 같은 날 네 번째 세션. 3부 §3 사용자 지시("확인할 게 많으면 디버그 페이지에 정리해놔야 한다 —
+> 나는 하루 한 번 몰아보는 수준")를 그대로 구현했다. **커밋 = 이 세션 마지막 커밋 참조.**
+
+## 1. 만든 것
+
+### ① `src/data/debugChecks.ts` (신규) — 확인 항목 정본
+- 항목 하나 = `date`(작업일지 MMDD) + `title` + **`what`(뭘 고쳤나 한 줄)** + **`see`(화면에서 뭘 보나 한 줄)**
+  + **그 연출로 한 방에 가는 `scene`/`data`** (+ `pickMove`면 기술 고르기 먼저).
+- 0722 하루치 **8항목** 등록: 카메라 프레이밍 · 오토타일 물 · 기술 애니(기술 골라서) · 배경 애니(EARTHQUAKE)
+  · 애니 중 대사창 유지 · HealthUp · HealthDown · 잔뎀 턴.
+- 공용 헬퍼도 여기로 모았다: `primeDebugRegistry()`(디버그로 아무 씬이나 열어도 이름·파티·가방·소지금·도감이
+  채워지게 — 전엔 DebugMenuScene 안에 인라인) · `startDebugCheck()` · `stepDebugCheck()`.
+
+### ② `src/scenes/DebugCheckBarScene.ts` (신규) — 상단 확인바
+- **별도 씬**이라 `scene.start`로 배틀→월드로 갈아타도 살아 있는다 → 하루치를 순서대로 훑는 핵심.
+- `◀이전 [` · `다시` · `다음 ▶ ]` · `목록 \` (게임이 안 쓰는 키만 골랐다). 클릭도 됨.
+- ⚠️ **바에서 `this.scene.start()`를 부르면 안 된다** — 바 자신이 죽고 옛 게임 씬이 남는다.
+  `gameScene()`으로 "지금 도는 진짜 씬"을 찾아 그쪽 ScenePlugin으로 이동한다.
+- `main.ts` scene 배열 맨 뒤에 등록(위에 그려지게) + `create`에서 `bringToTop()`.
+
+### ③ `src/scenes/DebugMenuScene.ts` — 2단 구성
+- 왼쪽 = 기존 씬 바로가기(그대로, 좌표만 좁힘). 오른쪽 = **"✅ 이번 작업 확인"** 패널
+  (↑↓ 커서 · Enter/클릭 실행 · 날짜 ◀▶ · 항목마다 제목+`what` 한 줄).
+- **기술 고르기 오버레이**: 애니 있는 기술 **859개**를 5×9 페이지(20p) + **알파벳 점프줄** + 프리셋 6개
+  (불꽃세례·전기쇼크·할퀴기·몸통박치기·지진·울음소리) + **쓰는 쪽(내/상대) 전환**. 마우스오버하면 영문 id를 보여준다.
+- ⚠️ ESC가 겹친다(오버레이 닫기 vs 타이틀로) → `pickerOpen` 플래그로 가로챈다. `once`가 아니라 `on`으로 바꿨다.
+- 목록으로 돌아오면 **방금 본 항목에 커서**가 있다(이어서 다음 항목).
+
+### ④ `src/scenes/BattleScene.ts` — 디버그 데모 모드
+- `BattleInit`에 `demo: "move"|"common"|"residual"|"msgbox"` (+ `demoMove`/`demoCommon`/`demoByAlly`).
+- `create()`에서 demo면 `runBattle()` 대신 `runDemo()` — **볼 던지기·조우 대사 없이 양쪽을 바로 세우고**
+  확인할 연출만 재생, 끝나면 아무 키나 눌러 반복.
+- **잔뎀은 가짜 연출이 아니라 실제 `afterTurn()`을 돌린다**(독=내 / 화상=상대를 걸고 턴 종료 처리).
+  HP를 풀로 채워두므로 기절 경로는 안 탄다.
+- 씬이 내려가면 `demoDead`로 루프를 멈춘다(파괴된 객체를 건드리지 않게).
+
+## 2. 규칙 등록 (사용자 지시)
+- **`myPokemon_AJ/AGENTS.md` §6**에 박았다: **"새 작업 = 확인 항목을 `debugChecks.ts`에 추가하는 것까지가 완료"**
+  + 추가 방법(데모 모드·확인바·검증 스크립트).
+- ⚠️ **리포 루트 `AGENTS.md`는 `.gitignore` 대상**(PC 로컬 — 다른 PC로 동기화 안 됨)이다.
+  거기에도 같은 줄을 넣었지만 **정본은 추적되는 `myPokemon_AJ/AGENTS.md`**다. 규칙은 앞으로도 그쪽에 박을 것.
+
+## 3. 검증 (전부 headless · `tools/shot-debugcheck.mjs` 신규)
+실제 UI(마우스 클릭·키)로 몰아봤다. `node tools/shot-debugcheck.mjs <출력폴더>` (⚠️ `tools/` 안에서 실행).
+- 확인 항목 8행 렌더 → 3번 항목 **마우스 클릭** → 기술 고르기 오버레이 → 프리셋(불꽃세례) 클릭 → 데모 재생.
+- 애니 호출 로그: `move:EMBER:ally` · `move:EARTHQUAKE:ally` · `move:TACKLE:ally` ·
+  `common:HealthUp:ally` · `common:HealthDown:ally` · 잔뎀 `common:HealthDown:ally`.
+- **애니 중 대사창 표시**: EARTHQUAKE 29/29, 나머지도 전부 표시.
+- 확인바 `]`로 4→5→6→7→8 순차 이동 OK, `\` 목록 복귀 시 **바 종료 + 커서 유지**(cursor=7) OK.
+- 월드 항목(카메라·오토타일 물)도 바를 단 채로 진입 OK.
+- `tsc --noEmit` 0 · **콘솔에러 0** · **`npm run app:bake` 완료**(app.asar 번들 = 이번 빌드 `index-DUxK7yhW.js`).
+- 캡처 11장: **`.claude/.verify/0722_debugcheck/`** (`D:\dev\Pokemon_With\.claude\.verify\0722_debugcheck\`).
+- ❗ 못 한 것: **소리는 못 들어봤다**(headless) · `/code-review`는 이 세션에서 못 돌렸다(슬래시 커맨드=사용자 트리거).
+
+## 4. 남은 것 (다음 세션)
+1. **Common 애니 나머지 미연결**: StatUp/StatDown · 상태이상(독·화상·마비·잠듦·얼음·혼란) · UseItem.
+   → 붙일 때마다 `debugChecks.ts`에 확인 항목 추가(이제 규칙).
+2. 애니 근사 유지분: 색 보정=틴트 / 감산 블렌드→곱셈 / 시트 hue 회전 무시.
+3. 타이밍 2·4 스크롤 보간이 **원본 실행화면과 같은지 미대조**.
+4. 앞부에서 남은 것: 라이벌집 마감(NPC 없음·워프 누락·현관 매트) · Summary 빈 기술칸 · 도감번호 `———`.

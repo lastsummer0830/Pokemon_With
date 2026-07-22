@@ -67,7 +67,16 @@ export interface BattleInit {
   returnScene?: string;
   returnFacing?: "down" | "left" | "right" | "up";
   backdrop?: Backdrop;  // 배틀 배경(AR battleback). 마을=town, 1번도로=route, 체육관=gym.
+  // ── 디버그 확인용 데모(DebugMenuScene "이번 작업 확인"에서만 넘어온다) ──
+  //  배틀을 진행하지 않고 **확인할 연출 하나만** 바로 재생한다(data/debugChecks.ts).
+  demo?: DemoKind;
+  demoMove?: string;    // demo="move"일 때 재생할 기술 id(없으면 EMBER)
+  demoCommon?: string;  // demo="common"일 때 Common 애니 이름(HealthUp / HealthDown)
+  demoByAlly?: boolean; // 내 포켓몬이 쓰는가(기본 true). false면 상대가 쓴다.
 }
+
+// move=기술 애니 · common=Common 애니 · residual=턴종료 잔뎀 · msgbox=애니 중 대사창 유지
+export type DemoKind = "move" | "common" | "residual" | "msgbox";
 
 export default class BattleScene extends Phaser.Scene {
   // 내 파티 = registry "playerParty"와 **같은 배열**. allyIdx = 지금 내보낸 칸.
@@ -107,6 +116,9 @@ export default class BattleScene extends Phaser.Scene {
   private returnPos: [number, number] | undefined;   // 승리/도망 시 돌아갈 좌표
   private returnFacing: "down" | "left" | "right" | "up" = "down";
   private returnScene: string | null = null;         // 승리 후 돌아갈 씬(실내 배틀). null이면 WorldScene.
+  // 디버그 데모(확인 항목에서 들어왔을 때만). null이면 평소대로 배틀을 진행한다.
+  private demo: { kind: DemoKind; move: string; common: string; byAlly: boolean } | null = null;
+  private demoDead = false;   // 씬이 내려가면 true — 데모 루프가 파괴된 객체를 건드리지 않게 멈춘다.
 
   constructor() { super("BattleScene"); }
 
@@ -135,6 +147,11 @@ export default class BattleScene extends Phaser.Scene {
     // ⚠️ Phaser는 씬을 다시 시작해도 **같은 인스턴스**를 쓴다 → 지난 배틀의 트레이너 그림이 남아 있으면
     //    (트레이너전 → 야생전처럼) 그림이 없는 배틀에서 buildSprites가 새로 안 만들어 **파괴된 옛 객체**를 물고 간다.
     this.trainerImg = undefined;
+    this.demo = data?.demo
+      ? { kind: data.demo, move: data.demoMove ?? "EMBER", common: data.demoCommon ?? "HealthUp",
+          byAlly: data.demoByAlly ?? true }
+      : null;
+    this.demoDead = false;
   }
 
   // 트레이너 배틀인가(AR 정의든 라이벌이든).
@@ -237,6 +254,11 @@ export default class BattleScene extends Phaser.Scene {
 
     void loadAnimIndex();            // 기술 애니 목록을 미리 받아둔다(첫 기술에서 멈칫하지 않게)
     playBgm(this, BGM.battle, 0.35); // 야생 배틀 BGM
+    if (this.demo) {
+      this.events.once("shutdown", () => { this.demoDead = true; });
+      this.runDemo().catch((e) => console.error("[BattleScene] 데모 오류:", e));
+      return;
+    }
     this.runBattle().catch((e) => console.error("[BattleScene] 진행 오류:", e));
   }
 
@@ -573,6 +595,81 @@ export default class BattleScene extends Phaser.Scene {
       if (isFainted(p)) break; // 쓰러지면 나머지 잔뎀은 생략하고 정리로
     }
     return this.resolveFaints();
+  }
+
+  // ── 디버그 확인용 데모 ────────────────────────────────────
+  //  확인 항목(data/debugChecks.ts)에서 들어왔을 때만 돈다. 배틀을 진행하지 않고
+  //  "확인할 연출 하나"만 반복 재생한다 — 사용자가 매번 상황을 손으로 만들지 않게.
+  //  이동(이전/다시/다음)은 상단 확인바(DebugCheckBarScene)가 맡는다.
+  private async runDemo(): Promise<void> {
+    const d = this.demo!;
+    // 등장 연출(볼 던지기·"나타났다" 대사)은 건너뛰고 양쪽을 바로 세운다 — 보려는 연출만 바로 본다.
+    this.enemyBox = new DataBox(this, this.view, this.enemy, false);
+    this.enemySprite.setAlpha(1);
+    this.allySprite.setVisible(true).setAlpha(1);
+
+    while (!this.demoDead) {
+      await this.playDemo(d);
+      if (this.demoDead) return;
+      await this.say("확인 끝 — 아무 키나 누르면 다시 본다.  (상단 바: ◀이전 [ · 다음▶ ] · 목록 \\)");
+    }
+  }
+
+  private async playDemo(d: { kind: DemoKind; move: string; common: string; byAlly: boolean }): Promise<void> {
+    switch (d.kind) {
+      case "move": {
+        const name = getMove(d.move)?.name ?? d.move;
+        const who = d.byAlly ? displayName(this.ally) : `상대 ${displayName(this.enemy)}`;
+        await this.say(`${who}의 ${name}!`);
+        await this.playMoveAnim(d.move, d.byAlly);
+        this.showMessage(`${name} 재생 완료 — 이 대사창은 애니 도중에도 그대로였다.`);
+        break;
+      }
+      case "msgbox": {
+        await this.say("① 대사창은 배틀 내내 한 벌만 만들어 살려 둔다(글자만 갈아 끼운다).");
+        await this.say("② 키를 넘기면 기술 애니가 돈다 — 그동안 창이 유지되는지 봐라.");
+        await this.playMoveAnim("TACKLE", true);
+        this.showMessage("③ 창이 사라지지 않고 그대로 남아 있으면 성공(예전엔 빈 바가 보였다).");
+        break;
+      }
+      case "common": {
+        const onAlly = d.byAlly;
+        const p = onAlly ? this.ally : this.enemy;
+        const box = onAlly ? this.allyBox : this.enemyBox;
+        if (d.common === "HealthDown") {
+          p.currentHp = p.maxHp;
+          await box.animateTo();
+          await this.say("HP가 줄 때의 연출(Common:HealthDown) — 독·화상 잔뎀에서 쓰는 그것이다.");
+          p.currentHp = Math.max(1, p.currentHp - Math.floor(p.maxHp / 3));
+          await this.playCommonAnim("HealthDown", onAlly);
+          await box.animateTo();
+        } else {
+          p.currentHp = Math.max(1, Math.floor(p.maxHp / 3));
+          await box.animateTo();
+          await this.say("HP를 깎아 뒀다 — 회복 연출(Common:HealthUp)을 튼다.");
+          p.currentHp = p.maxHp;
+          await this.playCommonAnim("HealthUp", onAlly);
+          await box.animateTo();
+        }
+        break;
+      }
+      case "residual": {
+        // 잔뎀은 실제 턴 종료 처리(afterTurn)를 그대로 돌린다 — 확인용으로 따로 짠 가짜 연출이 아니다.
+        this.ally.currentHp = this.ally.maxHp;
+        this.enemy.currentHp = this.enemy.maxHp;
+        this.ally.status = "poison";
+        this.enemy.status = "burn";
+        this.allyBox.refresh();
+        this.enemyBox.refresh();
+        await this.say("내 포켓몬=독 · 상대=화상을 걸었다. 턴 종료 처리(afterTurn)를 돌린다.");
+        await this.afterTurn();
+        this.ally.status = null;
+        this.enemy.status = null;
+        this.allyBox.refresh();
+        this.enemyBox.refresh();
+        break;
+      }
+    }
   }
 
   // 볼을 던진다 — 판정은 systems/capture.ts(AR 원본 공식), 여기선 연출·소비·파티 편입만.
