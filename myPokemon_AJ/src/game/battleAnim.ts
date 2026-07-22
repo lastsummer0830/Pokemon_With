@@ -46,6 +46,16 @@ interface AnimDoc {
   frames: Cell[][]; timings: Timing[];
 }
 
+// 배경(뒤)·전경(앞) 판 하나의 "지금 상태".
+//  원본은 판을 그림용(bgGraphic)·색용(bgColor) 둘로 나눠 들고 있는데, 여기선 한 덩어리로 들고
+//  그릴 때만 그림/색 중 하나를 쓴다(key가 있으면 그림, 없으면 색).
+interface PlaneState {
+  key: string | null;       // 그림 텍스처 키(null이면 색만 깐 판)
+  ox: number; oy: number;   // 그림 스크롤 — 원본 ox/oy(원본은 bgX의 부호를 뒤집어 넣는다)
+  op: number;               // 불투명도 0~255
+  c: number[];              // 색 보정 RGBA
+}
+
 interface AnimIndex {
   fps: number; cellSize: number; cols: number;
   focusUser: [number, number]; focusTarget: [number, number];
@@ -272,34 +282,62 @@ async function playAnimDoc(
   };
 
   // 배경(뒤)·전경(앞) 판 — 색만 깔거나 그림을 깐다(AR bgColor/bgGraphic/foColor/foGraphic).
-  //  대부분의 기술은 배경을 안 건드린다 → 필요할 때만 만든다(매 기술마다 빈 사각형 2개씩 만들지 않게).
+  //  대부분의 기술은 배경을 안 건드린다 → 실제로 쓸 때만 만든다(매 기술마다 빈 사각형 2개씩 만들지 않게).
   const { width: SW, height: SH } = scene.scale;
   const planes: Record<string, Phaser.GameObjects.GameObject & { setAlpha(v: number): unknown }> = {};
-  const setPlane = (fore: boolean, t: Timing): void => {
-    const key = t.n ? bgKeys.get(t.n) : undefined;
+  const newState = (): PlaneState => ({ key: null, ox: 0, oy: 0, op: 0, c: [0, 0, 0, 0] });
+  const state = { bg: newState(), fo: newState() };   // 지금 상태
+  const old = { bg: newState(), fo: newState() };     // 타이밍 2·4가 "여기서부터" 변해갈 시작점
+
+  // 상태를 실제 화면에 그린다.
+  const drawPlane = (fore: boolean): void => {
+    const st = fore ? state.fo : state.bg;
     const imgId = fore ? "foImg" : "bgImg";
     const colorId = fore ? "foColor" : "bgColor";
-    if (key && scene.textures.exists(key)) {
+    if (st.key && scene.textures.exists(st.key)) {
       let img = planes[imgId] as Phaser.GameObjects.TileSprite | undefined;
       if (!img) {
-        img = scene.add.tileSprite(0, 0, SW, SH, key).setOrigin(0).setDepth(fore ? 121 : 21);
+        img = scene.add.tileSprite(0, 0, SW, SH, st.key).setOrigin(0).setDepth(fore ? 121 : 21);
+        img.setTileScale(s, s);   // 원본은 512×384 화면에 1:1로 깐다 → 우리 화면 배율만큼 키운다
         planes[imgId] = img;
       }
-      img.setTexture(key);
-      img.tilePositionX = -(t.x ?? 0) * s;
-      img.tilePositionY = -(t.y ?? 0) * s;
-      img.setAlpha((t.op ?? 255) / 255);
+      img.setTexture(st.key);
+      img.tilePositionX = st.ox;
+      img.tilePositionY = st.oy;
+      img.setAlpha(st.op / 255);
       planes[colorId]?.setAlpha(0);
     } else {
       planes[imgId]?.setAlpha(0);
+      // 아직 아무것도 안 깔린 상태(투명)면 사각형을 만들지 않는다.
+      if (!planes[colorId] && st.op <= 0) return;
       let rect = planes[colorId] as Phaser.GameObjects.Rectangle | undefined;
       if (!rect) {
         rect = scene.add.rectangle(SW / 2, SH / 2, SW, SH, 0x000000, 0).setDepth(fore ? 120 : 20);
         planes[colorId] = rect;
       }
-      const c = t.c ?? [0, 0, 0, 0];
-      rect.setFillStyle(Phaser.Display.Color.GetColor(c[0], c[1], c[2]), 1);
-      rect.setAlpha((t.op ?? c[3] ?? 0) / 255);
+      // 원본 색 판 = "검은 판에 color를 알파만큼 섞은 것" → 실제로 보이는 색은 RGB×(알파/255).
+      const k = (st.c[3] ?? 0) / 255;
+      const v = (i: number) => Math.max(0, Math.min(255, Math.round((st.c[i] ?? 0) * k)));
+      rect.setFillStyle(Phaser.Display.Color.GetColor(v(0), v(1), v(2)), 1);
+      rect.setAlpha(Math.max(0, Math.min(1, st.op / 255)));
+    }
+  };
+
+  // 타이밍 1·3 = 즉시 설정(원본 playTiming의 when 1 / when 3 그대로).
+  const setPlane = (fore: boolean, t: Timing): void => {
+    const key = t.n ? bgKeys.get(t.n) : undefined;
+    const st = fore ? state.fo : state.bg;
+    if (key && scene.textures.exists(key)) {
+      st.key = key;
+      st.ox = -(t.x ?? 0);            // 원본: bgGraphic.ox = -i.bgX
+      st.oy = -(t.y ?? 0);
+      st.c = (t.c ?? [0, 0, 0, 0]).slice();
+      st.op = t.op ?? 0;
+    } else {
+      st.key = null;
+      st.ox = 0; st.oy = 0;
+      st.c = (t.c ?? [0, 0, 0, 0]).slice();
+      st.op = t.op ?? 0;
     }
   };
 
@@ -391,8 +429,35 @@ async function playAnimDoc(
     }
   };
 
-  // 타이밍(효과음·배경) — 프레임이 바뀔 때마다 그 프레임 것을 실행
+  // 타이밍 2·4 = "서서히 변화". 원본 playTiming 앞부분 그대로:
+  //  타이밍 프레임 < 지금 프레임 <= 타이밍 프레임+duration 인 동안, 시작점(old)에서 목표값 쪽으로
+  //  fraction 만큼 간 값을 매 프레임 넣는다.
+  const tweenPlanes = (fi: number): void => {
+    for (const t of doc.timings) {
+      if (t.t !== 2 && t.t !== 4) continue;
+      const dur = t.dur ?? 0;
+      if (dur <= 0) continue;
+      if (t.f + dur < fi || t.f >= fi) continue;
+      const fr = (fi - t.f) / dur;
+      const fore = t.t === 4;
+      const st = fore ? state.fo : state.bg;
+      const o = fore ? old.fo : old.bg;
+      if (st.key) {
+        // ⚠️ 원본이 여기만 뺄셈이다(다른 값은 전부 덧셈 보간) — 원본 동작을 그대로 옮긴다.
+        if (t.x !== undefined) st.ox = o.ox - (t.x - o.ox) * fr;
+        if (t.y !== undefined) st.oy = o.oy - (t.y - o.oy) * fr;
+      }
+      if (t.op !== undefined) st.op = o.op + (t.op - o.op) * fr;
+      if (t.c) {
+        st.c = [0, 1, 2, 3].map((i) => (o.c[i] ?? 0) + ((t.c![i] ?? 0) - (o.c[i] ?? 0)) * fr);
+      }
+    }
+  };
+
+  // 타이밍(효과음·배경) — 프레임이 바뀔 때마다 그 프레임 것을 실행.
+  //  순서도 원본과 같다: ① 진행 중인 "서서히 변화" 반영 → ② 이 프레임에 걸린 타이밍 실행.
   const fireTimings = (fi: number): void => {
+    tweenPlanes(fi);
     for (const t of doc.timings) {
       if (t.f !== fi) continue;
       if (t.t === 0) {
@@ -402,9 +467,16 @@ async function playAnimDoc(
         }
       } else if (t.t === 1 || t.t === 3) {
         setPlane(t.t === 3, t);
+      } else if (t.t === 2 || t.t === 4) {
+        // 변화 시작 프레임 — 지금 상태를 "시작점"으로 찍어 둔다(원본 oldbg/oldfo).
+        const fore = t.t === 4;
+        const st = fore ? state.fo : state.bg;
+        const o = fore ? old.fo : old.bg;
+        o.key = st.key; o.ox = st.ox; o.oy = st.oy; o.op = st.op; o.c = st.c.slice();
       }
-      // 2·4(배경 서서히 변화)는 아직 안 붙였다 — 값이 바뀌는 마지막 상태만 1·3이 이미 깔아준다.
     }
+    drawPlane(false);
+    drawPlane(true);
   };
 
   // ── 20fps로 돌린다 ──
@@ -420,6 +492,9 @@ async function playAnimDoc(
         const fi = Math.floor(((scene.time.now - started) / 1000) * fps);
         if (fi >= doc.frames.length) { ev.remove(); resolve(); return; }
         if (fi === last) return;
+        // 화면이 버벅여 프레임이 건너뛰어져도(원본은 한 프레임씩 반드시 지나간다) 타이밍은 빠짐없이 처리한다.
+        //  안 그러면 "서서히 변화"가 중간값에 갇히고 효과음이 통째로 빠진다.
+        for (let f = last + 1; f < fi; f++) fireTimings(f);
         last = fi;
         fireTimings(fi);
         applyFrame(fi);

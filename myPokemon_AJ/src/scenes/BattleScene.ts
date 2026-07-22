@@ -23,7 +23,7 @@ import {
 } from "./battleView";
 import { playBgm, stopBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
-import { playMoveAnimation, loadAnimIndex } from "../game/battleAnim";
+import { playMoveAnimation, playCommonAnimation, loadAnimIndex } from "../game/battleAnim";
 
 const FONT = "Galmuri11";
 const SPRITE_ZOOM = 2;   // AR 배틀 스프라이트 확대 배율(원본 프레임 44~48px)
@@ -90,6 +90,10 @@ export default class BattleScene extends Phaser.Scene {
   private backdrop: Backdrop = "town";
 
   private trainerImg?: Phaser.GameObjects.Image;   // 상대 트레이너 그림(포켓몬을 내보내면 물러난다)
+  // 대사창(배틀 내내 살아 있는 한 벌 — say()가 글자만 갈아 끼운다)
+  private msgLayer?: Phaser.GameObjects.Container;
+  private msgText?: Phaser.GameObjects.Text;
+  private msgArrow?: Phaser.GameObjects.Sprite;
 
   private pendingAlly: Pokemon | null = null;
   private pendingEnemyTeam: Pokemon[] | null = null;
@@ -169,6 +173,8 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   async create(): Promise<void> {
+    // ⚠️ Phaser는 씬을 재시작해도 같은 인스턴스를 쓴다 → 지난 배틀의 (이미 파괴된) 대사창 참조를 버린다.
+    this.msgLayer = undefined; this.msgText = undefined; this.msgArrow = undefined;
     await loadArDb(); // 종족·기술·상성·트레이너 데이터 확보
     if (this.trainerId) {
       this.trainerDef = getTrainer(this.trainerId) ?? null;
@@ -328,6 +334,7 @@ export default class BattleScene extends Phaser.Scene {
       // 가방: 아이템을 쓰면 그 턴에 기술은 못 쓴다(아이템 사용 = 턴 소비. AR·본가 동일).
       //  아무것도 안 쓰고 닫았으면 턴이 지나가지 않고 다시 커맨드 선택으로 돌아간다.
       if (cmd.kind === "item") {
+        const hpBefore = this.ally.currentHp;   // 회복 아이템이었는지 판정용(HealthUp 연출)
         const bag = await this.openBag();
         if (!bag.used) continue;
         // 볼을 골랐다 → 던진다. 잡으면 배틀 끝, 놓치면 아이템과 똑같이 상대에게 한 턴을 준다.
@@ -340,6 +347,8 @@ export default class BattleScene extends Phaser.Scene {
           continue;
         }
         if (bag.text) await this.say(bag.text);     // "OO의 HP가 20 회복됐다!" — 가방이 만든 문장
+        // 나가 있는 포켓몬의 HP가 실제로 늘었으면 원본처럼 HealthUp 연출을 튼다(다른 파티원을 회복했으면 안 튼다).
+        if (this.ally.currentHp > hpBefore) await this.playCommonAnim("HealthUp", true);
         await this.allyBox.animateTo();                  // 회복된 HP를 HP바에 반영
         await this.doTurn(this.enemy, this.ally, this.pickEnemyMove(), this.allyBox, false);
         if (await this.afterTurn()) break;
@@ -506,8 +515,9 @@ export default class BattleScene extends Phaser.Scene {
     // 풀죽음 부여 — 상대가 이번 턴 아직 행동 안 했을 때만 실효(후공이면 beforeMove가 막는다). 메시지는 그때 뜬다.
     if (res.flinched) defender.flinch = true;
 
-    // 회복기 — 사용자 HP 회복 후 HP바에 반영
+    // 회복기 — 사용자 HP 회복 후 HP바에 반영. 원본은 여기서 Common:HealthUp 연출을 튼다(pbHPChanged).
     if (res.healed > 0) {
+      await this.playCommonAnim("HealthUp", isAlly);
       await this.say(`${who}의 HP가 회복됐다!`);
       await attackerBox.animateTo();
     }
@@ -532,6 +542,14 @@ export default class BattleScene extends Phaser.Scene {
       md ? { type: md.type, category: md.category, target: md.target } : undefined);
   }
 
+  // Common 애니(HP회복 HealthUp / HP감소 HealthDown 등) — 원본 pbCommonAnimation.
+  //  기술 애니와 달리 "한 마리에게" 거는 연출이라 사용자·대상이 같은 스프라이트다(원본도 target||user).
+  private async playCommonAnim(name: string, onAlly: boolean): Promise<void> {
+    const sp = onAlly ? this.allySprite : this.enemySprite;
+    if (!sp) return;
+    await playCommonAnimation(this, this.view, { user: sp, target: sp }, name);
+  }
+
   // 턴 종료 처리: 상태이상(화상·독) 데미지를 양쪽에 적용하고 쓰러진 쪽을 정리한다.
   //  반환 true = 배틀 종료. (턴을 소비한 모든 분기에서 resolveFaints 대신 이걸 부른다.)
   private async afterTurn(): Promise<boolean> {
@@ -550,6 +568,7 @@ export default class BattleScene extends Phaser.Scene {
       advanceStatusTurn(p); // 맹독이면 누적 카운터 +1 (다음 턴 데미지가 커진다)
       const who = isAlly ? displayName(p) : `상대 ${displayName(p)}`;
       await this.say(residualMessage(who, p.status));
+      await this.playCommonAnim("HealthDown", isAlly);   // 원본: 기술 데미지가 아닌 HP 감소 = Common:HealthDown
       await box.animateTo();
       if (isFainted(p)) break; // 쓰러지면 나머지 잔뎀은 생략하고 정리로
     }
@@ -930,6 +949,7 @@ export default class BattleScene extends Phaser.Scene {
   // 배틀 위에 파티 화면을 띄운다 — 가방과 같은 방식으로 필드 UI(MenuScene)를 그대로 재사용한다.
   //  반환: 고른 파티 칸, 취소면 -1.
   private openParty(canCancel: boolean): Promise<number> {
+    this.hideMessage();
     return new Promise((resolve) => {
       this.scene.pause();
       this.scene.launch("MenuScene", {
@@ -963,34 +983,58 @@ export default class BattleScene extends Phaser.Scene {
 
   // 대사창 — AR 원본 overlay_message(512x96) 위에 글자만 얹는다(직접 그린 박스 아님).
   //  글자 시작 (32,306) · 색 base(80,80,88)/shadow(160,160,168) — 전부 AR 소스 값.
+  //  ★ 창은 한 번 만들면 계속 살려 둔다(원본도 배틀 내내 대사창이 떠 있다).
+  //    예전엔 say()마다 만들고 키를 누르면 부쉈는데, 그러면 기술 애니가 도는 동안 하단이 텅 비었다.
+  //    창을 치우는 건 커맨드/기술/가방/파티 메뉴가 열릴 때뿐(hideMessage).
+  private ensureMsgBox(): void {
+    if (this.msgLayer) return;
+    const v = this.view;
+    const layer = this.add.container(0, 0).setDepth(195);
+    v.bottomOverlay(layer, "bt_overlay_message");     // 화면 폭 전체
+    const t = this.add.text(v.XL(32), v.Y(306), "", {
+      fontFamily: FONT, fontSize: `${Math.round(20 * v.s)}px`, color: "#505058",
+      wordWrap: { width: 448 * v.s }, lineSpacing: Math.round(6 * v.s),
+    }).setOrigin(0);
+    t.setShadow(Math.max(1, v.s), Math.max(1, v.s), "#a0a0a8", 0, false, true);
+    layer.add(t);
+
+    // "계속" 화살표 — AR 원본 그림·좌표·속도 그대로(battleView의 PAUSE_* 주석에 근거).
+    //  ★ 대사창은 화면 폭을 꽉 채우니 화살표도 오른쪽 끝 기준(XR) — 커맨드 버튼과 같은 앵커.
+    //  그림이 없으면 화살표만 건너뛴다 — 장식 하나 때문에 배틀 진행이 멈추면 안 된다.
+    if (this.anims.exists("pause_arrow")) {
+      const arrow = this.add.sprite(v.XR(PAUSE_VX), v.Y(PAUSE_VY), "bt_pause_arrow")
+        .setOrigin(0).setScale(v.s).setVisible(false);
+      arrow.play("pause_arrow");
+      layer.add(arrow);
+      this.msgArrow = arrow;
+    }
+    this.msgLayer = layer;
+    this.msgText = t;
+  }
+
+  // 창을 띄운 채 글자만 바꾼다(키를 기다리지 않는다).
+  private showMessage(text: string): void {
+    this.ensureMsgBox();
+    this.msgLayer!.setVisible(true);
+    this.msgText!.setText(text);
+  }
+
+  // 메뉴가 열릴 때만 창을 감춘다(메뉴 창이 같은 자리를 쓴다).
+  private hideMessage(): void {
+    this.msgLayer?.setVisible(false);
+    this.msgArrow?.setVisible(false);
+  }
+
   private say(text: string): Promise<void> {
+    this.showMessage(text);
     return new Promise((resolve) => {
-      const v = this.view;
-      const layer = this.add.container(0, 0).setDepth(195);
-      v.bottomOverlay(layer, "bt_overlay_message");     // 화면 폭 전체
-      const t = this.add.text(v.XL(32), v.Y(306), text, {
-        fontFamily: FONT, fontSize: `${Math.round(20 * v.s)}px`, color: "#505058",
-        wordWrap: { width: 448 * v.s }, lineSpacing: Math.round(6 * v.s),
-      }).setOrigin(0);
-      t.setShadow(Math.max(1, v.s), Math.max(1, v.s), "#a0a0a8", 0, false, true);
-      layer.add(t);
-
-      // "계속" 화살표 — AR 원본 그림·좌표·속도 그대로(battleView의 PAUSE_* 주석에 근거).
-      //  ★ 대사창은 화면 폭을 꽉 채우니 화살표도 오른쪽 끝 기준(XR) — 커맨드 버튼과 같은 앵커.
-      //  그림이 없으면 화살표만 건너뛴다 — 장식 하나 때문에 배틀 진행이 멈추면 안 된다.
-      if (this.anims.exists("pause_arrow")) {
-        const arrow = this.add.sprite(v.XR(PAUSE_VX), v.Y(PAUSE_VY), "bt_pause_arrow")
-          .setOrigin(0).setScale(v.s);
-        arrow.play("pause_arrow");
-        layer.add(arrow);
-      }
-
+      this.msgArrow?.setVisible(true);   // 키를 기다리는 동안만 화살표가 깜빡인다
       const kb = this.input.keyboard!;
       const done = () => {
         kb.off("keydown-ENTER", done); kb.off("keydown-Z", done); kb.off("keydown-SPACE", done);
         playSfx(this, SFX.decision, 0.35);
-        layer.destroy();
-        resolve();
+        this.msgArrow?.setVisible(false);
+        resolve();                        // ★ 창은 그대로 둔다 — 다음 대사/기술 애니 동안 계속 보인다
       };
       kb.on("keydown-ENTER", done); kb.on("keydown-Z", done); kb.on("keydown-SPACE", done);
     });
@@ -1000,6 +1044,7 @@ export default class BattleScene extends Phaser.Scene {
   //  ★ 버튼 그림에 "싸운다/가방/포켓몬/도망" 한글이 이미 그려져 있다(AR 한글판) → 글자를 얹지 않는다.
   //  좌열=기본 / 우열(x=130)=선택.  반환 0=싸운다 1=가방 2=포켓몬 3=도망.
   private commandMenu(): Promise<number> {
+    this.hideMessage();   // 커맨드 창이 대사창과 같은 자리를 쓴다
     return new Promise((resolve) => {
       const v = this.view;
       const layer = this.add.container(0, 0).setDepth(200);
@@ -1050,6 +1095,7 @@ export default class BattleScene extends Phaser.Scene {
   //    (배틀 전용 4카테고리 화면은 HGSS 방식인데, 그건 DS 하단 터치스크린이 따로 있어서 가능했던 것.)
   //  배틀 씬은 pause — 안 그러면 키 입력이 두 씬에 동시에 먹는다.
   private openBag(): Promise<BagResult> {
+    this.hideMessage();
     return new Promise((resolve) => {
       this.scene.pause();
       this.scene.launch("BagScene", {
@@ -1067,6 +1113,7 @@ export default class BattleScene extends Phaser.Scene {
   //  오른쪽 흰 칸 = 선택한 기술의 타입 아이콘(types.png) + 남은 PP(색이 PP 비율에 따라 변한다).
   //  반환: 고른 기술 인덱스, X/ESC로 취소하면 -1(커맨드로 뒤로가기).
   private selectMove(): Promise<number> {
+    this.hideMessage();   // 기술 창이 대사창과 같은 자리를 쓴다
     return new Promise((resolve) => {
       const v = this.view;
       const layer = this.add.container(0, 0).setDepth(200);
@@ -1144,8 +1191,25 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   // ── 연출 ─────────────────────────────────────────────────
+  // 피격 깜빡임 — AR 원본 Animation::BattlerDamage 그대로.
+  //  원본은 20fps에서 "2프레임 숨김 + 2프레임 보임"을 4번(총 16프레임 = 0.8초) 반복한다.
+  //  ⚠️ 원본과 마찬가지로 기다리지 않는다 — HP바가 줄어드는 연출과 동시에 돈다.
+  //  (Common 애니가 아니다. AR에는 "명중" Common 애니가 없고 이 코드 연출이 정본이다.)
   private flash(sprite: Phaser.GameObjects.Image): void {
-    this.tweens.add({ targets: sprite, alpha: 0.2, duration: 60, yoyo: true, repeat: 2 });
+    if (!sprite.visible) return;
+    const step = 1000 / 20;              // 원본 1프레임
+    sprite.setAlpha(0);
+    let n = 0;
+    const ev = this.time.addEvent({
+      delay: step * 2, repeat: 6,        // 2프레임마다 토글 × 7 → 마지막은 다시 보이는 상태로 끝난다
+      callback: () => {
+        n++;
+        if (!sprite.active) { ev.remove(); return; }   // 교체·기절로 사라진 스프라이트
+        // 다른 연출(등장·퇴장 트윈)이 이 스프라이트를 잡으면 깜빡임을 접고 원래대로 돌려준다.
+        if (n >= 7 || this.tweens.isTweening(sprite)) { sprite.setAlpha(1); ev.remove(); return; }
+        sprite.setAlpha(n % 2 === 1 ? 1 : 0);
+      },
+    });
   }
   private fadeOutSprite(sprite: Phaser.GameObjects.Image): void {
     this.tweens.add({ targets: sprite, alpha: 0, y: sprite.y + 20, duration: 500, ease: "Sine.in" });
