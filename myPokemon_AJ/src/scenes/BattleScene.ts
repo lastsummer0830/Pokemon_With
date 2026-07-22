@@ -23,6 +23,7 @@ import {
 } from "./battleView";
 import { playBgm, stopBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
+import { playMoveAnimation, loadAnimIndex } from "../game/battleAnim";
 
 const FONT = "Galmuri11";
 const SPRITE_ZOOM = 2;   // AR 배틀 스프라이트 확대 배율(원본 프레임 44~48px)
@@ -228,6 +229,7 @@ export default class BattleScene extends Phaser.Scene {
     this.buildSprites();
     this.buildHud();
 
+    void loadAnimIndex();            // 기술 애니 목록을 미리 받아둔다(첫 기술에서 멈칫하지 않게)
     playBgm(this, BGM.battle, 0.35); // 야생 배틀 BGM
     this.runBattle().catch((e) => console.error("[BattleScene] 진행 오류:", e));
   }
@@ -474,6 +476,9 @@ export default class BattleScene extends Phaser.Scene {
 
     if (res.missed) { await this.say("하지만 빗나갔다!"); return; }
 
+    // AR 원본 기술 애니메이션 (데이터·그림이 없으면 조용히 건너뛴다 — game/battleAnim.ts)
+    await this.playMoveAnim(slot.id, isAlly);
+
     if (res.damage > 0) {
       // 데미지 효과음 — 상성에 따라 다른 소리
       const hit = res.effectiveness > 1 ? SFX.hitSuper : res.effectiveness > 0 && res.effectiveness < 1 ? SFX.hitWeak : SFX.hitNormal;
@@ -514,6 +519,17 @@ export default class BattleScene extends Phaser.Scene {
         : (isAlly ? `상대 ${displayName(defender)}` : displayName(defender));
       await this.say(statChangeMessage(target, sc));
     }
+  }
+
+  // 기술 애니메이션 재생 — 원본(AR) PkmnAnimations 데이터를 그대로 튼다.
+  //  기술에 애니가 없으면 battleAnim이 원본과 같은 규칙으로 타입 대타 → 몸통박치기 순으로 찾는다.
+  private async playMoveAnim(moveId: string, isAlly: boolean): Promise<void> {
+    const user = isAlly ? this.allySprite : this.enemySprite;
+    const target = isAlly ? this.enemySprite : this.allySprite;
+    if (!user || !target) return;
+    const md = getMove(moveId);
+    await playMoveAnimation(this, this.view, { user, target }, moveId, isAlly,
+      md ? { type: md.type, category: md.category, target: md.target } : undefined);
   }
 
   // 턴 종료 처리: 상태이상(화상·독) 데미지를 양쪽에 적용하고 쓰러진 쪽을 정리한다.
