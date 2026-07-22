@@ -1,6 +1,14 @@
-import struct, os, glob, json, sys
+import struct, os, glob, json, sys, importlib.util
 from rubymarshal.reader import loads
 from PIL import Image, ImageDraw
+
+# 오토타일 48변형 조립은 월드맵 추출기와 **완전히 같은 규격**이라 표를 복사하지 않고 빌려 온다.
+#  (파일명에 하이픈이 있어 일반 import가 안 된다 → 경로로 직접 로드. extract-map.py는 __main__
+#   가드가 있어 import해도 아무것도 실행되지 않는다.)
+_emp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "extract-map.py")
+_spec = importlib.util.spec_from_file_location("ar_extract_map", _emp)
+_mod = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(_mod)
+build_autotile = _mod.build_autotile
 # AR 원본 위치는 PC마다 다르다(D드라이브 회사PC / C드라이브 집PC). 하드코딩하면 다른 PC에서 죽으므로
 # 후보를 훑어 실제 존재하는 폴더를 고른다(extract-map.py와 동일 방식). 못 찾으면 명확히 죽는다.
 AR_CANDIDATES = [
@@ -43,7 +51,10 @@ def process(mid, outpng):
             return tsimg.crop((c*32,r*32,c*32+32,r*32+32)) if (r+1)*32<=tsimg.height else None
         n=tid//48
         if 1<=n<=len(aimg) and aimg[n-1]:
-            a=aimg[n-1]; return a.crop((0,32,32,64)) if a.height>=64 else a.crop((0,0,32,32))
+            # 오토타일은 `tid%48`이 모양 변형(한가운데/물가/모서리)이다. 예전엔 이걸 무시하고
+            # 채움 타일 한 종류만 찍어서 물·바닥 경계가 원본과 달라졌다(태초마을·상록시티 연못이
+            # 갈색 덩어리로 나온 원인). 조립표는 extract-map.py 한 곳에만 두고 여기서 빌려 쓴다.
+            return build_autotile(aimg[n-1], tid%48)
         return None
     def pflag(tid):
         if not tid: return 0

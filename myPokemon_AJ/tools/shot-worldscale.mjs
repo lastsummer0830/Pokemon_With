@@ -3,9 +3,10 @@
 import { chromium } from "playwright";
 import { snap } from "./_snap.mjs";
 
-const OUT = "/tmp/claude-1000/-mnt-d-dev-Pokemon-With/907c4f26-40cf-4781-b3bb-e959aab50a0f/scratchpad";
+// ⚠️ headless 필수 — 사용자가 같은 PC에서 작업 중일 수 있다(창 띄우려면 먼저 물어볼 것).
+const OUT = process.env.SHOT_OUT ?? ".claude/.verify";
 const b = await chromium.launch({
-  headless: false,
+  headless: true,
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--ignore-gpu-blocklist",
          "--enable-unsafe-swiftshader", "--enable-webgl", "--no-sandbox"],
 });

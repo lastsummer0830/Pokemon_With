@@ -20,7 +20,17 @@ import { encounterTriggered, chooseWildPokemon, resetEncounterSteps } from "../s
 type Dir = "down" | "left" | "right" | "up";
 interface Warp { x: number; y: number; to: string; dir?: Dir; room?: string }
 
-const SCALE = 2;                              // 화면 확대(타일 32→64px)
+// 카메라 프레이밍 — 원본(Another Red)은 내부해상도 512×384 / 타일 32px라 **창 크기와 무관하게 항상 16×12칸**이 보인다.
+//  우리는 캔버스가 창 전체(main.ts의 Phaser.Scale.RESIZE)라 SCALE을 2로 고정하면 창이 클수록 보이는 칸이 늘어
+//  건물이 상대적으로 작아 보였다(1280창=20칸, 1920창=30칸 → 원본의 0.8배·0.53배). → 창 크기에서 SCALE을 역산한다.
+//  ⚠️ 카메라 zoom으로 하면 안 된다: setScrollFactor(0)인 UI(DialogBox·HUD)까지 같이 확대되고 화면 밖으로 나간다.
+const VIEW_COLS = 16, VIEW_ROWS = 12;         // 원본 512×384 ÷ 32px
+const fitScale = (w: number, h: number): number =>
+  //  min = **세로맞춤**(사용자 확정, 01_Resources/Pick/14_카메라프레이밍 B안). 세로 12칸이 원본과 정확히 같고,
+  //  원본이라면 좌우에 검은 여백이 생길 자리를 맵으로 채운다(16:9 창 기준 21.3×12칸).
+  //  ⚠️ max로 바꾸면 가로 16칸에 맞춰져 세로가 9칸으로 잘린다(A안 — 사용자가 안 고름).
+  Phaser.Math.Clamp(Math.min(w / (VIEW_COLS * 32), h / (VIEW_ROWS * 32)), 1, 8);
+let SCALE = 2;                                // create()에서 창 크기로 다시 계산된다(타일 = 32*SCALE px)
 const START_MAP = "pallet";
 const START_LOCAL = { x: 17, y: 8 };          // 태초마을 기준 우리집 문 앞
 
@@ -84,7 +94,23 @@ export default class WorldScene extends Phaser.Scene {
   private nemona?: Phaser.GameObjects.Sprite;   // 첫 배틀 때 밖에서 기다리는 네모(그 외엔 없음)
   private rival?: { path: [number, number][]; from: "left" | "right" };   // 네모가 걸어올 길(플레이어 기준으로 잡음)
   private dlg!: DialogBox;
-  private onResize = (): void => this.dlg.layout();
+  private onResize = (): void => { this.reframe(); this.dlg.layout(); };
+
+  /** 창 크기가 바뀌어도 원본과 같은 16×12칸 프레이밍을 유지하도록 월드 전체를 다시 스케일한다.
+   *  월드 오브젝트의 좌표는 전부 tile의 배수(cx/cy·ox*tile)라 **비율만 곱하면** 된다 — 개별 좌표를 다시 계산할 필요가 없다.
+   *  HUD·대사창은 scrollFactor 0(화면 고정)이라 건드리지 않는다. */
+  private reframe(): void {
+    const s = fitScale(this.scale.gameSize.width, this.scale.gameSize.height);
+    if (s === SCALE) return;
+    const ratio = s / SCALE;
+    SCALE = s; this.tile = 32 * SCALE;
+    for (const obj of this.children.list) {
+      const o = obj as Phaser.GameObjects.Sprite;
+      if (o.scrollFactorX === 0 || typeof o.setScale !== "function") continue;
+      o.x *= ratio; o.y *= ratio; o.setScale(SCALE);
+    }
+    this.cameras.main.setBounds(0, 0, this.cols * this.tile, this.rows * this.tile);
+  }
 
   constructor() { super("WorldScene"); }
 
@@ -128,6 +154,11 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   create(): void {
+    // 프레이밍 먼저 정한다 — 아래 맵 이미지·스프라이트 배치가 전부 this.tile 기준이라 순서가 중요하다.
+    //  (this.tile의 필드 초기화는 씬 생성 때 한 번뿐이고 Phaser는 재시작해도 같은 인스턴스를 쓴다 → 여기서 매번 다시 잡는다)
+    SCALE = fitScale(this.scale.gameSize.width, this.scale.gameSize.height);
+    this.tile = 32 * SCALE;
+
     // 리전 격자를 "전부 막힘"으로 깔고, 맵 3장의 blocked를 각자 오프셋 위치에 찍어 넣는다.
     //  (맵이 안 덮는 칸은 막힌 채로 남아 밖으로 못 나간다 — 리전 가장자리 보호막 역할)
     this.blocked = Array.from({ length: REGION_ROWS }, () => new Array<number>(REGION_COLS).fill(1));
