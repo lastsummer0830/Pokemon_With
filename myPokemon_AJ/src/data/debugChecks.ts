@@ -24,6 +24,40 @@ export interface DebugCheck {
 
 // 최신 날짜를 위에 둔다(같은 날 안에서는 작업한 순서).
 export const DEBUG_CHECKS: DebugCheck[] = [
+  // ── 0727 Common 애니 나머지 연결(능력·상태이상·혼란·아이템) ──
+  {
+    date: "0727",
+    title: "능력 랭크 변화 애니(StatUp/StatDown)",
+    what: "능력이 실제로 오르내릴 때(doTurn statChanges) 원본 pbCommonAnimation처럼 StatUp/StatDown을 붙였다(capped면 메시지만).",
+    see: "능력 상승 연출(위로 뻗는 빛) → 능력 하락 연출(아래로)이 내 포켓몬에 순서대로 도는지.",
+    scene: "BattleScene",
+    data: { wild: true, testParty: true, backdrop: "route", demo: "common", demoCommon: "StatUp|StatDown", demoByAlly: true },
+  },
+  {
+    date: "0727",
+    title: "상태이상 부여 애니(독·화상·마비·잠듦·얼음)",
+    what: "상태이상이 새로 걸릴 때(doTurn statusInflicted) 걸린 쪽에 원본 Common 애니를 붙였다(맹독=Toxic·얼음=Frozen 매핑).",
+    see: "상대 포켓몬에 독→맹독→화상→마비→잠듦→얼음 연출이 차례로 도는지(메시지 라벨과 애니가 맞는지).",
+    scene: "BattleScene",
+    data: { wild: true, testParty: true, backdrop: "route", demo: "common",
+            demoCommon: "Poison|Toxic|Burn|Paralysis|Sleep|Frozen", demoByAlly: false },
+  },
+  {
+    date: "0727",
+    title: "혼란 애니(부여·자기공격)",
+    what: "혼란을 걸 때(statusInflicted 옆 confused) + 혼란으로 자기공격할 때(beforeMove selfDamage)에 Common:Confusion을 붙였다.",
+    see: "상대에 혼란 연출(빙글도는 별)이 도는지. 실제 배틀에선 자기공격 직전에도 같은 연출이 뜬다.",
+    scene: "BattleScene",
+    data: { wild: true, testParty: true, backdrop: "route", demo: "common", demoCommon: "Confusion", demoByAlly: false },
+  },
+  {
+    date: "0727",
+    title: "아이템 상태치료 애니(UseItem)",
+    what: "배틀 중 해독제 등으로 상태이상이 풀릴 때(status→null) UseItem 연출 + 아이콘 제거를 붙였다(HP회복은 기존 HealthUp).",
+    see: "내 포켓몬에 아이템 사용 연출이 도는지.",
+    scene: "BattleScene",
+    data: { wild: true, testParty: true, backdrop: "route", demo: "common", demoCommon: "UseItem", demoByAlly: true },
+  },
   // ── 0722 (1부) 카메라 프레이밍 · 오토타일 물 ──
   {
     date: "0722",

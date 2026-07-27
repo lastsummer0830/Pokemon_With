@@ -78,6 +78,18 @@ export interface BattleInit {
 // move=기술 애니 · common=Common 애니 · residual=턴종료 잔뎀 · msgbox=애니 중 대사창 유지
 export type DemoKind = "move" | "common" | "residual" | "msgbox";
 
+// 상태이상 → 원본 Common 애니 이름. (맹독 badpoison은 원본에서 Toxic, 얼음 freeze는 Frozen.)
+const STATUS_COMMON: Record<string, string> = {
+  poison: "Poison", badpoison: "Toxic", burn: "Burn",
+  paralysis: "Paralysis", sleep: "Sleep", freeze: "Frozen",
+};
+
+// Common 애니 이름 → 한글 라벨(디버그 데모 표시용).
+const COMMON_LABEL: Record<string, string> = {
+  Poison: "독", Toxic: "맹독", Burn: "화상", Paralysis: "마비", Sleep: "잠듦", Frozen: "얼음",
+  Confusion: "혼란", StatUp: "능력 상승", StatDown: "능력 하락", UseItem: "아이템 사용",
+};
+
 export default class BattleScene extends Phaser.Scene {
   // 내 파티 = registry "playerParty"와 **같은 배열**. allyIdx = 지금 내보낸 칸.
   //  (예전엔 ally를 따로 들고 "파티 선두와 같은 참조"라고 가정했는데, 교체가 생기면 그 가정이 깨진다.)
@@ -357,6 +369,7 @@ export default class BattleScene extends Phaser.Scene {
       //  아무것도 안 쓰고 닫았으면 턴이 지나가지 않고 다시 커맨드 선택으로 돌아간다.
       if (cmd.kind === "item") {
         const hpBefore = this.ally.currentHp;   // 회복 아이템이었는지 판정용(HealthUp 연출)
+        const statusBefore = this.ally.status;  // 상태이상 치료제였는지 판정용(UseItem 연출)
         const bag = await this.openBag();
         if (!bag.used) continue;
         // 볼을 골랐다 → 던진다. 잡으면 배틀 끝, 놓치면 아이템과 똑같이 상대에게 한 턴을 준다.
@@ -370,7 +383,13 @@ export default class BattleScene extends Phaser.Scene {
         }
         if (bag.text) await this.say(bag.text);     // "OO의 HP가 20 회복됐다!" — 가방이 만든 문장
         // 나가 있는 포켓몬의 HP가 실제로 늘었으면 원본처럼 HealthUp 연출을 튼다(다른 파티원을 회복했으면 안 튼다).
-        if (this.ally.currentHp > hpBefore) await this.playCommonAnim("HealthUp", true);
+        if (this.ally.currentHp > hpBefore) {
+          await this.playCommonAnim("HealthUp", true);
+        } else if (statusBefore && !this.ally.status) {
+          // 상태이상 치료제(해독제 등)로 나가 있는 포켓몬의 상태가 풀렸으면 UseItem 연출 + 아이콘 제거.
+          await this.playCommonAnim("UseItem", true);
+          this.allyBox.refresh();
+        }
         await this.allyBox.animateTo();                  // 회복된 HP를 HP바에 반영
         await this.doTurn(this.enemy, this.ally, this.pickEnemyMove(), this.allyBox, false);
         if (await this.afterTurn()) break;
@@ -493,7 +512,9 @@ export default class BattleScene extends Phaser.Scene {
     for (const m of gate.messages) await this.say(m);
     if (gate.messages.length) attackerBox.refresh();
     // 혼란 자기공격: 이번 턴은 못 움직이고 자신에게 데미지(gate.selfDamage). 자기 HP바에 반영.
+    //  원본 pbConfusionDamage는 자기공격 전에 Common:Confusion 연출을 튼다 → 그대로 붙인다.
     if (gate.selfDamage && gate.selfDamage > 0) {
+      await this.playCommonAnim("Confusion", isAlly);
       attacker.currentHp = Math.max(0, attacker.currentHp - gate.selfDamage);
       this.flash(isAlly ? this.allySprite : this.enemySprite);
       await attackerBox.animateTo();
@@ -521,16 +542,19 @@ export default class BattleScene extends Phaser.Scene {
     const eff = effectivenessText(res.effectiveness);
     if (eff) await this.say(eff);
 
-    // 상태이상을 걸었으면 알림 + 상대 박스 아이콘 갱신
+    // 상태이상을 걸었으면 연출(원본 pbCommonAnimation) + 알림 + 상대 박스 아이콘 갱신.
+    //  애니는 걸린 쪽(defender = 공격자의 반대편)에 재생한다.
     if (res.statusInflicted) {
       const foe = isAlly ? `상대 ${displayName(defender)}` : displayName(defender);
+      await this.playCommonAnim(STATUS_COMMON[res.statusInflicted] ?? "Poison", !isAlly);
       await this.say(inflictMessage(foe, res.statusInflicted));
       defenderBox.refresh();
     }
 
-    // 상대를 혼란에 빠뜨렸으면 알림(혼란은 DataBox 아이콘 없음 — 메시지만)
+    // 상대를 혼란에 빠뜨렸으면 연출 + 알림(혼란은 DataBox 아이콘 없음 — 메시지만)
     if (res.confused) {
       const foe = isAlly ? `상대 ${displayName(defender)}` : displayName(defender);
+      await this.playCommonAnim("Confusion", !isAlly);
       await this.say(confusionMessage(foe));
     }
 
@@ -544,11 +568,17 @@ export default class BattleScene extends Phaser.Scene {
       await attackerBox.animateTo();
     }
 
-    // 능력 변화(공/방/명중/회피 등) 알림 — side가 user면 사용자, target이면 상대.
+    // 능력 변화(공/방/명중/회피 등) 연출 + 알림 — side가 user면 사용자, target이면 상대.
+    //  실제로 랭크가 바뀐 것(outcome === "changed")만 연출을 튼다. 한계(capped)면 메시지만.
     for (const sc of res.statChanges) {
-      const target = sc.side === "user"
+      const onUserSide = sc.side === "user";
+      const target = onUserSide
         ? who
         : (isAlly ? `상대 ${displayName(defender)}` : displayName(defender));
+      if (sc.outcome === "changed") {
+        const onAlly = onUserSide ? isAlly : !isAlly;
+        await this.playCommonAnim(sc.delta > 0 ? "StatUp" : "StatDown", onAlly);
+      }
       await this.say(statChangeMessage(target, sc));
     }
   }
@@ -643,13 +673,22 @@ export default class BattleScene extends Phaser.Scene {
           p.currentHp = Math.max(1, p.currentHp - Math.floor(p.maxHp / 3));
           await this.playCommonAnim("HealthDown", onAlly);
           await box.animateTo();
-        } else {
+        } else if (d.common === "HealthUp") {
           p.currentHp = Math.max(1, Math.floor(p.maxHp / 3));
           await box.animateTo();
           await this.say("HP를 깎아 뒀다 — 회복 연출(Common:HealthUp)을 튼다.");
           p.currentHp = p.maxHp;
           await this.playCommonAnim("HealthUp", onAlly);
           await box.animateTo();
+        } else {
+          // 상태이상·능력변화·아이템 등 — HP를 건드리지 않고 Common 애니만 순서대로 보여준다.
+          //  "Poison|Burn|Sleep"처럼 |로 여러 개를 넘기면 차례로 재생한다(실제 배틀 연결은 doTurn에 있다).
+          for (const name of d.common.split("|")) {
+            if (this.demoDead) return;
+            const label = COMMON_LABEL[name] ?? name;
+            await this.say(`${label}(Common:${name}) 연출 — ${onAlly ? "내" : "상대"} 포켓몬에 재생한다.`);
+            await this.playCommonAnim(name, onAlly);
+          }
         }
         break;
       }
