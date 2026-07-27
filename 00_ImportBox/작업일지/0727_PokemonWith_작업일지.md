@@ -115,8 +115,9 @@ LabScene 스타터 지급을 실제로 완주시켜(`tools/dbg-starter.mjs` 신�
 - **`dbg-starter.mjs`는 Space 6번으론 autoSave(네모 대사·walkNemonaOut 뒤)까지 못 감** → 15~20번+대기 필요(`rivalBattlePending=true` 찍히면 도달). 첫 실행 때 `rivalBattlePending=undefined`였던 게 이 때문.
 - Lab/Gym `exit.toTown`/`toCity`는 **맵 로컬 좌표**(pallet/viridian_city) — `map`을 반드시 함께 저장.
 
-## 다음 세션 첫 프롬프트 제안
-"0727(2부) 일지 읽고 이어서. 스토리 이정표 자동저장(②④⑤⑥) + 수동저장 원본식 문구는 구현·tsc통과 끝.
-**다음 = ① 자동저장 실동작 최종검증(스타터 받으면 세이브에 실제로 들어가는지)·캡처 확인 → ② `debugChecks.ts`에 확인항목 등록(자동저장 배너/수동저장 문구) → ③ 커밋·push → ④ exe app:bake.**
-자동저장 4곳: Interior/Lab/Gym/World. Lab·Gym은 WorldScene 출구좌표로 저장하는 게 핵심(복원 대상 아님).
-캡처는 headless, playwright는 tools/ 안에서, 창 띄우기 전 먼저 물어볼 것."
+## 다음 세션 첫 프롬프트 제안 (검증·커밋 완료 후 최신)
+> ⭐ 이번 세션에서 **실동작 검증 완료**: 스타터 받으면 세이브에 실제로 들어감(party CHARMANDER·dexOwn·starterChosen·loc WorldScene/pallet(28,15)) · tsc EXIT=0 · 캡처 육안확인(수동 "레드는 게임을 저장했다!" / 자동 "저장 중…" 배너) · 콘솔에러0 · **커밋·push 완료**. 검증 몽타주 = `.claude/.verify/저장_자동수동_비교.png`.
+
+"0727(2부) 일지 읽고 이어서. 스토리 이정표 자동저장(집인트로·스타터·라이벌전·배지)+수동저장 원본식 문구는 구현·검증(세이브 실반영 확인)·커밋까지 끝.
+다음 = ① `debugChecks.ts`에 확인항목 등록(자동저장 배너/수동저장 문구 — 규칙상 이게 완료조건) → ② exe `app:bake`로 실행본 반영 → ③ `/code-review`(effort medium).
+자동저장 4곳 중 Lab·Gym은 WorldScene 출구좌표로 저장하는 게 핵심(복원 대상 아님). playwright는 tools/ 안에서, 창 띄우기 전 먼저 물어볼 것."
