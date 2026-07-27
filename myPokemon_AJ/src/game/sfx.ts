@@ -20,6 +20,7 @@ export const SFX = {
   flee: "sfx_flee",           // 도망
   pkmnGet: "me_pkmn_get",     // 포켓몬 획득 팡파레(짧은 ME)
   pkmnHeal: "me_pkmn_heal",   // 포켓몬센터 회복 징글(AR "Pkmn healing" — 획득 팡파레와 다른 전용음)
+  save: "me_save_game",       // 게임 저장 징글(AR "GUI save game" ME — 자동/수동 저장 공용)
 } as const;
 
 // 키 → 파일 경로
@@ -37,6 +38,7 @@ const FILES: Record<string, string> = {
   [SFX.flee]: "assets/audio/sfx_flee.ogg",
   [SFX.pkmnGet]: "assets/audio/me_pkmn_get.ogg",
   [SFX.pkmnHeal]: "assets/audio/me_pkmn_heal.ogg",
+  [SFX.save]: "assets/audio/me_save_game.ogg",
   // 마을/집/연구소 공용 BGM도 여기서 함께 로드(그래야 playBgm이 캐시에서 찾아 재생).
   bgm_town: "assets/audio/bgm_town.ogg",
   bgm_route1: "assets/audio/bgm_route1.ogg",       // 1번도로 (AR KM_Route1)

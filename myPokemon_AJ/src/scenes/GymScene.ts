@@ -4,6 +4,7 @@ import { josa } from "../data/josa";
 import DialogBox from "../ui/DialogBox";
 import { playBgm } from "../game/bgm";
 import { playSfx, playMe, preloadCommonAudio, SFX, BGM } from "../game/sfx";
+import { autoSaveWithToast } from "../game/saveIndicator";
 import { GREEN_BADGE, hasBadge, giveBadge } from "../data/Badges";
 
 // 상록체육관(AR Map194) — 관장 그린과의 첫 체육관 배틀.
@@ -300,6 +301,9 @@ export default class GymScene extends Phaser.Scene {
     await this.dlg.say("이 그린 배지를 받아주세요.", "그린");
 
     giveBadge(this.registry, GREEN_BADGE);
+    // 배지 획득 → 자동저장(이정표). GymScene은 복원 대상이 아니라 체육관 문 앞 상록시티 좌표(exit.toCity)로 넣는다.
+    const [bx, by] = this.map.exit.toCity;
+    autoSaveWithToast(this, { scene: "WorldScene", map: "viridian_city", tx: bx, ty: by, facing: "down" });
     playMe(this, SFX.pkmnGet, 0.6);   // 원본은 ME 'Badge get' — 그 파일이 없어 획득 팡파레(ME)로. BGM 잠깐 멈췄다 되살림
     const you = this.playerName();
     await this.dlg.say(`${you}${josa(you, "은는")} 그린 배지를 얻었다!`);

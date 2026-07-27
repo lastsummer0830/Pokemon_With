@@ -128,6 +128,16 @@ export function loadGame(reg: Reg): SaveData | null {
   return data;
 }
 
+// 스토리 이정표 자동저장 — 위치(loc)를 명시적으로 받아 기록한 뒤 통째로 저장한다.
+//  메뉴 수동저장은 씬이 openMenu에서 saveLoc을 미리 넣지만, 자동저장은 메뉴를 안 거치므로
+//  호출부(각 이정표 씬)가 "로드하면 돌아갈 위치"를 직접 넘긴다.
+//  ⚠️ LabScene·GymScene은 이어하기(MainMenuScene) 복원 대상이 아니다 → 그 두 곳에서 부를 땐
+//     loc.scene을 "WorldScene"으로, 좌표를 각 씬의 출구 마을 좌표로 변환해 넘겨야 로드 시 안 튄다.
+export function autoSave(reg: Reg, loc: SaveLoc): void {
+  reg.set("saveLoc", loc);
+  saveGame(reg);
+}
+
 // 저장 지우기
 export function clearSave(): void {
   try { localStorage.removeItem(SAVE_KEY); } catch { /* noop */ }

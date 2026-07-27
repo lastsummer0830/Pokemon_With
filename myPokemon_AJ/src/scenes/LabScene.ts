@@ -7,6 +7,7 @@ import { josa } from "../data/josa";
 import DialogBox from "../ui/DialogBox";
 import { playBgm } from "../game/bgm";
 import { playSfx, playMe, preloadCommonAudio, SFX, BGM } from "../game/sfx";
+import { autoSaveWithToast } from "../game/saveIndicator";
 
 // 포켓몬 연구소(오박사 랩) — 어나더레드 실제 내부맵(Map157) 추출본.
 //  실제 FRLG/AR 스타팅 방식: 탁자 위에 "포켓볼 3개"가 놓여 있고, 플레이어가 포켓볼 하나 앞에 서서
@@ -311,6 +312,10 @@ export default class LabScene extends Phaser.Scene {
     // 말만 하고 계속 서 있으면 안 된다 — 네모가 실제로 문까지 걸어 나가고, 마을에서 기다리는 걸로 이어진다.
     await this.walkNemonaOut();
     this.hint.setText("아래 문으로 나가면 네모가 기다린다!").setVisible(true);
+    // 스타터 수령 + 라이벌 예약 완료 → 자동저장(이정표). LabScene은 이어하기 복원 대상이 아니라
+    //  연구소 문 앞 태초마을 좌표(map.exit.toTown, pallet 로컬)로 넣어야 로드 시 안 튄다.
+    const [sx, sy] = this.map.exit.toTown;
+    autoSaveWithToast(this, { scene: "WorldScene", map: "pallet", tx: sx, ty: sy, facing: "down" });
     this.busy = false;
   }
 

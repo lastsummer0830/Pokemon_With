@@ -4,6 +4,7 @@ import { Pokemon } from "../data/Pokemon";
 import { josa } from "../data/josa";
 import { playBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
+import { autoSaveWithToast } from "../game/saveIndicator";
 import { FURNITURE, FurnitureDef } from "../data/furniture";
 import { HouseLayout, canPlace, furnitureAt } from "../data/HouseLayout";
 import { conditionCap, emptyHouse, sleepAtHome, furnitureHint, CONDITION_MAX } from "../systems/homeBonus";
@@ -780,6 +781,8 @@ export default class InteriorScene extends Phaser.Scene {
     this.setDialogVisible(false);   // 마지막 대사에서 엔터 → 대화상자 닫기(이동 화면과 통일)
 
     this.registry.set("houseIntroDone", true);
+    // 집 인트로(네모 첫 등장) 완료 → 자동저장(이정표). 침실에서만 도는 컷신이라 room=roomKey로 복원됨.
+    autoSaveWithToast(this, { scene: "InteriorScene", room: this.roomKey });
     hud?.setVisible(true);
     this.busy = false;   // 이동 가능
   }

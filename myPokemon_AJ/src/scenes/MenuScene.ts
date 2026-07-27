@@ -2,8 +2,9 @@ import Phaser from "phaser";
 import { Pokemon, displayName, caughtBallOf } from "../data/Pokemon";
 import { PETTED_KEY } from "../systems/bond";
 import { iconPath, makePartyIcon } from "../game/pokemonSprite";
-import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
+import { playSfx, playMe, preloadCommonAudio, SFX } from "../game/sfx";
 import { saveGame } from "../systems/save";
+import { josa } from "../data/josa";
 
 // 인게임 스타트 메뉴 (오버레이). 필드(WorldScene 등)에서 Enter/X로 연다.
 //  상태: main(하단 바: 도감/포켓몬/가방/저장/설정) → party(파티 목록).
@@ -161,7 +162,13 @@ export default class MenuScene extends Phaser.Scene {
       // 도감·가방은 별도 씬(오버레이). 메뉴는 멈춰 두고, 돌아오면 다시 살아난다.
       else if (item === "도감") { this.scene.pause(); this.scene.launch("PokedexScene", { from: "MenuScene" }); }
       else if (item === "가방") { this.scene.pause(); this.scene.launch("BagScene", { from: "MenuScene" }); }
-      else if (item === "저장") { saveGame(this.registry); this.toast("저장했다!"); }
+      // 저장 — AR 원본식(306_UI_Save.rb): "○○은 게임을 저장했다." + 저장 징글(ME, BGM 잠깐 멈춤).
+      else if (item === "저장") {
+        saveGame(this.registry);
+        playMe(this, SFX.save, 0.6);
+        const who = (this.registry.get("playerName") as string) || "플레이어";
+        this.toast(`${who}${josa(who, "은는")} 게임을 저장했다!`);
+      }
       else if (item === "설정") { this.toast("설정은 준비 중이야."); }
     } else if (this.state === "party") {
       if (!this.party.length) return;

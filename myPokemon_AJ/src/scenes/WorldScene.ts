@@ -3,6 +3,7 @@ import { Gender } from "../data/Player";
 import { Pokemon, createFromSpecies } from "../data/Pokemon";
 import { playBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
+import { autoSaveWithToast } from "../game/saveIndicator";
 import DialogBox from "../ui/DialogBox";
 import { REGION_MAPS, REGION_COLS, REGION_ROWS, mapAtGlobal, toGlobal, toLocal, assertRegionMatches, RegionMap } from "../data/region";
 import { getEncounters, getMapTrainers, loadArDb } from "../data/ar";
@@ -251,6 +252,16 @@ export default class WorldScene extends Phaser.Scene {
 
     // 연구소에서 스타터를 고르고 나왔다면: 밖에서 기다리던 네모가 다가와 첫 라이벌 배틀을 건다.
     this.time.delayedCall(450, () => this.maybeStartRivalBattle());
+
+    // 첫 라이벌전을 방금 이기고 마을로 돌아왔다면(도입부 완결) → 자동저장(이정표).
+    //  BattleScene이 승리 시 세운 원샷 플래그를 여기서 소비한다(스폰 좌표 확정 후 잠깐 뒤).
+    if (this.registry.get("rivalJustWon")) {
+      this.registry.set("rivalJustWon", false);
+      this.time.delayedCall(600, () => {
+        const at = toLocal(this.tx, this.ty);
+        autoSaveWithToast(this, { scene: "WorldScene", map: at.map, tx: at.x, ty: at.y, facing: this.facing });
+      });
+    }
 
     // 트레이너 배치는 AR DB(비동기 fetch)가 있어야 알 수 있다 → 따로 띄운다.
     this.setupTrainers().catch((e) => console.error("[WorldScene] 트레이너 배치 실패:", e));

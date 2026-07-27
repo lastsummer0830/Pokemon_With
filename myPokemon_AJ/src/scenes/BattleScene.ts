@@ -954,6 +954,7 @@ export default class BattleScene extends Phaser.Scene {
       await this.say(`${t}${josa(t, "과와")}의 승부에서 이겼다!`);
       // 라이벌전 예약은 '이겼을 때만' 소비(지면 재대결 가능).
       this.registry.set("rivalBattlePending", false);
+      this.registry.set("rivalJustWon", true);   // WorldScene 복귀 시 자동저장(이정표) 트리거용 원샷 플래그
     }
   }
 

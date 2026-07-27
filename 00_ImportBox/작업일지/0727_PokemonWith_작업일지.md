@@ -78,8 +78,45 @@ Phase C(0722)에서 `HealthUp`/`HealthDown`만 붙어 있었다. 배틀 로직(�
 2. **Bash `cd`가 호출 사이에 리셋**될 수 있다(다음 호출이 프로젝트 루트 밖이면 `cd tools` 실패) → 절대경로나 `cd /full/path && ...`로.
 3. 도감 데이터 확인은 **반드시 디버그메뉴 실경로**(프라이밍 포함)로. PokedexScene 직접 start하면 dex 비어 0으로 나온다.
 
+---
+
+# 0727 (2부) — 스타팅 지급 흐름 점검 → 스토리 이정표 자동저장 구현
+
+## A. 점검 결과 (실동작 headless 검증)
+LabScene 스타터 지급을 실제로 완주시켜(`tools/dbg-starter.mjs` 신규) 데이터로 확인:
+- **파티 ✅**(CHARMANDER Lv5·기술3·maxHp18) · **도감 ✅**(dexSeen/dexOwn 둘 다 CHARMANDER) · **직렬화 ✅**(JSON 가능).
+- **세이브 ❌** — 지급 직후 localStorage에 세이브가 **아예 없음**. 원인 = **지급 흐름 어디에도 `saveGame()` 호출이 없음**(저장 트리거는 MenuScene 수동 "저장" 한 곳뿐). 버그가 아니라 **영속화 누락**. (파티·도감은 registry엔 완벽히 들어감.)
+
+## B. 원본(AR) 저장 방식 확인 — 추측 금지, 소스 대조
+`Scripts.rxdata`(406개 .rb, rubymarshal+zlib) 조사:
+- AR = **Essentials v21.1**(`000_Settings.rb:455`). 저장 = `Game.save`→`SaveData.save_to_file`→`Marshal.dump`(단일 슬롯).
+- **자동저장 없음**(autosave/pbAutosave grep 0건). 게임 자체 저장은 크래시 긴급저장·배틀챌린지 진행저장뿐.
+- 메뉴 저장 문구(`306_UI_Save.rb`): `"Would you like to save?"` 확인 → **`"{1} saved the game."`**(=○○은 게임을 저장했다) + ME `\me[GUI save game]`.
+- ⭐ 사용자 결정: 원본엔 없지만 **"스토리 진행 후 자동저장"을 새로 넣기로**(라이벌=네모 SV 감성 → SV식 "저장 중…" 표시). 수동저장도 원본식 문구·사운드로.
+
+## C. 현재 스토리 라인(이정표) — 조사 확정
+①인트로(IntroScene) ②집 인트로·네모 첫 등장(`houseIntroDone`) ③집→마을→연구소 ④연구소 스타터 수령(`starterChosen`+`rivalBattlePending`) ⑤마을 첫 라이벌전(승리 시 `rivalBattlePending=false`) ⑥상록 그린전 배지(`badges`).
+
+## D. 구현 (자동+수동 저장)
+- **에셋:** AR `Audio/ME/GUI save game.ogg`→`public/assets/audio/me_save_game.ogg`, `SE/GUI save choice.ogg`→`se_save_choice.ogg`(SE는 미사용, 이식만).
+- `src/game/sfx.ts`: `SFX.save`(me_save_game) 추가.
+- `src/systems/save.ts`: **`autoSave(reg, loc)`** 추가(saveLoc 기록+saveGame).
+- **신규 `src/game/saveIndicator.ts`**: `showSavingToast(scene)`(우상단 "저장 중…" 배너, **무음**, `setScrollFactor(0)`) + `autoSaveWithToast(scene, loc)`.
+- **자동저장 4곳:** InteriorScene(`houseIntroDone` 직후, room복원) · LabScene(스타터 수령·busy=false 직전, `map.exit.toTown`→pallet 좌표) · GymScene(`giveBadge` 직후, `map.exit.toCity`→viridian 좌표) · WorldScene(라이벌 승리 복귀 — BattleScene:957에서 `rivalJustWon` 원샷 플래그 → World create에서 소비).
+  - ⚠️ **Lab/Gym은 이어하기(MainMenuScene) 복원 대상이 아님** → 그 두 곳은 `scene:"WorldScene"` + 출구 마을 좌표로 저장해야 로드 시 안 튄다(조사로 확인한 핵심 제약).
+- **수동저장(MenuScene:164):** `"${이름}은/는 게임을 저장했다!"` + `playMe(SFX.save)`.
+
+## E. 검증 상태
+- **`tsc --noEmit` EXIT=0** ✅.
+- 실동작(스타터→세이브 반영) 재검증 + **화면 캡처**(자동저장 배너/수동저장 문구, `.claude/.verify/`)는 **세션 끝 서브에이전트로 진행 중** — 결과 확인 후 커밋. (Stop 훅이 MenuScene 캡처 증거 요구.)
+- ⭐ **미완:** 디버그 확인항목(`debugChecks.ts`) 등록 아직 안 함(규칙상 완료 조건) · exe 미반영(`app:bake`) · `/code-review` 미실행.
+
+## F. 함정
+- **`dbg-starter.mjs`는 Space 6번으론 autoSave(네모 대사·walkNemonaOut 뒤)까지 못 감** → 15~20번+대기 필요(`rivalBattlePending=true` 찍히면 도달). 첫 실행 때 `rivalBattlePending=undefined`였던 게 이 때문.
+- Lab/Gym `exit.toTown`/`toCity`는 **맵 로컬 좌표**(pallet/viridian_city) — `map`을 반드시 함께 저장.
+
 ## 다음 세션 첫 프롬프트 제안
-"0727 일지 읽고 이어서. Common 애니 나머지 연결(6곳·원본 매치 확인)은 끝났다.
-**다음 = 실제 스타팅 지급 흐름 점검** — 오박사(LabScene)에서 스타터 받아 파티+도감+세이브에 실제 반영되는지부터 확인.
-(세이브에 스타터가 안 들어간다는 게 이번에 발견됨. 도감의 3마리는 primeDebugRegistry 가짜값.)
+"0727(2부) 일지 읽고 이어서. 스토리 이정표 자동저장(②④⑤⑥) + 수동저장 원본식 문구는 구현·tsc통과 끝.
+**다음 = ① 자동저장 실동작 최종검증(스타터 받으면 세이브에 실제로 들어가는지)·캡처 확인 → ② `debugChecks.ts`에 확인항목 등록(자동저장 배너/수동저장 문구) → ③ 커밋·push → ④ exe app:bake.**
+자동저장 4곳: Interior/Lab/Gym/World. Lab·Gym은 WorldScene 출구좌표로 저장하는 게 핵심(복원 대상 아님).
 캡처는 headless, playwright는 tools/ 안에서, 창 띄우기 전 먼저 물어볼 것."
