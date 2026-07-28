@@ -25,13 +25,27 @@ except ImportError:
 
 
 # ── 뽑을 아이템 (세로 슬라이스에 실제로 쓰는 것만) ─────────────
-#  pocket: 1=일반 2=회복약 3=몬스터볼 (AR 기준. items.dat의 @pocket을 그대로 쓴다)
+#  pocket: AR items.dat의 @pocket을 그대로 쓴다. 원본(Essentials v21.1) 포켓 번호는 9개다 —
+#          1=일반 2=회복약 3=몬스터볼 4=기술머신 5=나무열매 6=편지 7=배틀아이템 8=소중한물건 9=Z크리스탈.
+#          (원본 items.dat 실측: 1→382개, 2→95, 3→37, 4→107, 5→68, 6→12, 7→42, 8→64, 9→35)
 WHITELIST = [
-    "POKEBALL", "GREATBALL",                     # 잡는다
+    "POKEBALL", "GREATBALL", "ULTRABALL", "MASTERBALL",   # 잡는다 (하이퍼·마스터볼 = 포획 시스템에서 추가)
     "POTION", "SUPERPOTION",                     # HP 회복
     "ANTIDOTE", "PARALYZEHEAL", "AWAKENING", "BURNHEAL", "ICEHEAL",  # 상태이상
     "REVIVE",                                    # 기절 회복
+    # 소중한 물건(포켓8) — 스토리 진행용. 오박사가 스타터와 함께 주고, 상록체육관에서 그린에게 보여준다.
+    #  ⚠️ 원본에 실제로 있는 아이템이다(:OAKSINTRODUCTION = "오박사의 소개장"). 우리가 지어낸 게 아니다.
+    "OAKSINTRODUCTION",
 ]
+
+# ── 원본 값을 일부러 덮어쓰는 가격 ────────────────────────────
+#  ⚠️ 이 표가 없으면 이 스크립트를 다시 돌릴 때마다 아래 값이 AR 원본 값으로 되돌아가 회귀가 난다
+#     (실제로 한 번 발생: 하이퍼볼 1200→800, 마스터볼 0→50000).
+#  이유: AR은 자체 밸런스를 쓰지만 우리는 공식 한국판 기준을 따르기로 했다.
+PRICE_OVERRIDE = {
+    "ULTRABALL": 1200,   # 공식 한국판 하이퍼볼 가격(AR 원본은 800)
+    "MASTERBALL": 0,     # 비매품 — 상점에 노출되면 안 된다(AR 원본은 50000)
+}
 
 
 # ── AR 원본 경로 찾기 (extract-battle-data.py와 같은 규칙) ─────
@@ -108,7 +122,7 @@ def main():
             "name": ko_name.get(en, en),               # 한글명(없으면 영문)
             "nameEn": en,
             "pocket": a.get("@pocket"),                # 1=일반 2=회복 3=볼 …
-            "price": a.get("@price"),
+            "price": PRICE_OVERRIDE.get(iid, a.get("@price")),
             "desc": ko_desc.get(desc_en, desc_en),     # 한글 설명(없으면 영문)
             # 0이 아니면 그 상황에서 쓸 수 있다는 뜻(에센셜즈 규약).
             "fieldUse": a.get("@field_use") or 0,

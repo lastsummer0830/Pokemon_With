@@ -24,6 +24,30 @@ export interface DebugCheck {
 
 // 최신 날짜를 위에 둔다(같은 날 안에서는 작업한 순서).
 export const DEBUG_CHECKS: DebugCheck[] = [
+  // ── 0728 스토리 라인: 컨셉(유대) 안내 + 소중한 물건 포켓 ──
+  {
+    date: "0728",
+    title: "가방 '소중한 물건' 포켓 + 오박사의 소개장",
+    what: "포켓 8(소중한 물건)을 가방 탭에 연결하고, AR 원본 아이템 :OAKSINTRODUCTION(오박사의 소개장)을 추출해 넣었다.",
+    see: "가방 탭을 좌우로 넘겨 '소중한 물건'이 나오는지 → 그 안에 '오박사의 소개장'이 아이콘과 함께 보이는지.",
+    scene: "BagScene",
+    data: { testParty: true },
+  },
+  {
+    date: "0728",
+    title: "오박사의 유대 조언 + 소개장 지급",
+    what: "스타터를 준 직후, 유대를 '어떻게' 깊게 하는지(집에서 재우기·방 꾸미기·쓰다듬기)를 알려주고 소개장을 실제로 준다. 이게 없어 체육관에서 받은 적 없는 소개장을 건네고 있었다.",
+    see: "포켓볼 앞에서 Space로 스타터를 고르면 → 오박사 조언 3줄 → '오박사의 소개장을 받았다!' 나레이션이 뜨는지.",
+    scene: "LabScene",
+  },
+  {
+    date: "0728",
+    title: "집에 돌아왔을 때 유대 힌트",
+    what: "파트너를 받고 처음 내 방에 돌아오면 오박사의 조언을 실제 조작(침대=잠자기, F=꾸미기)과 이어 주는 나레이션을 띄운다.",
+    see: "방에 들어서자마자 '포켓몬은 편히 쉴 곳이 있어야 마음을 연다' → 'F키: 방 꾸미기' 2줄이 이름창 없이 뜨는지.",
+    scene: "InteriorScene",
+    data: { room: "bedroom", debugBondHint: true },
+  },
   // ── 0727 Common 애니 나머지 연결(능력·상태이상·혼란·아이템) ──
   {
     date: "0727",
@@ -162,7 +186,9 @@ export function primeDebugRegistry(scene: Phaser.Scene, opts?: { party?: boolean
   if (!(reg.get("bag") as unknown[])?.length)
     reg.set("bag", [...START_BAG, { itemId: "SUPERPOTION", count: 2 }, { itemId: "ANTIDOTE", count: 1 },
       { itemId: "GREATBALL", count: 3 }, { itemId: "ULTRABALL", count: 3 }, { itemId: "MASTERBALL", count: 1 },
-      { itemId: "REVIVE", count: 1 }]);
+      { itemId: "REVIVE", count: 1 },
+      // 소중한 물건 포켓(8) 확인용 — 실제 게임에선 오박사가 스타터와 함께 준다(LabScene).
+      { itemId: "OAKSINTRODUCTION", count: 1 }]);
   if (!(reg.get("dexSeen") as unknown[])?.length) {
     for (const id of ["CHARMANDER", "SQUIRTLE", "BULBASAUR"]) markOwn(reg, id);
     for (const id of ["PIDGEY", "RATTATA", "CATERPIE", "WEEDLE", "SPEAROW"]) markSeen(reg, id);

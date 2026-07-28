@@ -8,6 +8,8 @@ import { autoSaveWithToast } from "../game/saveIndicator";
 import { FURNITURE, FurnitureDef } from "../data/furniture";
 import { HouseLayout, canPlace, furnitureAt } from "../data/HouseLayout";
 import { conditionCap, emptyHouse, sleepAtHome, furnitureHint, CONDITION_MAX } from "../systems/homeBonus";
+import { bondOf } from "../systems/bond";
+import { HOME_BOND_HINT } from "../data/story";
 
 // ⚠️ 검증용 임시 오버레이 — 충돌(빨강)·워프(초록) 칸을 화면에 그린다. 확인 끝나면 false로.
 const DEBUG_COLLISION = false;
@@ -78,6 +80,7 @@ export default class InteriorScene extends Phaser.Scene {
   // 시작 방/인트로 스킵 (디버그에서 거실로 바로 진입할 때 사용)
   private startRoom = "bedroom";
   private skipIntro = false;
+  private debugBondHint = false;
 
   // ── ★ 집 꾸미기(내 색) ──
   //  배치는 registry "houseLayout"에 산다(저장은 systems/save.ts가 함께 직렬화).
@@ -98,7 +101,7 @@ export default class InteriorScene extends Phaser.Scene {
   }
 
   // scene.start("InteriorScene", { room: "living", skipIntro: true }) 로 특정 방부터 시작 가능
-  init(data: { room?: string; skipIntro?: boolean }): void {
+  init(data: { room?: string; skipIntro?: boolean; debugBondHint?: boolean }): void {
     // ⚠️ Phaser는 씬을 다시 시작해도 **같은 인스턴스**를 쓴다 → 클래스 필드(= 위의 `busy = false`)는 다시 초기화되지 않는다.
     //    문으로 마을에 나갈 때 켜둔 busy를 여기서 안 되돌리면 다시 집에 들어왔을 때 켜진 채로 남아 **플레이어가 영영 얼어붙는다**
     //    (update()가 busy면 입력을 통째로 무시한다). init은 scene.start마다 도는 유일한 자리다.
@@ -106,6 +109,8 @@ export default class InteriorScene extends Phaser.Scene {
     this.moving = false;
     this.startRoom = data?.room ?? "bedroom";
     this.skipIntro = !!data?.skipIntro || this.startRoom !== "bedroom";
+    // 디버그 확인 항목 전용 — 진행 상황(스타터 수령·유대 0)을 만들지 않고 유대 힌트만 바로 재생한다.
+    this.debugBondHint = !!data?.debugBondHint;
   }
 
   preload(): void {
@@ -195,11 +200,43 @@ export default class InteriorScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off("resize", this.layout, this));
     this.cameras.main.fadeIn(450, 0, 0, 0);
 
+    // 디버그 확인 항목 — 진행 상황을 손으로 만들지 않고 유대 힌트만 바로 본다(인트로보다 우선).
+    if (sr === "bedroom" && this.debugBondHint) {
+      this.busy = true;
+      this.runHomeBondHint();
     // 인트로 컷신은 침실에서 처음 시작할 때만(거실 바로가기 등은 스킵)
-    if (sr === "bedroom" && !this.skipIntro && !this.registry.get("houseIntroDone")) {
+    } else if (sr === "bedroom" && !this.skipIntro && !this.registry.get("houseIntroDone")) {
       this.busy = true;
       this.runHouseIntro();
+    // 파트너를 받고 처음 내 방에 돌아온 순간 → 유대를 어떻게 쌓는지 알려준다.
+    } else if (sr === "bedroom" && !this.skipIntro && this.needsBondHint()) {
+      this.busy = true;
+      this.runHomeBondHint();
     }
+  }
+
+  /**
+   * 유대 힌트를 띄울 때인가 —— "파트너를 받아서 처음 내 방에 돌아온 순간"만 참이다.
+   *
+   * 왜 세이브 플래그를 안 쓰나: 조건을 **현재 상태에서 파생**시키면 새 세이브 필드가 필요 없다.
+   *   파티 전원의 유대가 0 = 아직 한 번도 재우거나 쓰다듬지 않았다는 뜻 →
+   *   한 번이라도 돌보면 저절로 조건이 꺼져 다시 뜨지 않는다.
+   */
+  private needsBondHint(): boolean {
+    if (!this.registry.get("starterChosen")) return false;
+    const party = (this.registry.get("playerParty") as Pokemon[]) ?? [];
+    return party.length > 0 && party.every(p => bondOf(p) === 0);
+  }
+
+  /** 오박사의 조언을 실제 조작(침대=잠자기, F=꾸미기)과 이어 주는 나레이션. 이름창 없이 박스만 뜬다. */
+  private async runHomeBondHint(): Promise<void> {
+    const hud = this.children.getByName("hud") as Phaser.GameObjects.Text | null;
+    hud?.setVisible(false);
+    await this.wait(400);
+    for (const line of HOME_BOND_HINT) await this.say(line);
+    this.setDialogVisible(false);
+    hud?.setVisible(true);
+    this.busy = false;
   }
 
   private playerName(): string { return (this.registry.get("playerName") as string) ?? "너"; }

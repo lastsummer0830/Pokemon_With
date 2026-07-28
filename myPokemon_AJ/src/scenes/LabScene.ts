@@ -8,6 +8,8 @@ import DialogBox from "../ui/DialogBox";
 import { playBgm } from "../game/bgm";
 import { playSfx, playMe, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 import { autoSaveWithToast } from "../game/saveIndicator";
+import { addItem } from "../data/Bag";
+import { OAKS_LETTER, oakBondAdvice, oakLetterLines } from "../data/story";
 
 // 포켓몬 연구소(오박사 랩) — 어나더레드 실제 내부맵(Map157) 추출본.
 //  실제 FRLG/AR 스타팅 방식: 탁자 위에 "포켓볼 3개"가 놓여 있고, 플레이어가 포켓볼 하나 앞에 서서
@@ -301,6 +303,13 @@ export default class LabScene extends Phaser.Scene {
     await this.dlg.say(`한 가지만 기억하렴. ${disp}${josa(disp, "을를")} 진심으로 아껴주어야 한다.`, "오박사");
     await this.dlg.say("요즘 포켓몬은... 예전 같지 않아. 트레이너의 마음을 느끼고, 그만큼 배틀에서 응답해준단다.", "오박사");
     await this.dlg.say(`다행히 ${disp}${josa(disp, "은는")} 왠지 널 마음에 들어 하는 것 같구나. 좋은 인연이야.`, "오박사");
+    // ★ 유대를 '어떻게' 깊게 하는지 — 인트로 나레이션이 내건 주제("잊혀진 유대를 되찾아라")를
+    //   실제 조작(집에서 재우기·방 꾸미기·쓰다듬기)과 이어 주는 대목. 대사는 data/story.ts에 있다.
+    for (const line of oakBondAdvice(disp)) await this.dlg.say(line, "오박사");
+    // ★ 오박사의 소개장 — 상록체육관에서 그린에게 보여주는 물건(AR 원본 아이템 :OAKSINTRODUCTION).
+    //   이게 없으면 GymScene 컷신이 '받은 적 없는 소개장'을 건네게 된다.
+    addItem(this.registry, OAKS_LETTER, 1);
+    for (const l of oakLetterLines(you)) await this.dlg.say(l.text, l.speaker);
     // 네모 — 즉시 라이벌 배틀 도발(사용자 지시). "밖에서 기다린다" → 마을로 나가면 WorldScene에서 배틀 발동.
     await this.dlg.say(`좋았어, 결정했구나! ${you}, 이제 우린 라이벌이야.`, "네모");
     await this.dlg.say("그 파트너가 얼마나 굉장한지 당장 보고 싶어! 지금 바로 한 판 어때?", "네모");

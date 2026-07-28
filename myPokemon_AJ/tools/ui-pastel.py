@@ -26,12 +26,14 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 # 리컬러할 파일 (그 외 아이콘·타입 아이콘은 원본 그대로 쓴다)
 #  ⚠️ 가방 그림(bag_N)은 건드리지 않는다 — 리컬러했더니 배경에 묻히거나 갈색 가방이 돼서 이상해졌다(사용자 지적).
 #     원본 흰·파란 백팩 그대로 둔다.
-BAG_FILES = ["bg_1", "bg_2", "bg_3", "cursor", "icon_pocket", "icon_slider"]
+#  bg_8 = 소중한 물건 포켓(스토리 물건이 들어간다). 다른 배경과 같은 규칙으로 리컬러해야
+#  탭을 넘길 때 톤이 튀지 않는다 — 빠뜨리면 그 포켓만 텍스처 로드가 실패한다(실제로 발생).
+BAG_FILES = ["bg_1", "bg_2", "bg_3", "bg_8", "cursor", "icon_pocket", "icon_slider"]
 DEX_FILES = ["bg_list", "bg_info", "cursor_list", "icon_slider"]
 
 # sky 변형에서 파일별 목표 색상(hue, 0~1). None = 원래 색상 유지.
 SKY_HUE = {
-    "bg_1": 0.58, "bg_2": 0.58, "bg_3": 0.58,     # 가방 배경 = 연하늘
+    "bg_1": 0.58, "bg_2": 0.58, "bg_3": 0.58, "bg_8": 0.58,   # 가방 배경 = 연하늘
     "bg_list": 0.58, "bg_info": 0.58,             # 도감 배경 = 연하늘
     "cursor": 0.93, "cursor_list": 0.93,          # 커서만 연분홍(선택이 눈에 띄어야 함)
     "icon_slider": 0.62,                          # 슬라이더 = 라벤더

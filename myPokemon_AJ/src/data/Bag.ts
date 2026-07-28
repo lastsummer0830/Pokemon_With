@@ -13,13 +13,27 @@ export interface BagEntry {
 type Reg = Phaser.Data.DataManager;
 
 // AR 포켓 번호 → 화면에 보일 한글 이름. (가방 탭)
-//  세로 슬라이스에선 3개만 쓴다 — 나머지 포켓(기술머신·열매 등)은 아이템 자체가 없다.
+//  원본(Essentials v21.1)은 포켓이 9개다: 1=일반 2=회복약 3=몬스터볼 4=기술머신 5=나무열매
+//  6=편지 7=배틀아이템 8=소중한물건 9=Z크리스탈. 가방 배경 그림에도 8칸이 이미 구워져 있다.
+//  아직 아이템이 하나도 없는 포켓(기술머신·열매 등)은 여기 안 적어 탭 순회에서 빠진다.
 export const POCKET_NAME: Record<number, string> = {
   1: "일반",
   2: "회복약",
   3: "몬스터볼",
+  8: "소중한 물건",
 };
-export const POCKETS = [2, 3, 1];   // 탭 순서(회복약 → 볼 → 일반)
+export const POCKETS = [2, 3, 1, 8];   // 탭 순서(회복약 → 볼 → 일반 → 소중한 물건)
+
+/**
+ * 소중한 물건 포켓 — 스토리 진행용 물건이 들어간다(예: 오박사의 소개장).
+ * 이 포켓 물건은 **버리거나 팔 수 없다**(원본 규칙과 동일). 판정을 여기 한 곳에 둔다.
+ */
+export const KEY_ITEM_POCKET = 8;
+
+/** 이 아이템을 버리거나 팔 수 있나 — 소중한 물건이면 안 된다. */
+export function isKeyItem(pocket: number): boolean {
+  return pocket === KEY_ITEM_POCKET;
+}
 
 export const MAX_STACK = 99;
 
