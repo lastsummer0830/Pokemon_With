@@ -121,6 +121,9 @@ export default class InteriorScene extends Phaser.Scene {
     // 디버그 확인 항목 전용 — 진행 상황(스타터 수령·유대 0)을 만들지 않고 유대 힌트만 바로 재생한다.
     this.debugBondHint = !!data?.debugBondHint;
     this.debugMomGreet = !!data?.debugMomGreet;
+    // ⚠️ WorldScene과 같은 Phaser 함정 — data 없이 scene.start를 부르면 지난 data가 다시 온다.
+    //    디버그 플래그가 다음 입장까지 살아 있으면 집에 들어올 때마다 힌트/컷신이 또 돈다. 읽고 바로 지운다.
+    if (data) { delete data.debugBondHint; delete data.debugMomGreet; }
     // 엄마의 아침 대사는 "1층에 내려온 그 순간" 한 번이다. 씬 인스턴스가 재사용되므로 여기서 되돌린다.
     this.momGreeted = false;
     this.momTile = [...MOM_HOME_TILE];

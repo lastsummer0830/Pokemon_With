@@ -33,6 +33,10 @@ export interface RegionMap {
   // 전경(priority) 레이어 PNG가 있으면 true. AR의 나무 캐노피·지붕처럼 **캐릭터 위에** 그려지는 타일 모음
   //  (extract-map.py가 <name>_over.png로 뽑는다). WorldScene이 캐릭터보다 높은 depth로 덮어 그린다.
   overImg?: string;
+  // 이 맵의 고정 날씨 (AR map_metadata의 `weather` = `[:Rain, 100]` 형식 그대로 = [심볼, 확률%]).
+  //  ⚠️ 원본 382맵 중 이게 있는 맵은 3개뿐이다(Route 2·15번도로·쌍둥이섬 지하4층).
+  //     우리가 지금 쓰는 3맵은 전부 없음 = **항상 맑음이 원본 그대로**다. 날씨 있는 맵을 추가하면 여기 적으면 된다.
+  weather?: [string, number];
 }
 
 // ⚠️ 이름 "pallet"은 바꾸지 말 것 — 기존 세이브(v3)의 loc.map 값이자 텍스처 키다.

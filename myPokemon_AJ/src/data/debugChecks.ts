@@ -24,6 +24,33 @@ export interface DebugCheck {
 
 // 최신 날짜를 위에 둔다(같은 날 안에서는 작업한 순서).
 export const DEBUG_CHECKS: DebugCheck[] = [
+  // ── 0801 날씨 — AR Graphics/Weather 23장을 이식해 필드 날씨를 붙였다 ──
+  //   ⚠️ 원본 382맵 중 날씨가 적힌 맵은 3개뿐이고 **우리 3맵은 전부 없음**(= 항상 맑음이 원본 그대로).
+  //      그래서 확인은 debugWeather로 강제해서 본다. 2번도로 같은 비 오는 맵을 추가하면 저절로 뜬다.
+  {
+    date: "0801",
+    title: "날씨 — 비 (원본 Graphics/Weather 이식)",
+    what: "비·폭풍·눈·눈보라·싸락눈·모래바람·안개를 필드에 뿌리는 장치를 만들었다. 맵 메타데이터의 [:Rain, 확률%]를 그대로 굴린다(원본 방식).",
+    see: "빗줄기가 비스듬히 내리고 화면이 푸르스름하게 어둑해지는지. HUD 끝에 '비'가 붙는지.",
+    scene: "WorldScene",
+    data: { debugWeather: "rain" },
+  },
+  {
+    date: "0801",
+    title: "날씨 — 모래바람 (흐르는 무늬 + 알갱이)",
+    what: "모래바람·눈보라는 알갱이뿐 아니라 원본의 256px 무늬(sandstorm_tile)가 화면을 가로질러 흐른다.",
+    see: "누런 모래 무늬가 옆으로 흐르고 알갱이가 빠르게 지나가는지.",
+    scene: "WorldScene",
+    data: { debugWeather: "sandstorm" },
+  },
+  {
+    date: "0801",
+    title: "날씨 — 밤에 내리는 비(밤낮과 겹치기)",
+    what: "날씨(depth 880)를 밤낮 색조(900)보다 아래에 그려, 밤에 내리는 비도 함께 어두워지게 했다.",
+    see: "화면이 밤처럼 어두운 채로 비가 내리는지(비만 대낮처럼 밝으면 잘못된 것).",
+    scene: "WorldScene",
+    data: { debugWeather: "rain", debugTimeBand: "night" },
+  },
   // ── 0801 밤낮(시간 흐름) — 지금까지 이 게임엔 시간 개념이 아예 없었다 ──
   //   ⚠️ 시간대는 실제 시계를 읽는다 → 확인 항목은 registry "debugTimeBand"로 강제한다(밤까지 기다릴 순 없다).
   {

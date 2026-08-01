@@ -10,6 +10,7 @@ import { getEncounters, getMapTrainers, loadArDb } from "../data/ar";
 import type { TrainerPlacement } from "../data/ar";
 import { encounterTriggered, chooseWildPokemon, resetEncounterSteps } from "../systems/encounter";
 import { attachDayNight, applyDebugBand, BAND_LABEL, DayNightOverlay, TimeBand } from "../systems/daynight";
+import { attachWeather, applyDebugWeather, preloadWeather, rollWeather, WeatherKind, WEATHER_LABEL, WeatherOverlay } from "../systems/weather";
 
 // 야외 = 어나더레드에서 그대로 추출한 맵 3장을 **하나로 이어붙인 리전**(52×100칸).
 //  - 위에서부터 상록시티(0~39) · 1번도로(40~79) · 태초마을(80~99). 배치 근거는 src/data/region.ts 주석 참고
@@ -97,13 +98,16 @@ export default class WorldScene extends Phaser.Scene {
   private rival?: { path: [number, number][]; from: "left" | "right" };   // 네모가 걸어올 길(플레이어 기준으로 잡음)
   private dlg!: DialogBox;
   private dayNight!: DayNightOverlay;   // 야외 시간대 색조(아침/낮/저녁/밤)
+  private weather!: WeatherOverlay;     // 야외 날씨(비·눈·모래바람…) — 밤낮보다 아래에 그린다
 
   /** HUD 한 줄 — 조작 안내 + 지금 시간대. 시간대가 바뀌면 다시 불러 글자만 갈아끼운다. */
   private updateHudTime(): void {
     const hud = this.children.getByName("hud") as Phaser.GameObjects.Text | null;
     if (!hud) return;
     const name = (this.registry.get("playerName") as string) ?? "";
-    hud.setText(`${name ? name + "  |  " : ""}방향키: 이동  |  Enter: 메뉴  |  ${BAND_LABEL[this.dayNight.band]}`);
+    // 날씨는 맑을 땐 안 적는다(항상 "맑음"이 붙어 있으면 잔소리다).
+    const w = this.weather?.kind && this.weather.kind !== "none" ? `  |  ${WEATHER_LABEL[this.weather.kind]}` : "";
+    hud.setText(`${name ? name + "  |  " : ""}방향키: 이동  |  Enter: 메뉴  |  ${BAND_LABEL[this.dayNight.band]}${w}`);
   }
   private onResize = (): void => { this.reframe(); this.dlg.layout(); };
 
@@ -128,9 +132,14 @@ export default class WorldScene extends Phaser.Scene {
   // spawn 좌표의 의미가 두 가지다 — 안 지키면 엉뚱한 맵에 떨어진다:
   //   · map을 같이 주면  → spawn은 **그 맵 기준 로컬** (예: LabScene이 "태초마을 (28,15)"로 내보냄)
   //   · map이 없으면     → spawn은 **리전 글로벌** (예: BattleScene이 돌려주는 returnPos = 배틀 걸린 그 자리)
-  init(data: { spawn?: [number, number]; map?: string; face?: Dir; openMenu?: boolean; debugTimeBand?: TimeBand }): void {
-    // 확인 항목이 시간대를 강제로 넘겼으면 반영(없으면 실제 시계로 되돌린다).
+  init(data: { spawn?: [number, number]; map?: string; face?: Dir; openMenu?: boolean; debugTimeBand?: TimeBand; debugWeather?: WeatherKind }): void {
+    // 확인 항목이 시간대·날씨를 강제로 넘겼으면 반영(없으면 실제 시계/맵 설정으로 되돌린다).
     applyDebugBand(this.registry, data);
+    applyDebugWeather(this.registry, data);
+    // ⚠️ Phaser 함정: `scene.start(key)`를 **data 없이** 부르면 지난번 data를 그대로 다시 넘긴다
+    //    (settings.data가 남아 있다). 그래서 디버그로 한 번 밤·비를 강제하면 그 뒤 정상 입장에도
+    //    계속 밤비가 따라왔다(실제로 검증에서 잡혔다). 읽은 즉시 지워 **1회용**으로 만든다.
+    if (data) { delete data.debugTimeBand; delete data.debugWeather; }
     // ⚠️ Phaser는 씬을 다시 시작해도 **같은 인스턴스**를 쓴다 → 클래스 필드(= 위의 `busy = false`)는 다시 초기화되지 않는다.
     //    배틀·워프로 나갈 때 켜둔 busy를 여기서 안 되돌리면 돌아왔을 때 켜진 채로 남아 **플레이어가 영영 얼어붙는다**
     //    (update()가 busy면 입력을 통째로 무시한다). init은 scene.start마다 도는 유일한 자리다.
@@ -160,6 +169,7 @@ export default class WorldScene extends Phaser.Scene {
       if (m.overImg) this.load.image(`${m.name}_over`, `${m.overImg}?v=` + Date.now());
     }
     preloadCommonAudio(this);
+    preloadWeather(this);   // 날씨 그림(AR 원본) — 맵에 날씨가 없으면 안 쓰이고 로드만 된다
     const file = this.gender === "girl" ? "assets/characters/trainer_DAWN.png" : "assets/characters/trainer_RED.png";
     this.load.spritesheet(this.texKey, file, { frameWidth: 32, frameHeight: 48 });
     // 라이벌(네모) 오버월드 스프라이트 — 스타터 선택 직후 첫 배틀 연출용.
@@ -249,6 +259,9 @@ export default class WorldScene extends Phaser.Scene {
     // ★ 밤낮 — 야외는 실제 시계를 따라 아침/낮/저녁/밤으로 물든다(systems/daynight.ts).
     //   depth 900 = 맵·캐릭터보다 위, HUD(100)보다도 위지만 대화창(1000)·메뉴보다는 아래.
     //   ⚠️ HUD 글자까지 같이 어두워지는 게 맞다(원본도 화면 전체에 색조를 씌운다).
+    // ★ 날씨 — 맵 메타데이터에 적힌 확률로 정한다(원본 방식). depth 880 = **밤낮 색조(900)보다 아래**라
+    //   밤에 내리는 비도 함께 어두워진다.
+    this.weather = attachWeather(this, rollWeather(this.registry, this.curMap?.weather), 880);
     //   구간이 바뀌면(예: 19시→20시) HUD 글자도 같이 갈아끼운다.
     this.dayNight = attachDayNight(this, 900, () => this.updateHudTime());
 
@@ -437,6 +450,9 @@ export default class WorldScene extends Phaser.Scene {
       this.showMapName(m.label);
       // BGM은 곡이 실제로 바뀔 때만 갈아준다(태초마을↔집처럼 같은 곡이면 끊지 않는다).
       if (prev?.bgm !== m.bgm) playBgm(this, m.bgm, 0.35);
+      // 날씨는 맵마다 다르다(원본도 맵 메타데이터에 적혀 있다) → 새 맵의 확률로 다시 굴린다.
+      this.weather.setKind(rollWeather(this.registry, m.weather));
+      this.updateHudTime();
     }
     // 트레이너가 먼저다 — 눈이 마주쳤으면 풀숲 조우는 안 걸린다(busy가 되어 아래에서 걸러진다).
     this.checkTrainerSight();
