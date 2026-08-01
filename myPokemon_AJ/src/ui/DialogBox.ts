@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { textDelayMs } from "../systems/settings";
 import { playSfx, SFX } from "../game/sfx";
 
 // 공용 HGSS 감성 대화창 — 집(InteriorScene)/인트로/연구소가 같은 박스를 쓰도록 뽑아낸 컴포넌트.
@@ -103,7 +104,7 @@ export default class DialogBox {
       };
       const finishTyping = () => { timer.remove(); this.boxText.setText(text); typing = false; this.arrow.setVisible(true); };
       const timer = this.scene.time.addEvent({
-        delay: 38, loop: true, callback: () => { i++; this.boxText.setText(text.slice(0, i)); if (i >= text.length) finishTyping(); },
+        delay: textDelayMs(), loop: true, callback: () => { i++; this.boxText.setText(text.slice(0, i)); if (i >= text.length) finishTyping(); },
       });
       const onAdvance = () => { if (typing) finishTyping(); else { playSfx(this.scene, SFX.decision, 0.4); cleanup(); resolve(); } };
       kb.on("keydown-SPACE", onAdvance); kb.on("keydown-ENTER", onAdvance); kb.on("keydown-Z", onAdvance);

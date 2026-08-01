@@ -11,6 +11,8 @@ import type { TrainerPlacement } from "../data/ar";
 import { encounterTriggered, chooseWildPokemon, resetEncounterSteps } from "../systems/encounter";
 import { attachDayNight, applyDebugBand, BAND_LABEL, DayNightOverlay, TimeBand } from "../systems/daynight";
 import { attachWeather, applyDebugWeather, preloadWeather, rollWeather, WeatherKind, WEATHER_LABEL, WeatherOverlay } from "../systems/weather";
+import { preloadVsIntroAll, playVsIntro, vsKeyFromTrainerId } from "../systems/vsIntro";
+import { settings, stepDurationMs } from "../systems/settings";
 
 // 야외 = 어나더레드에서 그대로 추출한 맵 3장을 **하나로 이어붙인 리전**(52×100칸).
 //  - 위에서부터 상록시티(0~39) · 1번도로(40~79) · 태초마을(80~99). 배치 근거는 src/data/region.ts 주석 참고
@@ -65,11 +67,16 @@ export default class WorldScene extends Phaser.Scene {
   private readonly texKey = "hero";
   private idleFrame: Record<Dir, number> = { down: 0, left: 4, right: 8, up: 12 };
   private facing: Dir = "down";
+  private runKeys: Phaser.Input.Keyboard.Key[] = [];   // 눌러 두면 반대 속도(걷기↔달리기)
 
   // 리전 전체 격자(맵 3장을 이어붙인 것). 좌표는 전부 글로벌.
   private cols = REGION_COLS; private rows = REGION_ROWS;
   private blocked: number[][] = [];
   private grass: number[][] = [];   // 1 = 풀숲(야생 조우 판정 칸). 풀숲 없는 맵은 전부 0으로 남는다.
+  // 언덕(점프대). 0 = 아님 / 2·4·6·8 = **그 방향으로만** 뛰어내릴 수 있다(RMXP 방향번호: 2아래 4왼 6오 8위).
+  //  원본 Game_Player#move_generic 과 같다 — 방향이 맞으면 걷는 대신 2칸 점프, 아니면 벽이다.
+  //  ⚠️ 언덕 칸은 blocked에서도 1이다(그 위에 설 수 없다) → walkable()만 보는 코드는 자동으로 안전하다.
+  private ledge: number[][] = [];
   private tile = 32 * SCALE;
   private tx = 0; private ty = 0;
   private moving = false; private busy = false;
@@ -92,6 +99,9 @@ export default class WorldScene extends Phaser.Scene {
 
   private spawn = { x: 0, y: 0, face: "down" as Dir };
   private autoMenu = false;   // 디버그 '인게임 메뉴' 바로가기: 마을 위에 메뉴를 바로 연다
+  // 확인 항목용 VS 연출 바로가기 — [상대 id, 화면에 적을 이름]. AR 정의가 있는 상대는 "TYPE:이름",
+  //  정의가 없는 상대(네모)는 그림 파일 이름("NEMONA")을 준다.
+  private debugVs: [string, string] | null = null;
   private trainers: TrainerNpc[] = [];          // 맵에 서 있는 트레이너들(1번도로 반바지꼬마·짧은치마)
   private setupRun = 0;                         // setupTrainers 실행 번호(씬 재시작 시 옛 실행을 무시하려고)
   private nemona?: Phaser.GameObjects.Sprite;   // 첫 배틀 때 밖에서 기다리는 네모(그 외엔 없음)
@@ -132,7 +142,7 @@ export default class WorldScene extends Phaser.Scene {
   // spawn 좌표의 의미가 두 가지다 — 안 지키면 엉뚱한 맵에 떨어진다:
   //   · map을 같이 주면  → spawn은 **그 맵 기준 로컬** (예: LabScene이 "태초마을 (28,15)"로 내보냄)
   //   · map이 없으면     → spawn은 **리전 글로벌** (예: BattleScene이 돌려주는 returnPos = 배틀 걸린 그 자리)
-  init(data: { spawn?: [number, number]; map?: string; face?: Dir; openMenu?: boolean; debugTimeBand?: TimeBand; debugWeather?: WeatherKind }): void {
+  init(data: { spawn?: [number, number]; map?: string; face?: Dir; openMenu?: boolean; debugTimeBand?: TimeBand; debugWeather?: WeatherKind; debugVs?: [string, string] }): void {
     // 확인 항목이 시간대·날씨를 강제로 넘겼으면 반영(없으면 실제 시계/맵 설정으로 되돌린다).
     applyDebugBand(this.registry, data);
     applyDebugWeather(this.registry, data);
@@ -154,6 +164,11 @@ export default class WorldScene extends Phaser.Scene {
       this.spawn = { x: gx, y: gy, face: "down" };
     }
     this.autoMenu = !!data?.openMenu;
+    // ⚠️ 0801 함정 6번과 같은 처리 — 읽은 즉시 지워 **1회용**으로 만든다.
+    //    안 지우면 scene.start(key)를 data 없이 부를 때 Phaser가 지난 data를 다시 넘겨,
+    //    한 번 본 VS 연출이 그 뒤 정상 플레이에도 계속 따라붙는다.
+    this.debugVs = data?.debugVs ?? null;
+    if (data) delete data.debugVs;
   }
 
   preload(): void {
@@ -169,6 +184,8 @@ export default class WorldScene extends Phaser.Scene {
       if (m.overImg) this.load.image(`${m.name}_over`, `${m.overImg}?v=` + Date.now());
     }
     preloadCommonAudio(this);
+    // VS 연출 — 월드에선 누구와 눈이 마주칠지 미리 모르므로 초상까지 전부 받아 둔다(그림 5장, 가볍다).
+    preloadVsIntroAll(this);
     preloadWeather(this);   // 날씨 그림(AR 원본) — 맵에 날씨가 없으면 안 쓰이고 로드만 된다
     const file = this.gender === "girl" ? "assets/characters/trainer_DAWN.png" : "assets/characters/trainer_RED.png";
     this.load.spritesheet(this.texKey, file, { frameWidth: 32, frameHeight: 48 });
@@ -187,14 +204,18 @@ export default class WorldScene extends Phaser.Scene {
     this.blocked = Array.from({ length: REGION_ROWS }, () => new Array<number>(REGION_COLS).fill(1));
     // 풀숲은 반대로 "전부 아님(0)"으로 깔고 맵이 준 칸만 켠다(맵 밖은 풀숲이 아니다).
     this.grass = Array.from({ length: REGION_ROWS }, () => new Array<number>(REGION_COLS).fill(0));
+    // 언덕도 "전부 아님(0)"으로 깔고 맵이 준 칸만 켠다(태초마을엔 언덕이 0칸이라 키가 아예 없다).
+    this.ledge = Array.from({ length: REGION_ROWS }, () => new Array<number>(REGION_COLS).fill(0));
     for (const m of REGION_MAPS) {
-      // grass는 풀숲이 있는 맵(1번도로)에만 있다 — 없는 맵은 extract-map.py가 키를 아예 안 넣는다.
-      const col = this.cache.json.get(`${m.name}_col`) as { cols: number; rows: number; blocked: number[][]; grass?: number[][] };
+      // grass·ledge는 그게 있는 맵에만 있다 — 없는 맵은 extract-map.py가 키를 아예 안 넣는다.
+      const col = this.cache.json.get(`${m.name}_col`) as
+        { cols: number; rows: number; blocked: number[][]; grass?: number[][]; ledge?: number[][] };
       assertRegionMatches(m.name, col.cols, col.rows);   // 크기가 어긋나면 조용히 깨지지 말고 여기서 죽어라
       for (let y = 0; y < col.rows; y++)
         for (let x = 0; x < col.cols; x++) {
           this.blocked[y + m.oy][x + m.ox] = col.blocked[y][x];
           if (col.grass) this.grass[y + m.oy][x + m.ox] = col.grass[y][x];
+          if (col.ledge) this.ledge[y + m.oy][x + m.ox] = col.ledge[y][x];
         }
       this.textures.get(m.name).setFilter(Phaser.Textures.FilterMode.NEAREST);
       this.add.image(m.ox * this.tile, m.oy * this.tile, m.name).setOrigin(0, 0).setScale(SCALE).setDepth(0);
@@ -229,6 +250,11 @@ export default class WorldScene extends Phaser.Scene {
     this.player = this.add.sprite(this.cx(this.tx), this.cy(this.ty), this.texKey, this.idleFrame[this.facing])
       .setOrigin(0.5, 1).setScale(SCALE).setDepth(5);
     this.cursors = this.input.keyboard!.createCursorKeys();
+    // 이동 중 눌러 두면 '반대 속도'가 되는 키(원본의 Back 버튼 = 우리 취소키 X / Shift).
+    this.runKeys = [
+      this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.X),
+      this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT),
+    ];
     this.dlg = new DialogBox(this);
     // ⚠️ this.scale은 씬이 아니라 게임 전역 이벤트원이다 → off("resize")를 콜백 없이 부르면 '다른 씬 리스너까지' 다 지운다.
     this.scale.on("resize", this.onResize);
@@ -285,6 +311,22 @@ export default class WorldScene extends Phaser.Scene {
 
     // 연구소에서 스타터를 고르고 나왔다면: 밖에서 기다리던 네모가 다가와 첫 라이벌 배틀을 건다.
     this.time.delayedCall(450, () => this.maybeStartRivalBattle());
+
+    // 확인 항목용: VS 연출만 바로 본다(실제 배틀 진입 경로 그대로 — 연출 끝나면 그 배틀로 들어간다).
+    if (this.debugVs) {
+      const [id, name] = this.debugVs;
+      this.time.delayedCall(400, () => this.startBattleWithVs(vsKeyFromTrainerId(id), name, () =>
+        void this.scene.start("BattleScene", {
+          ally: (this.registry.get("playerParty") as Pokemon[] | undefined)?.[0],
+          trainerId: id.includes(":") ? id : undefined,
+          trainer: id.includes(":") ? undefined : name,
+          trainerSprite: id.includes(":") ? undefined : id,
+          enemy: id.includes(":") ? undefined : createFromSpecies("CHARMANDER", 5),
+          wild: false, testParty: true,
+          backdrop: this.curMap?.battleBg ?? "town",
+          returnPos: [this.tx, this.ty], returnFacing: this.facing,
+        })));
+    }
 
     // 첫 라이벌전을 방금 이기고 마을로 돌아왔다면(도입부 완결) → 자동저장(이정표).
     //  BattleScene이 승리 시 세운 원샷 플래그를 여기서 소비한다(스폰 좌표 확정 후 잠깐 뒤).
@@ -421,13 +463,30 @@ export default class WorldScene extends Phaser.Scene {
   private startTrainerBattle(t: TrainerNpc): void {
     const party = this.registry.get("playerParty") as Pokemon[] | undefined;
     const ally = party && party.length ? party[0] : undefined;
-    this.cameras.main.fadeOut(300, 0, 0, 0);
-    this.time.delayedCall(320, () =>
-      this.scene.start("BattleScene", {
+    const go = (): void =>
+      void this.scene.start("BattleScene", {
         ally, trainerId: t.spot.id,
         backdrop: this.curMap?.battleBg ?? "town",
         returnPos: [this.tx, this.ty], returnFacing: this.facing,
-      }));
+      });
+    // VS 초상이 등록된 상대만 VS 연출(원본 규칙 그대로 — 잡트레이너는 그림이 없어 그냥 페이드).
+    //  나중에 관장을 추가하면 vs_<타입>.png 한 장 + VS_PORTRAITS 한 줄로 여기가 저절로 켜진다.
+    this.startBattleWithVs(vsKeyFromTrainerId(t.spot.id), t.spot.speaker, go);
+  }
+
+  /** VS 초상이 있으면 VS 연출로, 없으면 기존 페이드로 배틀에 들어간다. */
+  private startBattleWithVs(vsKey: string | null, name: string, go: () => void): void {
+    this.busy = true;   // 연출 도중 한 칸 더 걷거나 메뉴가 열리는 것 방지
+    if (vsKey) {
+      // 우리 HUD("방향키: 이동 | Enter: 메뉴")는 원본에 없는 것이라 VS 화면에 비치면 흉하다 → 잠깐 끈다.
+      //  (씬을 떠나면 어차피 새로 그려지므로 되돌릴 필요는 없다.)
+      this.children.getByName("hud")?.setActive(false);
+      (this.children.getByName("hud") as Phaser.GameObjects.Text | null)?.setVisible(false);
+      void playVsIntro(this, vsKey, name).then(go);
+      return;
+    }
+    this.cameras.main.fadeOut(300, 0, 0, 0);
+    this.time.delayedCall(320, go);
   }
 
   private cx(tx: number): number { return (tx + 0.5) * this.tile; }
@@ -500,22 +559,82 @@ export default class WorldScene extends Phaser.Scene {
     else { this.player.stop(); this.player.setFrame(this.idleFrame[this.facing]); return; }
 
     const ntx = this.tx + dx, nty = this.ty + dy;
-    if (!this.walkable(ntx, nty)) {
-      this.player.stop(); this.player.setFrame(this.idleFrame[this.facing]);
-      if (this.time.now - this.lastBump > 300) { playSfx(this, SFX.bump, 0.4); this.lastBump = this.time.now; } // 벽 부딪힘(연타 방지)
+
+    // ── 언덕(점프대) ─────────────────────────────────────────────────────
+    //  원본 Game_Player#move_generic 과 같은 자리에서 본다 — **걷기보다 먼저** 판정한다.
+    //  방향이 맞으면 걷는 대신 2칸 점프(jumpForward(2)), 안 맞으면 그냥 벽이다(못 기어올라감).
+    const led = this.ledge[nty]?.[ntx] ?? 0;
+    if (led) {
+      const dir = dy === 1 ? 2 : dx === -1 ? 4 : dx === 1 ? 6 : 8;   // RMXP 방향번호
+      const jtx = this.tx + dx * 2, jty = this.ty + dy * 2;          // 언덕 너머 착지칸
+      // ⚠️ 착지칸 검사는 원본에 없는 안전장치다(원본 jump는 통과 여부를 안 본다).
+      //    AR 3맵 100칸 전부 착지칸이 비어 있음을 tools/ar-map/verify-passability.py로 확인했으니
+      //    실제로는 안 걸린다 — 나중에 맵을 잘못 손봤을 때 캐릭터가 벽에 처박히는 것만 막는다.
+      if (led === dir && this.walkable(jtx, jty)) { this.jumpLedge(jtx, jty); return; }
+      this.bump();
       return;
     }
+
+    if (!this.walkable(ntx, nty)) { this.bump(); return; }
 
     this.moving = true;
     this.player.play(`walk-${this.facing}`, true);
     this.tweens.add({
-      targets: this.player, x: this.cx(ntx), y: this.cy(nty), duration: 150,
+      targets: this.player, x: this.cx(ntx), y: this.cy(nty), duration: this.stepMs(),
+      onComplete: () => this.landOn(ntx, nty),
+    });
+  }
+
+  /**
+   * 한 칸 가는 데 걸리는 시간 — 옵션의 '기본 이동'(걷기/달리기)을 따른다.
+   * 원본 Options의 Default Movement와 같고, **이동 중 취소키(X/Shift)를 누르고 있으면 반대 속도**가 된다
+   * (원본 설명 그대로: "Hold Back while moving to move at the other speed").
+   */
+  private stepMs(): number {
+    const held = this.runKeys.some(k => k.isDown);
+    const running = settings().moveStyle === "run" ? !held : held;
+    return stepDurationMs(running);
+  }
+
+  /** 벽에 부딪힘 — 걷기·점프가 다 막혔을 때(연타로 효과음이 겹치지 않게 300ms 간격). */
+  private bump(): void {
+    this.player.stop(); this.player.setFrame(this.idleFrame[this.facing]);
+    if (this.time.now - this.lastBump > 300) { playSfx(this, SFX.bump, 0.4); this.lastBump = this.time.now; }
+  }
+
+  /** 한 칸(또는 점프 후) 도착 처리 — 걷기와 점프가 똑같이 쓴다. */
+  private landOn(tx: number, ty: number): void {
+    this.tx = tx; this.ty = ty; this.moving = false;
+    this.onEnterTile();   // 맵 경계를 넘었는지 확인(암전 없이 그냥 넘어간다) + 풀숲 조우 판정
+    // 조우가 걸렸으면(busy) 워프는 건너뛴다 — 지금은 풀숲과 워프 칸이 겹치지 않지만,
+    //  겹치는 순간 배틀과 문 진입이 동시에 scene.start 되어 화면이 뒤엉킨다.
+    if (!this.busy) this.handleWarp();
+  }
+
+  /**
+   * 언덕을 뛰어넘는다 — 원본 수치 그대로(Game_Character#jump / update).
+   *   · 걸리는 시간 = jump_speed 3의 @jump_time 0.25초 × 2칸 = **0.5초**
+   *   · 뛰는 높이  = jump_peak = 2 × 32px × 3/8 = 24px = **0.75칸**
+   *   · 높이 곡선  = jump_peak × (4·|f−0.5|² − 1)  (f = 0→1 진행도, 포물선)
+   *   · 착지 = 걷기와 똑같이 한 보로 친다(원본 jump도 increase_steps 한다) → 풀숲 조우·워프 판정 그대로.
+   */
+  private jumpLedge(jtx: number, jty: number): void {
+    this.moving = true;
+    playSfx(this, SFX.jump, 0.5);
+    this.player.play(`walk-${this.facing}`, true);
+    const x0 = this.player.x, y0 = this.player.y;
+    const x1 = this.cx(jtx), y1 = this.cy(jty);
+    const peak = this.tile * 0.75;   // this.tile = 화면상 한 칸 크기(32 × SCALE)
+    this.tweens.addCounter({
+      from: 0, to: 1, duration: 500,
+      onUpdate: (tw) => {
+        const f = tw.getValue() ?? 0;
+        const arc = peak * ((4 * (f - 0.5) ** 2) - 1);   // f=0·1에서 0, f=0.5에서 -peak
+        this.player.setPosition(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f + arc);
+      },
       onComplete: () => {
-        this.tx = ntx; this.ty = nty; this.moving = false;
-        this.onEnterTile();   // 맵 경계를 넘었는지 확인(암전 없이 그냥 넘어간다) + 풀숲 조우 판정
-        // 조우가 걸렸으면(busy) 워프는 건너뛴다 — 지금은 풀숲과 워프 칸이 겹치지 않지만,
-        //  겹치는 순간 배틀과 문 진입이 동시에 scene.start 되어 화면이 뒤엉킨다.
-        if (!this.busy) this.handleWarp();
+        this.player.setPosition(x1, y1);
+        this.landOn(jtx, jty);
       },
     });
   }
@@ -609,15 +728,16 @@ export default class WorldScene extends Phaser.Scene {
     const ally = party && party.length ? party[0] : undefined;
     const enemyKey = (this.registry.get("rivalEnemySpecies") as string) ?? "CHARMANDER";
     const enemy = createFromSpecies(enemyKey, 5);
-    this.cameras.main.fadeOut(300, 0, 0, 0);
-    this.time.delayedCall(320, () =>
-      this.scene.start("BattleScene", {
+    const go = (): void =>
+      void this.scene.start("BattleScene", {
         // 배경은 서 있는 맵이 정한다(야생전과 같은 규칙 — 하드코딩하면 나중에 도로/시티 트레이너전에서 틀린 배경이 뜬다).
         //  네모는 AR에 트레이너 정의가 없다(원본엔 스타터 직후 라이벌전 자체가 없음) → 이름·그림만 직접 넘긴다.
         ally, enemy, wild: false, trainer: "네모", trainerSprite: "NEMONA",
         backdrop: this.curMap?.battleBg ?? "town",
         returnPos: [this.tx, this.ty], returnFacing: this.facing,
-      }));
+      });
+    // 라이벌전도 VS 연출로 들어간다(초상은 전신 그림에서 잘라 만든 것 — vsIntro.ts 주석 참고).
+    this.startBattleWithVs(vsKeyFromTrainerId("NEMONA"), "네모", go);
   }
 
   private handleWarp(): void {

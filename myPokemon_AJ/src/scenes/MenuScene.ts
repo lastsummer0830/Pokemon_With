@@ -162,14 +162,10 @@ export default class MenuScene extends Phaser.Scene {
       // 도감·가방은 별도 씬(오버레이). 메뉴는 멈춰 두고, 돌아오면 다시 살아난다.
       else if (item === "도감") { this.scene.pause(); this.scene.launch("PokedexScene", { from: "MenuScene" }); }
       else if (item === "가방") { this.scene.pause(); this.scene.launch("BagScene", { from: "MenuScene" }); }
-      // 저장 — AR 원본식(306_UI_Save.rb): "○○은 게임을 저장했다." + 저장 징글(ME, BGM 잠깐 멈춤).
-      else if (item === "저장") {
-        saveGame(this.registry);
-        playMe(this, SFX.save, 0.6);
-        const who = (this.registry.get("playerName") as string) || "플레이어";
-        this.toast(`${who}${josa(who, "은는")} 게임을 저장했다!`);
-      }
-      else if (item === "설정") { this.toast("설정은 준비 중이야."); }
+      // 저장 — 원본(Auto Multi Save)처럼 **어느 칸에 저장할지 고른다**(자동 3 + 수동 8).
+      //  "○○은 게임을 저장했다." 대사와 저장 징글은 SaveSlotScene이 이어서 낸다.
+      else if (item === "저장") { this.scene.pause(); this.scene.launch("SaveSlotScene", { mode: "save", from: "MenuScene" }); }
+      else if (item === "설정") { this.scene.pause(); this.scene.launch("OptionsScene", { from: "MenuScene" }); }
     } else if (this.state === "party") {
       if (!this.party.length) return;
       // 교체 모드 — 상세로 안 들어가고 고른 칸을 배틀에 돌려준다.

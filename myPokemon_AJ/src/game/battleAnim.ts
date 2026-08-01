@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { settings } from "../systems/settings";
 import { BattleView, VW } from "../scenes/battleView";
 
 // ─────────────────────────────────────────────────────────────
@@ -194,6 +195,8 @@ export async function playMoveAnimation(
   scene: Phaser.Scene, view: BattleView, sprites: AnimTargets,
   moveId: string, byAlly: boolean, info?: MoveInfoForAnim,
 ): Promise<void> {
+  // 옵션 '배틀 이펙트: 끔' — 원본 Options의 Battle Effects와 같다(애니만 건너뛰고 진행은 그대로).
+  if (!settings().battleEffects) return;
   const idx = await loadAnimIndex();
   if (!idx) return;
   const picked = resolveAnim(idx, moveId, byAlly, info);
@@ -213,6 +216,7 @@ export async function playMoveAnimation(
 export async function playCommonAnimation(
   scene: Phaser.Scene, view: BattleView, sprites: AnimTargets, name: string,
 ): Promise<void> {
+  if (!settings().battleEffects) return;
   const idx = await loadAnimIndex();
   const id = idx?.commons[name];
   if (id === undefined) return;

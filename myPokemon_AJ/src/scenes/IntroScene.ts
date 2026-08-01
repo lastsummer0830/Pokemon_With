@@ -3,7 +3,7 @@ import { Gender } from "../data/Player";
 import { stopBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
 import { DEFAULT_DIFFICULTY } from "../systems/difficulty";
-import { START_BAG, START_MONEY } from "../systems/save";
+import { START_BAG, START_MONEY, startPlayClock } from "../systems/save";
 
 // 게임 인트로 — 옛날 픽셀 포켓몬 게임 오프닝 감성.
 // 어두운 스포트라이트 배경 → "…" → "여기는 어디지…?" → 오박사 등장 →
@@ -252,8 +252,10 @@ export default class IntroScene extends Phaser.Scene {
     this.registry.set("playerName", name);
     this.registry.set("playerGender", gender);
     // 새 게임의 시작 상태: 난이도·소지금·가방·도감·뱃지. (저장 v3 — systems/save.ts 가 registry를 그대로 직렬화한다)
-    //  ⚠️ 난이도 선택 화면은 아직 없다(다음 스텝) → 지금은 기본값 '노말'. AR처럼 게임 시작 시 1회만 고르게 할 것.
+    //  ⚠️ 난이도는 **노말 하나로 고정이다**(2026-08-02 사용자 확정 — AGENTS.md §1.5).
+    //     선택 화면을 만들지 않는다. 값은 세이브 호환 때문에 계속 registry에 넣어 둔다.
     if (!this.registry.get("difficulty")) this.registry.set("difficulty", DEFAULT_DIFFICULTY);
+    startPlayClock(this.registry, 0);   // 새 게임 = 플레이 시간 0부터(세이브 화면의 '시간' 표시용)
     this.registry.set("money", START_MONEY);
     this.registry.set("bag", START_BAG.map(e => ({ ...e })));
     this.registry.set("dexSeen", []);

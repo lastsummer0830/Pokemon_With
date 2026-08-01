@@ -15,6 +15,7 @@ import { captureShakes, SHAKE_FAIL_TEXT } from "../systems/capture";
 import { battleExpYield, gainExp } from "../systems/exp";
 import { applyDebugBand, backdropName, currentBand, TimeBand } from "../systems/daynight";
 import { scaledTrainerLevel, leaderBonusForType, DEFAULT_DIFFICULTY } from "../systems/difficulty";
+import { settings } from "../systems/settings";
 import type { Difficulty } from "../systems/difficulty";
 import type { BagResult } from "./BagScene";
 import {
@@ -446,6 +447,17 @@ export default class BattleScene extends Phaser.Scene {
     const next = this.enemyTeam.findIndex((p, i) => i > this.enemyIdx && !isFainted(p));
     if (next < 0) { await this.winBattle(); return true; }
     this.enemyIdx = next;
+    // ★ 옵션 '배틀 스타일: 교체' — 원본 Options의 Battle Style(Switch)과 같다.
+    //   상대가 다음 포켓몬을 내기 **전에** 나도 바꿀지 물어본다. '고정'이면 안 묻는다.
+    //   ⚠️ 야생전에는 안 묻는다(원본도 트레이너전 전용 개념이다).
+    if (!this.wild && settings().battleStyle === "switch" && this.canSwitchAlly()) {
+      const nextFoe = displayName(this.enemyTeam[next]);
+      const me = displayName(this.ally);
+      if (await this.askYesNo(`상대는 ${nextFoe}${josa(nextFoe, "을를")} 내보내려 한다.\n${me}${josa(me, "을를")} 바꾸겠는가?`)) {
+        const pick = await this.choosePartyIdx(true);
+        if (pick >= 0 && pick !== this.allyIdx) await this.switchAlly(pick);
+      }
+    }
     await this.sendOutEnemy(false);
     return false;
   }
@@ -1183,6 +1195,58 @@ export default class BattleScene extends Phaser.Scene {
         resolve();                        // ★ 창은 그대로 둔다 — 다음 대사/기술 애니 동안 계속 보인다
       };
       kb.on("keydown-ENTER", done); kb.on("keydown-Z", done); kb.on("keydown-SPACE", done);
+    });
+  }
+
+  /** 바꿔 낼 수 있는 포켓몬이 남아 있나(배틀 스타일 '교체'로 물어볼 가치가 있는지). */
+  private canSwitchAlly(): boolean {
+    return this.party.some((p, i) => i !== this.allyIdx && !isFainted(p));
+  }
+
+  /**
+   * 예/아니오 물어보기 — 배틀 스타일 '교체'에서 쓴다.
+   * 대사창은 그대로 두고 오른쪽 아래에 작은 선택칸만 얹는다(원본 pbConfirmMessage와 같은 자리).
+   */
+  private askYesNo(text: string): Promise<boolean> {
+    this.showMessage(text);
+    return new Promise((resolve) => {
+      const v = this.view;
+      const layer = this.add.container(0, 0).setDepth(210);
+      const w = 120, h = 62;
+      const bx = v.XR(512 - w - 12), by = v.Y(288 - h - 8);
+      layer.add(this.add.rectangle(bx, by, w * v.s, h * v.s, 0xf8f8f8, 1)
+        .setOrigin(0).setStrokeStyle(Math.max(2, 2 * v.s), 0x505058));
+      const mk = (label: string, row: number) => {
+        const t = this.add.text(bx + 34 * v.s, by + (12 + row * 24) * v.s, label, {
+          fontFamily: FONT, fontSize: `${Math.round(20 * v.s)}px`, color: "#505058",
+        }).setOrigin(0);
+        layer.add(t); return t;
+      };
+      const items = [mk("예", 0), mk("아니오", 1)];
+      const cursor = this.add.text(bx + 14 * v.s, by + 12 * v.s, "▶", {
+        fontFamily: FONT, fontSize: `${Math.round(20 * v.s)}px`, color: "#505058",
+      }).setOrigin(0);
+      layer.add(cursor);
+
+      let idx = 0;
+      const paint = () => cursor.setY(by + (12 + idx * 24) * v.s);
+      paint();
+      const kb = this.input.keyboard!;
+      const move = (d: number) => { idx = (idx + d + 2) % 2; playSfx(this, SFX.cursor, 0.35); paint(); };
+      const up = () => move(-1), down = () => move(1);
+      const pick = () => {
+        kb.off("keydown-UP", up); kb.off("keydown-DOWN", down);
+        kb.off("keydown-ENTER", pick); kb.off("keydown-Z", pick); kb.off("keydown-SPACE", pick);
+        kb.off("keydown-X", no); kb.off("keydown-ESC", no);
+        playSfx(this, SFX.decision, 0.35);
+        layer.destroy();
+        resolve(idx === 0);
+      };
+      const no = () => { idx = 1; pick(); };
+      kb.on("keydown-UP", up); kb.on("keydown-DOWN", down);
+      kb.on("keydown-ENTER", pick); kb.on("keydown-Z", pick); kb.on("keydown-SPACE", pick);
+      kb.on("keydown-X", no); kb.on("keydown-ESC", no);
+      void items;
     });
   }
 

@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
-import { hasSave, loadGame } from "../systems/save";
+import { hasSave } from "../systems/save";
 
 // 메인 메뉴 화면 — 타이틀(로고+PRESS START)에서 엔터/클릭하면 이 화면이 뜬다.
 // 톤 = 화이트/블루. 밝은 하늘 그라데 배경 + 몬스터볼(우하단) + AR식 가로 메뉴 바.
@@ -123,18 +123,12 @@ export default class MainMenuScene extends Phaser.Scene {
       this.cameras.main.fadeOut(250, 0, 0, 0);
       this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("IntroScene"));
     } else if (action === "continue") {
-      const data = hasSave() ? loadGame(this.registry) : null;
-      if (!data) { this.showToast("저장된 게임이 없어요"); return; }
-      // 저장 상태를 registry에 복원(loadGame이 처리) → 저장돼 있던 씬·위치로 이동.
-      const loc = data.loc;
-      this.cameras.main.fadeOut(250, 0, 0, 0);
-      this.cameras.main.once("camerafadeoutcomplete", () => {
-        if (loc.scene === "InteriorScene") this.scene.start("InteriorScene", { room: loc.room ?? "living", skipIntro: true });
-        // 세이브의 tx/ty는 **그 맵 기준 로컬**이라 map을 같이 넘긴다(loadGame이 옛 세이브엔 "pallet"을 채워준다).
-        else this.scene.start("WorldScene", { spawn: [loc.tx ?? 17, loc.ty ?? 8], map: loc.map ?? "pallet", face: loc.facing ?? "down" });
-      });
+      // 세이브가 여러 칸(자동 3 + 수동 8, 원본 Auto Multi Save와 같은 구성)이라 목록에서 고른다.
+      //  실제 불러오기·씬 복원은 SaveSlotScene이 한다(저장 화면과 같은 코드를 쓴다).
+      if (!hasSave()) { this.showToast("저장된 게임이 없어요"); return; }
+      this.scene.start("SaveSlotScene", { mode: "load" });
     } else if (action === "options") {
-      this.showToast("옵션은 준비 중이에요");
+      this.scene.start("OptionsScene");
     } else if (action === "quit") {
       window.close();
     }

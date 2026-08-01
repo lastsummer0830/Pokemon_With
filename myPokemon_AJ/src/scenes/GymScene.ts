@@ -6,6 +6,7 @@ import { playBgm } from "../game/bgm";
 import { playSfx, playMe, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 import { autoSaveWithToast } from "../game/saveIndicator";
 import { GREEN_BADGE, hasBadge, giveBadge } from "../data/Badges";
+import { preloadVsIntro, playVsIntro, vsKeyFromTrainerId } from "../systems/vsIntro";
 
 // 상록체육관(AR Map194) — 관장 그린과의 첫 체육관 배틀.
 //
@@ -40,6 +41,7 @@ interface GymInit {
 }
 
 const GREEN_TRAINER_ID = "LEADER_Green:그린";
+const GREEN_NAME = GREEN_TRAINER_ID.split(":")[1];   // VS 연출 띠에 적는 이름
 const GREEN_START: [number, number] = [10, 5];   // 원본 EV3 위치
 const GREEN_FACE_TILE: [number, number] = [10, 7];  // 아래로 2칸(원본 이동경로 209: 1,1)
 const PLAYER_FACE_TILE: [number, number] = [10, 8]; // 위로 3칸(원본 이동경로 209: 4,4,4)
@@ -93,6 +95,7 @@ export default class GymScene extends Phaser.Scene {
     this.load.spritesheet(this.texKey, hero, { frameWidth: 32, frameHeight: 48 });
     preloadCommonAudio(this);
     this.load.audio(BGM.gym, "assets/audio/bgm_gym.ogg");  // AR Gym.mid를 원본 사운드폰트로 렌더한 것
+    preloadVsIntro(this, vsKeyFromTrainerId(GREEN_TRAINER_ID));   // 그린전 VS 연출 그림 + 배틀 BGM
   }
 
   create(): void {
@@ -265,8 +268,7 @@ export default class GymScene extends Phaser.Scene {
   private startBattle(): void {
     // returnScene="GymScene"만 주면 된다 — 이기고 돌아올 때 BattleScene이 fromBattle/battleOutcome을
     //  씬 데이터로 넘겨 우리 create()가 뒷대사를 잇는다(전역 플래그를 안 써 패배 후 누수가 없다).
-    this.cameras.main.fadeOut(340, 0, 0, 0);
-    this.time.delayedCall(360, () => {
+    const go = (): void => {
       // trainerId만 주면 팀(랜덤 3버전)·대사·상금·그림을 전부 AR 정의에서 가져온다.
       this.scene.start("BattleScene", {
         trainerId: GREEN_TRAINER_ID,
@@ -274,7 +276,13 @@ export default class GymScene extends Phaser.Scene {
         testParty: this.initData.testParty,
         returnScene: "GymScene",
       });
-    });
+    };
+    // 그린은 원본에 VS 초상(hgss_vs_LEADER_Green)이 있는 상대다 → 페이드 대신 VS 연출로 들어간다.
+    //  연출이 끝나면 화면이 이미 새까매서 따로 fadeOut을 걸지 않는다(원본도 같다).
+    const vs = vsKeyFromTrainerId(GREEN_TRAINER_ID);
+    if (vs) { this.busy = true; void playVsIntro(this, vs, GREEN_NAME).then(go); return; }
+    this.cameras.main.fadeOut(340, 0, 0, 0);
+    this.time.delayedCall(360, go);
   }
 
   // ── 배틀에서 이기고 돌아온 뒤(원본 EV3의 배틀 성공 분기) ──────────────

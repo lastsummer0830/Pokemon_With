@@ -7,9 +7,11 @@ AR(Another Red)의 맵 한 장을 우리 게임용 PNG + 충돌/풀숲 JSON으�
 
 결과물 (public/assets/world/):
     <out>.png   — 맵 그림 (32px 타일)
-    <out>.json  — {cols, rows, blocked, grass?}
+    <out>.json  — {cols, rows, blocked, grass?, ledge?}
                   blocked[y][x] = 1이면 못 지나감
                   grass[y][x]   = 1이면 풀숲(야생 포켓몬 나옴). 풀숲 없으면 이 키 자체가 없다.
+                  ledge[y][x]   = 언덕(점프대). 0이면 아님, 2/4/6/8이면 **그 방향으로만** 뛰어내릴 수 있다
+                                  (RMXP 방향번호 2=아래 4=왼쪽 6=오른쪽 8=위). 언덕 없으면 키 자체가 없다.
 
 ⚠️ 집(방/거실)은 이 스크립트가 아니라 extract.py가 담당한다 — 이건 월드맵 전용.
 """
@@ -24,8 +26,24 @@ AR_CANDIDATES = [
     "/mnt/c/Users/ONE/Desktop/Pokemon Another Red_PWT_250829",
 ]
 
-# RPG Maker XP의 terrain_tag 값. AR에서 2 = 풀숲(야생 인카운터)으로 쓴다.
-TERRAIN_GRASS = 2
+# RPG Maker XP의 terrain_tag 값 (원본 Scripts.rxdata의 TerrainTag.rb 등록 순서 그대로).
+TERRAIN_LEDGE = 1   # :Ledge  — 뛰어내리는 언덕(한 방향으로만 넘어갈 수 있다)
+TERRAIN_GRASS = 2   # :Grass  — 풀숲(야생 인카운터)
+
+# ── 언덕(점프대) 방향 판정 ───────────────────────────────────────────────────
+# RMXP의 passage는 "이 타일의 어느 변이 막혔나"를 비트로 갖는다: 1=아래 2=왼쪽 4=오른쪽 8=위.
+# 원본 Game_Character#passable? 는 **목적지 칸을 반대방향(10-d)으로** 검사한다
+#   → d 방향으로 그 칸에 들어가려면 `passage & BIT[10-d] == 0` 이어야 한다.
+# 1번도로 언덕은 passage=0x07(아래·왼쪽·오른쪽 막힘) → 위쪽 변만 열림 → **아래로만** 들어갈 수 있다.
+# (AR 382개 맵 전수 확인: 언덕 1456칸이 전부 아래 1292 / 왼쪽 101 / 오른쪽 60 / 완전막힘 3 으로
+#  '열린 방향이 정확히 하나'다 → 아래 유도식이 원본 전체에서 성립한다.)
+PASSAGE_BIT = {2: 1, 4: 2, 6: 4, 8: 8}   # 방향번호 → 막힘 비트
+
+
+def ledge_dir(passage: int) -> int:
+    """언덕 타일의 passage → 뛰어내릴 수 있는 방향(2/4/6/8). 하나로 안 떨어지면 0(=그냥 벽)."""
+    open_dirs = [d for d in (2, 4, 6, 8) if not (passage & PASSAGE_BIT[10 - d])]
+    return open_dirs[0] if len(open_dirs) == 1 else 0
 
 # ── 오토타일(물·모래·꽃 등) 조립표 ────────────────────────────────────────────
 # RPG Maker XP는 타일ID 1~383을 오토타일로 쓴다: `id//48` = 오토타일 번호, `id%48` = **모양 변형 48종**
@@ -143,11 +161,13 @@ def extract(ar: str, mid: int, out: str):
     over = Image.new("RGBA", (xs * 32, ys * 32), (0, 0, 0, 0))
     blocked = [[0] * xs for _ in range(ys)]
     grass = [[0] * xs for _ in range(ys)]
+    ledge = [[0] * xs for _ in range(ys)]
 
     for y in range(ys):
         for x in range(xs):
             cellblock = False
             cellgrass = False
+            cellledge = 0
             for z in range(zs):
                 tid = vals[x + xs * y + xs * ys * z]
                 t = tile(tid)
@@ -158,10 +178,19 @@ def extract(ar: str, mid: int, out: str):
                 # 사방(0x0f)이 다 막힌 타일 = 못 지나감
                 if (tbl_lookup(passg, tid) & 0x0f) == 0x0f:
                     cellblock = True
-                if tbl_lookup(terrain, tid) == TERRAIN_GRASS:
+                tag = tbl_lookup(terrain, tid)
+                if tag == TERRAIN_GRASS:
                     cellgrass = True
+                elif tag == TERRAIN_LEDGE:
+                    cellledge = ledge_dir(tbl_lookup(passg, tid))
             blocked[y][x] = 1 if cellblock else 0
             grass[y][x] = 1 if cellgrass else 0
+            # 언덕 칸은 **그 위에 설 수 없다**(원본도 마찬가지 — 지나갈 뿐이다) → blocked로도 막아 둔다.
+            #  방향이 맞을 때만 WorldScene이 2칸 점프로 건너뛴다. 방향이 하나로 안 떨어지는 칸(원본 3칸)은
+            #  ledge_dir가 0을 주므로 그냥 벽으로 남는다.
+            ledge[y][x] = cellledge
+            if cellledge:
+                blocked[y][x] = 1
 
     os.makedirs(OUT_DIR, exist_ok=True)
     png_path = os.path.join(OUT_DIR, f"{out}.png")
@@ -179,6 +208,9 @@ def extract(ar: str, mid: int, out: str):
     # 풀숲이 한 칸도 없는 맵(도시·실내)은 grass 키를 아예 넣지 않는다 — 스키마 선택 필드.
     if grass_cells:
         data["grass"] = grass
+    ledge_cells = sum(1 for r in ledge for v in r if v)
+    if ledge_cells:
+        data["ledge"] = ledge
     json_path = os.path.join(OUT_DIR, f"{out}.json")
 
     # ⚠️ 이 도구가 만드는 건 cols/rows/blocked/grass 뿐이다. 실내 맵 JSON엔 씬이 쓰는
@@ -188,7 +220,9 @@ def extract(ar: str, mid: int, out: str):
     if os.path.isfile(json_path):
         try:
             old = json.load(open(json_path, encoding="utf-8"))
-            kept = {k: v for k, v in old.items() if k not in data and k != "grass"}
+            # grass·ledge는 "이번에 0칸이면 키를 안 넣는다"가 정상이라 보존 대상에서 뺀다
+            #  (안 빼면 옛 파일의 값이 계속 살아남아 지워지지 않는다).
+            kept = {k: v for k, v in old.items() if k not in data and k not in ("grass", "ledge")}
         except (OSError, ValueError) as e:
             print(f"  ⚠️ 기존 JSON을 못 읽어 보존을 건너뛴다({e}) — spawn/exit가 있었다면 다시 넣을 것")
     if kept:
@@ -196,7 +230,7 @@ def extract(ar: str, mid: int, out: str):
     json.dump({**data, **kept}, open(json_path, "w"), ensure_ascii=False)
 
     blocked_cells = sum(sum(r) for r in blocked)
-    print(f"Map{mid:03d} → {out}: {xs}x{ys}칸  막힘 {blocked_cells}칸  풀숲 {grass_cells}칸")
+    print(f"Map{mid:03d} → {out}: {xs}x{ys}칸  막힘 {blocked_cells}칸  풀숲 {grass_cells}칸  언덕 {ledge_cells}칸")
     print(f"  {png_path}")
     print(f"  {json_path}")
     return xs, ys, blocked, grass

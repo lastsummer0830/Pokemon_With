@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { musicFactor, onSettingsChange } from "../systems/settings";
 
 // 공용 BGM 매니저 — 씬이 바뀌어도 끊기지 않게 전역 사운드 매니저(scene.sound = game.sound)로 한 곡만 유지한다.
 //  - playBgm: 같은 곡이면 그대로 두고, 다른 곡이면 이전 곡 끄고 새로 재생.
@@ -6,13 +7,21 @@ import Phaser from "phaser";
 //  - 파일이 아직 없으면(로드 실패) 조용히 넘어간다(게임은 안 멈춤).
 let current: Phaser.Sound.BaseSound | null = null;
 let currentKey = "";
+let currentBase = 0.4;   // 옵션 배율을 빼고 그 곡이 원래 갖는 볼륨(옵션이 바뀌면 여기에 다시 곱한다)
+
+// 옵션의 '음악 볼륨'이 바뀌면 **지금 나오는 곡에 바로** 반영한다(껐다 켜야 적용되면 안 된다).
+onSettingsChange(() => {
+  const s = current as Phaser.Sound.BaseSound & { volume?: number } | null;
+  if (s && "volume" in s) s.volume = currentBase * musicFactor();
+});
 
 export function playBgm(scene: Phaser.Scene, key: string, volume = 0.4): void {
   if (currentKey === key && current && current.isPlaying) return; // 이미 그 곡 재생 중
   stopBgm();
   if (!scene.cache.audio.exists(key)) return; // 아직 파일 없음 → 패스
 
-  const snd = scene.sound.add(key, { loop: true, volume });
+  currentBase = volume;
+  const snd = scene.sound.add(key, { loop: true, volume: volume * musicFactor() });
   current = snd;
   currentKey = key;
 

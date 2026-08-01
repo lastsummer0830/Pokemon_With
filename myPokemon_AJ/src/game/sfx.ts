@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { pauseBgm, resumeBgm } from "./bgm";
+import { musicFactor, seFactor } from "../systems/settings";
 
 // 공용 효과음(SFX) — Another Red 정품 효과음(public/assets/audio/sfx_*.ogg).
 //  BGM(루프)은 bgm.ts가, 일회성 효과음은 여기가 담당.
@@ -13,6 +14,7 @@ export const SFX = {
   doorIn: "sfx_door_in",      // 문/워프 진입
   doorOut: "sfx_door_out",    // 문 나가기
   bump: "sfx_bump",           // 벽에 부딪힘
+  jump: "sfx_jump",           // 언덕(점프대) 뛰어내리기 — AR "Player jump"
   exclaim: "sfx_exclaim",     // "!" 발견/조우
   hitNormal: "sfx_hit_normal",// 배틀 데미지(보통)
   hitSuper: "sfx_hit_super",  // 배틀 데미지(효과 굉장)
@@ -31,6 +33,7 @@ const FILES: Record<string, string> = {
   [SFX.doorIn]: "assets/audio/sfx_door_in.ogg",
   [SFX.doorOut]: "assets/audio/sfx_door_out.ogg",
   [SFX.bump]: "assets/audio/sfx_bump.ogg",
+  [SFX.jump]: "assets/audio/sfx_jump.ogg",
   [SFX.exclaim]: "assets/audio/sfx_exclaim.ogg",
   [SFX.hitNormal]: "assets/audio/sfx_hit_normal.ogg",
   [SFX.hitSuper]: "assets/audio/sfx_hit_super.ogg",
@@ -54,7 +57,9 @@ export function preloadCommonAudio(scene: Phaser.Scene): void {
 
 // 효과음 한 번 재생(파일 없으면 조용히 패스 — 게임 안 멈춤).
 export function playSfx(scene: Phaser.Scene, key: string, volume = 0.5): void {
-  if (scene.cache.audio.exists(key)) scene.sound.play(key, { volume });
+  // 옵션의 '효과음 볼륨'을 곱한다(0이면 아예 안 낸다).
+  const v = volume * seFactor();
+  if (v > 0 && scene.cache.audio.exists(key)) scene.sound.play(key, { volume: v });
 }
 
 // ME(음악성 팡파레) 재생 — BGM과 겹치지 않게 BGM을 pause 했다가, ME가 끝나면 resume 한다.
@@ -62,7 +67,8 @@ export function playSfx(scene: Phaser.Scene, key: string, volume = 0.5): void {
 export function playMe(scene: Phaser.Scene, key: string, volume = 0.5): void {
   if (!scene.cache.audio.exists(key)) return;
   pauseBgm();
-  const me = scene.sound.add(key, { volume });
+  // ME는 '음악'이라 음악 볼륨을 따른다(원본도 ME/BGM이 같은 채널이다).
+  const me = scene.sound.add(key, { volume: volume * musicFactor() });
   // 끝나면(또는 파괴돼도) BGM을 되살린다. once로 한 번만.
   me.once(Phaser.Sound.Events.COMPLETE, () => { resumeBgm(); me.destroy(); });
   me.play();
