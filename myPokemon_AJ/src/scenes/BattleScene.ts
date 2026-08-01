@@ -13,6 +13,7 @@ import { beforeMove, inflictMessage, confusionMessage, residualDamage, residualM
 import { resetStages, statChangeMessage } from "../systems/stages";
 import { captureShakes, SHAKE_FAIL_TEXT } from "../systems/capture";
 import { battleExpYield, gainExp } from "../systems/exp";
+import { applyDebugBand, backdropName, currentBand, TimeBand } from "../systems/daynight";
 import { scaledTrainerLevel, leaderBonusForType, DEFAULT_DIFFICULTY } from "../systems/difficulty";
 import type { Difficulty } from "../systems/difficulty";
 import type { BagResult } from "./BagScene";
@@ -73,6 +74,7 @@ export interface BattleInit {
   demoMove?: string;    // demo="move"일 때 재생할 기술 id(없으면 EMBER)
   demoCommon?: string;  // demo="common"일 때 Common 애니 이름(HealthUp / HealthDown)
   demoByAlly?: boolean; // 내 포켓몬이 쓰는가(기본 true). false면 상대가 쓴다.
+  debugTimeBand?: TimeBand; // 확인 항목 전용 — 시간대 강제(밤 배경을 밤까지 기다리지 않고 본다)
 }
 
 // move=기술 애니 · common=Common 애니 · residual=턴종료 잔뎀 · msgbox=애니 중 대사창 유지
@@ -151,7 +153,9 @@ export default class BattleScene extends Phaser.Scene {
     this.returnFacing = data?.returnFacing ?? "down";
     this.returnScene = data?.returnScene ?? null;
     // 배경은 "어디서 싸우느냐"가 정한다(AR도 맵 메타데이터의 battle_background). 마을=town, 도로·풀숲=route.
+    //  거기에 **언제 싸우느냐**(시간대)가 겹친다 — preload에서 backdropName이 _eve/_night 판을 고른다.
     this.backdrop = data?.backdrop ?? "route";
+    applyDebugBand(this.registry, data);   // 확인 항목이 시간대를 강제했을 때만(없으면 실제 시계)
     this.outcome = "win";
     this.allyIdx = 0;
     this.enemyIdx = 0;
@@ -180,7 +184,12 @@ export default class BattleScene extends Phaser.Scene {
   preload(): void {
     // AR 원본 배틀 에셋 — 배경(배틀백)과 UI(HP박스·커맨드 버튼·대사창).
     //  ⚠️ assets/battlebacks·assets/ui/battle 는 새 폴더 → dev 서버를 재시작해야 png가 제대로 응답한다.
-    this.load.image("bb_bg", `assets/battlebacks/${this.backdrop}_bg.png`);
+    // ★ 배경은 시간대를 따른다 — 원본 파일명 규칙 그대로(route_bg / route_eve_bg / route_night_bg).
+    //   실내(체육관)처럼 변형이 없는 배경은 backdropName이 기본 그림을 돌려준다.
+    //   ⚠️ 텍스처 키는 그대로 "bb_bg"다 → 저녁에 배틀했다가 낮에 다시 하면 옛 그림이 캐시에 남는다.
+    //      그래서 매번 지우고 새로 읽는다(맵/가구 캐시버스터와 같은 이유).
+    if (this.textures.exists("bb_bg")) this.textures.remove("bb_bg");
+    this.load.image("bb_bg", `assets/battlebacks/${backdropName(this.backdrop, currentBand(this.registry))}.png`);
     this.load.image("bb_msg", `assets/battlebacks/${this.backdrop}_message.png`);
     for (const k of ["databox_normal", "databox_normal_foe", "overlay_command", "cursor_command",
                      "overlay_message", "overlay_fight", "cursor_fight", "overlay_hp", "overlay_lv", "icon_numbers",

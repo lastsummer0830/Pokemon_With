@@ -23,6 +23,9 @@ interface StarterDef { key: string; name: string; type: string; id: number; cate
 // 타입 표준색 — 설명카드 타입칩 배경(관용 팔레트).
 const TYPE_COLOR: Record<string, number> = { "풀": 0x78c850, "불꽃": 0xf08030, "물": 0x6890f0 };
 // 분류·도감·키·무게 = PokeAPI/공식 SV 데이터 원문(추측 아님).
+// ⚠️ 파이리 분류 `도롱뇽포켓몬`은 오타가 아니다(0801 웹 대조 확인).
+//    일본판 とかげ(도마뱀)·영문 Lizard의 오역이지만 **포켓몬코리아 공식 도감 표기가 도롱뇽포켓몬**이라
+//    공식 표기를 따른다(AGENTS.md §1.5 "실제 게임의 공식 표기"). '도마뱀포켓몬'으로 고치지 말 것.
 const STARTERS: StarterDef[] = [
   { key: "SPRIGATITO", name: "나오하",  type: "풀",   id: 906, category: "풀고양이포켓몬", height: "0.4m", weight: "4.1kg",
     dex: "몸에서 나오는 달콤한 향기로 주위를 매료시킨다. 햇빛에 닿으면 향기가 더욱 강해진다." },

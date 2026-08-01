@@ -9,7 +9,7 @@ import { FURNITURE, FurnitureDef } from "../data/furniture";
 import { HouseLayout, canPlace, furnitureAt } from "../data/HouseLayout";
 import { conditionCap, emptyHouse, sleepAtHome, furnitureHint, CONDITION_MAX } from "../systems/homeBonus";
 import { bondOf } from "../systems/bond";
-import { HOME_BOND_HINT } from "../data/story";
+import { HOME_BOND_HINT, momMorningLines, momTalkLine } from "../data/story";
 
 // ⚠️ 검증용 임시 오버레이 — 충돌(빨강)·워프(초록) 칸을 화면에 그린다. 확인 끝나면 false로.
 const DEBUG_COLLISION = false;
@@ -38,6 +38,11 @@ interface RoomDef { img: string; cols: number; rows: number; blocked: number[][]
 type Rooms = Record<string, RoomDef>;
 type Dir = "down" | "left" | "right" | "up";
 
+// 엄마가 평소 서 있는 칸(1층 거실, 부엌 앞). 눈대중이 아니라 rooms.json의 blocked 격자 위에
+//  32px 격자를 얹어 확인한 자리다 — living의 (13,4)는 부엌 조리대 바로 앞 빈 바닥이고,
+//  통로(문 8~9열·계단 5열)를 막지 않는다. AGENTS.md "맵 좌표 눈대중 금지".
+const MOM_HOME_TILE: [number, number] = [13, 4];
+
 export default class InteriorScene extends Phaser.Scene {
   private rooms!: Rooms;
   private roomKey = "bedroom";          // 시작은 2층 방
@@ -48,6 +53,9 @@ export default class InteriorScene extends Phaser.Scene {
   private stairsDeco!: Phaser.GameObjects.Image;   // 거실(1F)에 깔아주는 2층식 계단 그림
   private dbg?: Phaser.GameObjects.Graphics;       // 검증용 충돌/워프 오버레이
   private nemona?: Phaser.GameObjects.Sprite;      // 컷신용 라이벌 네모
+  private momSpr!: Phaser.GameObjects.Sprite;      // 1층 거실의 엄마(상시 NPC — 거실에서만 보인다)
+  private momTile: [number, number] = [...MOM_HOME_TILE];   // 엄마가 지금 서 있는 칸(다가올 때 움직인다)
+  private momGreeted = false;                      // 이번 입장에서 아침 대사를 이미 했나(init에서 리셋)
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
 
   private gender: Gender = "boy";
@@ -81,6 +89,7 @@ export default class InteriorScene extends Phaser.Scene {
   private startRoom = "bedroom";
   private skipIntro = false;
   private debugBondHint = false;
+  private debugMomGreet = false;
 
   // ── ★ 집 꾸미기(내 색) ──
   //  배치는 registry "houseLayout"에 산다(저장은 systems/save.ts가 함께 직렬화).
@@ -101,7 +110,7 @@ export default class InteriorScene extends Phaser.Scene {
   }
 
   // scene.start("InteriorScene", { room: "living", skipIntro: true }) 로 특정 방부터 시작 가능
-  init(data: { room?: string; skipIntro?: boolean; debugBondHint?: boolean }): void {
+  init(data: { room?: string; skipIntro?: boolean; debugBondHint?: boolean; debugMomGreet?: boolean }): void {
     // ⚠️ Phaser는 씬을 다시 시작해도 **같은 인스턴스**를 쓴다 → 클래스 필드(= 위의 `busy = false`)는 다시 초기화되지 않는다.
     //    문으로 마을에 나갈 때 켜둔 busy를 여기서 안 되돌리면 다시 집에 들어왔을 때 켜진 채로 남아 **플레이어가 영영 얼어붙는다**
     //    (update()가 busy면 입력을 통째로 무시한다). init은 scene.start마다 도는 유일한 자리다.
@@ -111,6 +120,10 @@ export default class InteriorScene extends Phaser.Scene {
     this.skipIntro = !!data?.skipIntro || this.startRoom !== "bedroom";
     // 디버그 확인 항목 전용 — 진행 상황(스타터 수령·유대 0)을 만들지 않고 유대 힌트만 바로 재생한다.
     this.debugBondHint = !!data?.debugBondHint;
+    this.debugMomGreet = !!data?.debugMomGreet;
+    // 엄마의 아침 대사는 "1층에 내려온 그 순간" 한 번이다. 씬 인스턴스가 재사용되므로 여기서 되돌린다.
+    this.momGreeted = false;
+    this.momTile = [...MOM_HOME_TILE];
   }
 
   preload(): void {
@@ -132,6 +145,8 @@ export default class InteriorScene extends Phaser.Scene {
     this.load.spritesheet(this.texKey, file, { frameWidth: 32, frameHeight: 48 });
     // 라이벌 네모(오버월드 걷기 시트, 32x48 4방향x4프레임)
     this.load.spritesheet("nemona", "assets/characters/trainer_NEMONA.png", { frameWidth: 32, frameHeight: 48 });
+    // 엄마 — AR 오버월드 NPC 시트(주인공과 같은 32x48 4방향x4프레임 배치). 직접 그리지 않았다(AGENTS.md §4).
+    this.load.spritesheet("mom", "assets/characters/NPC_MidageWoman.png", { frameWidth: 32, frameHeight: 48 });
     // 집 꾸미기 가구 그림 (카탈로그의 id 그대로 파일명). 방 그림과 같은 이유로 캐시버스터를 붙인다
     // (가구 png를 교체했는데 브라우저가 옛 그림을 물어 "고쳐도 똑같다"가 되는 걸 막는다).
     for (const f of FURNITURE) this.load.image(f.sprite, `assets/house/furniture/${f.id}.png` + v);
@@ -141,7 +156,7 @@ export default class InteriorScene extends Phaser.Scene {
     this.rooms = this.cache.json.get("rooms") as Rooms;
 
     // 도트는 또렷하게(픽셀 보존) — 화질 개선의 핵심
-    for (const k of ["room_bedroom", "room_living", "room_rival", "stairs_living", "nemona", this.texKey, ...FURNITURE.map(f => f.sprite)]) {
+    for (const k of ["room_bedroom", "room_living", "room_rival", "stairs_living", "nemona", "mom", this.texKey, ...FURNITURE.map(f => f.sprite)]) {
       if (this.textures.exists(k)) this.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
     }
 
@@ -153,6 +168,7 @@ export default class InteriorScene extends Phaser.Scene {
     // 걷기 애니메이션(행0=아래,1=왼쪽,2=오른쪽,3=위, 각 4프레임)
     this.makeWalkAnims(this.texKey, "walk");
     this.makeWalkAnims("nemona", "nemona");
+    this.makeWalkAnims("mom", "mom");
 
     playBgm(this, BGM.town, 0.35); // 집 BGM(마을 테마와 동일 — 젠1 정통)
 
@@ -160,6 +176,9 @@ export default class InteriorScene extends Phaser.Scene {
     // 거실 계단 그림 — 발판(아래끝)을 워프 칸 바닥에 맞춤. 바닥보다 위, 주인공보다 아래.
     this.stairsDeco = this.add.image(0, 0, "stairs_living").setOrigin(0, 1).setDepth(5).setVisible(false);
     this.player = this.add.sprite(0, 0, this.texKey, this.idleFrame.down).setOrigin(0.5, 1);
+    // 엄마는 1층 거실에 늘 있는 NPC다(인트로에서 아래층 목소리로만 나오던 사람 = 실체를 세운다).
+    //  주인공(depth 10)보다 살짝 아래로 둬 겹칠 때 주인공이 앞에 보인다.
+    this.momSpr = this.add.sprite(0, 0, "mom", this.idleFrame.down).setOrigin(0.5, 1).setDepth(9).setVisible(false);
     // (가구 전경 오버레이 방식은 back wall/소품까지 캐릭터 머리를 가려 '대가리 잘림'이 생겨 폐기. 캐릭터를 그냥 앞에 그린다. AGENTS.md 참고.)
     this.cursors = this.input.keyboard!.createCursorKeys();
     // 꾸미기·잠자기용 키. (대사창은 keydown 이벤트를 쓰므로, 여기선 update에서 JustDown으로만 읽어 충돌을 피한다)
@@ -200,8 +219,12 @@ export default class InteriorScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off("resize", this.layout, this));
     this.cameras.main.fadeIn(450, 0, 0, 0);
 
+    // 디버그 확인 항목 — 거실에서 시작해 엄마의 아침 대사만 바로 본다(계단으로 내려온 것과 같은 연출).
+    if (sr === "living" && this.debugMomGreet) {
+      this.busy = true;
+      void this.runMomGreeting();
     // 디버그 확인 항목 — 진행 상황을 손으로 만들지 않고 유대 힌트만 바로 본다(인트로보다 우선).
-    if (sr === "bedroom" && this.debugBondHint) {
+    } else if (sr === "bedroom" && this.debugBondHint) {
       this.busy = true;
       this.runHomeBondHint();
     // 인트로 컷신은 침실에서 처음 시작할 때만(거실 바로가기 등은 스킵)
@@ -290,6 +313,7 @@ export default class InteriorScene extends Phaser.Scene {
     this.player.setFrame(this.idleFrame[face]);
     this.moving = false;
     if (this.decorating) this.exitDecorate();   // 방을 옮기면 꾸미기 모드는 닫는다
+    this.updateMom();                           // 엄마는 거실에서만 보인다(제자리로 되돌려 세운다)
     this.renderFurniture();                     // 놓아둔 가구 다시 그리기(침실에서만 보인다)
     this.updateHud();                           // 안내 문구도 이 방에서 되는 것만 남긴다
     this.layout();
@@ -575,6 +599,153 @@ export default class InteriorScene extends Phaser.Scene {
     this.endBusySoon();
   }
 
+  // ─────────────────────── ★ 엄마(1층 거실 NPC) ───────────────────────
+  // 이야기 봉합의 핵심 인물 — 인트로(시작의 숲에서 깨어남)를 "아주 생생한 꿈"으로 받아 주고,
+  // "오박사님께 미리 연락해 두었다"고 말해 연구소에서 받는 소개장의 근거를 만든다(data/story.ts).
+
+  /** 엄마를 이 방에서 보일지 정하고 제자리에 세운다(거실에서만 보인다). */
+  private updateMom(): void {
+    const show = this.roomKey === "living";
+    this.momSpr.setVisible(show);
+    if (!show) return;
+    this.momTile = [...MOM_HOME_TILE];
+    this.momSpr.stop();
+    this.momSpr.setFrame(this.idleFrame.down);
+    this.placeMom();
+  }
+
+  /** 엄마 그림을 지금 서 있는 칸에 맞춘다(리사이즈·걷기 후 공통). */
+  private placeMom(): void {
+    if (!this.momSpr?.visible) return;
+    this.momSpr.setPosition(this.cx(this.momTile[0]), this.cy(this.momTile[1])).setScale(this.zoom * 0.92);
+  }
+
+  /** 지금 엄마를 마주보고 있나(말 걸기 판정). */
+  private facingMom(): boolean {
+    if (!this.momSpr.visible) return false;
+    const [dx, dy] = this.dirVec(this.facing);
+    return this.tx + dx === this.momTile[0] && this.ty + dy === this.momTile[1];
+  }
+
+  /** 엄마가 사람을 마주보게 세운다(상대 칸의 반대 방향). */
+  private faceMomTo(tx: number, ty: number): void {
+    const dx = tx - this.momTile[0], dy = ty - this.momTile[1];
+    const dir: Dir = dx > 0 ? "right" : dx < 0 ? "left" : dy > 0 ? "down" : "up";
+    this.momSpr.stop();
+    this.momSpr.setFrame(this.idleFrame[dir]);
+  }
+
+  /**
+   * 아침 대사를 띄울 때인가 —— "집 인트로를 본 뒤, 아직 파트너를 받기 전"에 1층으로 내려온 순간.
+   * 세이브 필드를 늘리지 않고 기존 플래그에서 파생한다(story.ts와 같은 원칙).
+   */
+  private needsMomGreeting(): boolean {
+    if (this.momGreeted) return false;
+    return !!this.registry.get("houseIntroDone") && !this.registry.get("starterChosen");
+  }
+
+  /**
+   * NPC가 걸어갈 수 있는 칸인가 — 벽·계단/문(워프)·주인공이 선 자리는 뺀다.
+   * (플레이어의 walkable과 달리 워프를 밟지 않는다. NPC가 계단이나 현관에 서면 안 되니까.)
+   */
+  private npcWalkable(x: number, y: number): boolean {
+    if (x < 0 || y < 0 || x >= this.def.cols || y >= this.def.rows) return false;
+    if (this.def.blocked[y][x] === 1) return false;
+    if (this.warpAt(x, y)) return false;
+    if (x === this.tx && y === this.ty) return false;
+    return true;
+  }
+
+  /**
+   * from에서 goals 중 하나까지의 최단 경로(칸 목록, from 포함)를 BFS로 뽑는다. 못 가면 null.
+   * ⚠️ 경로를 손으로 찍지 않는 이유 = AGENTS.md "맵 좌표 눈대중 금지".
+   *    격자가 바뀌어도 이 함수가 알아서 새 길을 찾으므로 벽을 뚫고 걷는 사고가 안 난다.
+   */
+  private npcPath(from: [number, number], goals: Array<[number, number]>): Array<[number, number]> | null {
+    const goal = new Set(goals.map(([x, y]) => `${x},${y}`));
+    if (goal.has(`${from[0]},${from[1]}`)) return [from];   // 이미 그 자리면 걸을 필요가 없다
+    const prev = new Map<string, string | null>([[`${from[0]},${from[1]}`, null]]);
+    const queue: Array<[number, number]> = [from];
+    let hit: string | null = null;
+    while (queue.length && !hit) {
+      const [x, y] = queue.shift()!;
+      for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+        const nx = x + dx, ny = y + dy;
+        const key = `${nx},${ny}`;
+        if (prev.has(key) || !this.npcWalkable(nx, ny)) continue;
+        prev.set(key, `${x},${y}`);
+        if (goal.has(key)) { hit = key; break; }
+        queue.push([nx, ny]);
+      }
+    }
+    if (!hit) return null;
+    const path: Array<[number, number]> = [];
+    for (let k: string | null = hit; k; k = prev.get(k) ?? null) {
+      const [x, y] = k.split(",").map(Number);
+      path.unshift([x, y]);
+    }
+    return path;
+  }
+
+  /** 엄마를 경로대로 걷게 한다(path[0] = 지금 자리). 한 칸 150ms — 주인공 걸음과 같은 속도. */
+  private async walkMom(path: Array<[number, number]>, endFacing: Dir): Promise<void> {
+    for (let i = 1; i < path.length; i++) {
+      const [px, py] = path[i - 1];
+      const [tx, ty] = path[i];
+      const dir: Dir = tx < px ? "left" : tx > px ? "right" : ty < py ? "up" : "down";
+      this.momSpr.play(`mom-${dir}`, true);
+      await new Promise<void>((res) => {
+        this.tweens.add({
+          targets: this.momSpr, x: this.cx(tx), y: this.cy(ty), duration: 150,
+          onComplete: () => { this.momTile = [tx, ty]; res(); },
+        });
+      });
+    }
+    this.momSpr.stop();
+    this.momSpr.setFrame(this.idleFrame[endFacing]);
+  }
+
+  /** 1층에 내려온 주인공에게 엄마가 다가와 아침 대사를 하고, 하던 자리로 돌아간다. */
+  private async runMomGreeting(): Promise<void> {
+    const hud = this.children.getByName("hud") as Phaser.GameObjects.Text | null;
+    hud?.setVisible(false);
+    this.momGreeted = true;
+    await this.wait(400);
+
+    // 주인공 옆칸(사방) 중 걸어서 닿는 곳으로 다가온다 — 어디에 서 있든 마주 선다.
+    const near: Array<[number, number]> = [[this.tx, this.ty + 1], [this.tx, this.ty - 1], [this.tx + 1, this.ty], [this.tx - 1, this.ty]];
+    const path = this.npcPath(this.momTile, near.filter(([x, y]) => this.npcWalkable(x, y)));
+    if (path) {
+      // 마지막 칸에 도착한 뒤의 방향은 어차피 아래에서 주인공 쪽으로 다시 돌려세운다.
+      await this.walkMom(path, "down");
+      this.faceMomTo(this.tx, this.ty);
+      // 주인공도 엄마 쪽을 본다(서로 마주봄).
+      const fx = this.momTile[0] - this.tx, fy = this.momTile[1] - this.ty;
+      this.facing = fx > 0 ? "right" : fx < 0 ? "left" : fy > 0 ? "down" : "up";
+      this.player.setFrame(this.idleFrame[this.facing]);
+      await this.wait(150);
+    }
+
+    for (const l of momMorningLines(this.playerName())) await this.say(l.text, l.speaker ?? null);
+    this.setDialogVisible(false);
+
+    // 하던 일(부엌)로 돌아간다. 길이 막혔으면 그냥 그 자리에 선다.
+    const back = this.npcPath(this.momTile, [MOM_HOME_TILE]);
+    if (back) await this.walkMom(back, "down");
+    hud?.setVisible(true);
+    this.busy = false;
+  }
+
+  /** 엄마에게 말 걸기 — 진행 상황에 맞는 한 줄(data/story.ts). */
+  private async talkToMom(): Promise<void> {
+    this.busy = true;
+    this.faceMomTo(this.tx, this.ty);
+    const line = momTalkLine(!!this.registry.get("starterChosen"));
+    await this.say(line.text, line.speaker ?? null);
+    this.setDialogVisible(false);
+    this.endBusySoon();
+  }
+
   // 대사가 끝난 직후의 Space가 다시 잠자기를 부르지 않도록 잠깐 뒤에 입력을 푼다.
   private endBusySoon(): void {
     this.time.delayedCall(200, () => { this.busy = false; });
@@ -594,6 +765,7 @@ export default class InteriorScene extends Phaser.Scene {
     this.player.setDepth(10);
     this.snapPlayer();
     if (this.nemona) this.nemona.setScale(this.zoom * 0.92);
+    this.placeMom();
     this.updateStairsDeco();
     this.layoutFurniture();
     this.drawDecorate();
@@ -639,6 +811,8 @@ export default class InteriorScene extends Phaser.Scene {
     if (tx < 0 || ty < 0 || tx >= this.def.cols || ty >= this.def.rows) return false;
     const w = this.warpAt(tx, ty);
     if (w) return w.dir ? w.dir === dir : true;
+    // 엄마가 서 있는 칸은 사람이 서 있으니 못 지나간다(다가와 있는 동안엔 그 자리도 함께 막힌다).
+    if (this.momSpr.visible && tx === this.momTile[0] && ty === this.momTile[1]) return false;
     // 내가 놓은 가구도 벽처럼 막는다 — 단 러그·카펫(walkable)은 밟고 지나간다.
     if (this.roomKey === "bedroom") {
       const p = furnitureAt(this.house, tx, ty);
@@ -677,6 +851,8 @@ export default class InteriorScene extends Phaser.Scene {
     if (justF) { this.toggleDecorate(); return; }
     // ★ 침대를 바라보고 Space → 잠자기(파티 컨디션 회복)
     if (justSpace && this.facingBed()) { void this.sleepInBed(); return; }
+    // ★ 엄마를 바라보고 Space → 말 걸기
+    if (justSpace && this.facingMom()) { void this.talkToMom(); return; }
 
     let dx = 0, dy = 0;
     if (this.cursors.left.isDown) { dx = -1; this.facing = "left"; }
@@ -763,6 +939,8 @@ export default class InteriorScene extends Phaser.Scene {
       }
       this.enterRoom(w.to, w.ax ?? this.rooms[w.to].start[0], w.ay ?? this.rooms[w.to].start[1], w.face ?? "down");
       this.cameras.main.fadeIn(300, 0, 0, 0);
+      // ★ 계단으로 1층에 처음 내려온 순간 → 엄마가 다가와 말을 건다(busy는 컷신이 끝날 때 풀린다).
+      if (w.to === "living" && this.needsMomGreeting()) { void this.runMomGreeting(); return; }
       this.busy = false;
     });
   }

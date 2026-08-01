@@ -1,7 +1,8 @@
 import Phaser from "phaser";
 import { Pokemon } from "../data/Pokemon";
 import { HouseLayout } from "../data/HouseLayout";
-import { BagEntry } from "../data/Bag";
+import { BagEntry, addItem, countItem } from "../data/Bag";
+import { OAKS_LETTER } from "../data/story";
 import { findFurniture } from "../data/furniture";
 import { Difficulty, DEFAULT_DIFFICULTY } from "./difficulty";
 import { emptyHouse } from "./homeBonus";
@@ -119,6 +120,12 @@ export function loadGame(reg: Reg): SaveData | null {
   reg.set("dexOwn", data.dexOwn ?? partySpecies);
   reg.set("badges", data.badges ?? []);
   reg.set("trainersDefeated", data.trainersDefeated ?? []);
+  // ── 소개장 호환 채우기 ──
+  //  '오박사의 소개장'은 스타터를 고르는 순간 지급되게 만들었다(LabScene). 그래서 그 기능이 생기기
+  //  전에 스타터를 받아 둔 저장에는 소개장이 없고, 상록체육관 컷신("소개장을 그린에게 건냈다!")이
+  //  갖고 있지도 않은 물건을 건네게 된다 → 스타터가 있는데 소개장이 없으면 여기서 채워 넣는다.
+  //  ⚠️ 새 세이브 필드가 아니라 '가방 내용 보정'이다(버전을 올릴 필요가 없다).
+  if (reg.get("starterChosen") && countItem(reg, OAKS_LETTER) === 0) addItem(reg, OAKS_LETTER, 1);
 
   // v2 저장의 tx,ty는 '태초마을 안에서의' 칸 좌표다(당시 야외 맵이 태초뿐이었다).
   //  v3부터 야외가 여러 맵이므로 어느 맵인지를 붙여준다 — 좌표 자체는 그대로 유효하다.
