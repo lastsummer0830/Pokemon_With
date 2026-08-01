@@ -101,7 +101,11 @@
 - `npx electron-builder --win --x64`로 exe를 새로 구우면 초기화된다 → 그때 `bash tools/set-exe-icon.sh` 한 번.
 - 아이콘 원본은 **`electron/assets/`**에 둔다. `build/`는 `.gitignore(**/build/)` 대상이라 거기 두면 **다른 PC로 안 넘어간다.**
 - 적용 확인은 exe에서 **아이콘을 다시 꺼내** 봤다(PowerShell `ExtractAssociatedIcon`) — 눈대중 아님.
-- 윈도우 탐색기가 옛 아이콘을 캐시해 안 바뀐 것처럼 보일 수 있다.
+- 윈도우 탐색기가 옛 아이콘을 캐시해 **안 바뀐 것처럼 보인다**(실제로 겪음 — exe는 이미 정상인데 바탕화면만 옛 그림).
+  해결: `ie4uinit.exe -show` + **바로가기(`PokemonWith.lnk`)의 `IconLocation`을 exe 대신 `electron/assets/icon.ico`로 바꿔 저장**
+  (다른 파일이라 캐시를 우회한다). 이걸로 즉시 바뀌었다.
+  ⚠️ 그래서 이 PC의 lnk는 **ico 파일 경로를 직접** 본다 → **리포 폴더명·위치를 바꾸면 아이콘이 깨진다**(lnk 재생성할 것).
+  그래도 안 되면 마지막 수단 = `iconcache_*.db` 삭제 + explorer 재시작(열린 탐색기 창이 다 닫힌다).
 
 ---
 
