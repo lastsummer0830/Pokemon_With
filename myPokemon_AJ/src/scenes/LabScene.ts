@@ -5,6 +5,7 @@ import { loadArDb } from "../data/ar";
 import { markOwn } from "../data/Pokedex";
 import { josa } from "../data/josa";
 import DialogBox from "../ui/DialogBox";
+import { keysLabel, onAction } from "../systems/input";
 import { playBgm } from "../game/bgm";
 import { playSfx, playMe, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 import { autoSaveWithToast } from "../game/saveIndicator";
@@ -174,9 +175,8 @@ export default class LabScene extends Phaser.Scene {
     this.scale.on("resize", this.layout, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.scale.off("resize", this.layout, this); this.dlg.destroy(); });
 
-    this.input.keyboard!.on("keydown-SPACE", this.onKey, this);
-    this.input.keyboard!.on("keydown-ENTER", this.onKey, this);
-    this.input.keyboard!.on("keydown-Z", this.onKey, this);
+    // 확인키(기본 C·Enter·Space) — 실제 키는 옵션의 키 설정을 따른다.
+    onAction(this, "USE", () => this.onKey());
 
     this.cameras.main.fadeIn(400, 0, 0, 0);
 
@@ -471,7 +471,7 @@ export default class LabScene extends Phaser.Scene {
     await this.dlg.say(`${name}! 나까지 두근거리잖아! 네가 고른 파트너랑 배틀할 생각에 벌써 신난다고!`, "네모");
     await this.dlg.say("마음에 드는 포켓볼 앞에 서서 살펴보렴.", "오박사");
     this.dlg.hide();
-    this.hint.setText("방향키: 이동  |  포켓볼 앞에서 Space: 살펴보기  |  아래 문: 나가기").setVisible(true);
+    this.hint.setText(`방향키: 이동  |  포켓볼 앞에서 ${keysLabel("USE").split(" · ")[0]}: 살펴보기  |  아래 문: 나가기`).setVisible(true);
     this.busy = false;
   }
 

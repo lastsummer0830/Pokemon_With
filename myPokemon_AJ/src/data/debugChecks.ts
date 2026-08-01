@@ -24,6 +24,63 @@ export interface DebugCheck {
 
 // 최신 날짜를 위에 둔다(같은 날 안에서는 작업한 순서).
 export const DEBUG_CHECKS: DebugCheck[] = [
+  // ── 0803 필드 이벤트 — 원본 맵 이벤트 전수 대조에서 "말 걸기 자체가 없다"를 발견해 붙였다 ──
+  {
+    date: "0803",
+    title: "필드 — NPC·팻말에 말 걸기",
+    what: "원본 맵 이벤트를 뽑아(tools/ar-map/extract-events.py) NPC·팻말을 세우고 확인키로 말이 걸리게 했다. 그 전엔 필드에서 확인키가 아무 일도 안 했다.",
+    see: "태초마을 NPC(20,12) 앞에서 확인키 → \"과학의 힘은 대단해!\". 1번도로 팻말(18,7)·상록시티 팻말(19,16)도 읽히는지. 사람이 선 칸은 못 지나가는지.",
+    scene: "WorldScene",
+    data: { map: "pallet", spawn: [20, 13], testParty: true },
+  },
+  {
+    date: "0803",
+    title: "필드 — 바닥 아이템·열매나무",
+    what: "원본 pbItemBall 4곳(상처약·해독제·몬스터볼·TM09)과 열매나무 2그루(오랭열매 2개)를 이식했다. 주우면 셀프스위치가 켜져 사라진다(원본 규칙).",
+    see: "1번도로 볼(16,14) 앞에서 확인키 → \"상처약을 주웠다!\" → 가방에 들어가고 볼이 사라지는지. 열매나무(16,7)는 \"딸까?\"를 묻는지.",
+    scene: "WorldScene",
+    data: { map: "route1", spawn: [16, 15], testParty: true },
+  },
+  {
+    date: "0803",
+    title: "상록시티 물결(오토타일 애니)",
+    what: "원본 오토타일 STILL(11프레임)을 뽑아 30칸에 깔았다. 속도는 원본 규칙대로 프레임당 0.25초. 태초마을 물은 원본이 정지 오토타일(NOANIMSEA)이라 일부러 안 붙였다.",
+    see: "상록시티 연못 물이 잔잔하게 일렁이는지(잔물결이라 크지 않다). 태초마을 물은 그대로 멈춰 있는 게 맞다.",
+    scene: "WorldScene",
+    data: { map: "viridian_city", spawn: [24, 20], testParty: true },
+  },
+  // ── 0803 조작키 — 흩어져 있던 키를 액션(USE/BACK/MENU/BAG/SPEED)으로 모으고 원본 배치를 기본으로 ──
+  //   원본 실측: 확인 C · 취소 X · 메뉴 Z(Input::ACTION) · 스페셜 D · 배속 Q (systems/input.ts 머리말 참고)
+  {
+    date: "0803",
+    title: "키 설정 화면 (F1)",
+    what: "원본의 F1 커스터마이즈에 해당하는 화면을 만들었다. 프리셋(원본식/기존식) 전환 + 액션별 키 다시 잡기.",
+    see: "↑↓로 줄 이동. 맨 윗줄에서 ←→로 원본식↔기존식이 바뀌고 아래 키 이름들이 통째로 바뀌는지. 아무 줄에서 확인키를 누르면 '새 키를 누르세요'가 뜨고, 누른 키가 그 자리에 들어가는지. R로 기본값.",
+    scene: "KeyConfigScene",
+  },
+  {
+    date: "0803",
+    title: "필드 — 메뉴 Z / 가방 D",
+    what: "원본대로 메뉴는 Z(Input::ACTION), 가방은 D로 바로 열리게 했다. 이동 중 취소키(X)를 누르면 여전히 반대 속도.",
+    see: "Z를 누르면 메뉴가, D를 누르면 가방이 바로 열리는지. 좌상단 HUD의 안내가 '지금 걸린 메뉴 키'로 적혀 있는지.",
+    scene: "WorldScene",
+  },
+  {
+    date: "0803",
+    title: "확인키 C — 대사·선택",
+    what: "대사 넘기기·선택 확정이 Enter/Space/Z 고정이 아니라 확인 액션(기본 C·Enter·Space)을 따른다.",
+    see: "C로 대사가 넘어가는지(Enter·Space도 그대로 되는지). 실내에서 엄마에게 말을 걸 때도 C가 먹는지.",
+    scene: "InteriorScene",
+    data: { room: "living", skipIntro: true },
+  },
+  {
+    date: "0803",
+    title: "배속 Q — 배틀에서만",
+    what: "원본 안내문대로 배속은 배틀 전용. Q로 켜고 끈다(시간·트윈 2배).",
+    see: "배틀에서 Q를 누르면 우상단에 '≫ 배속 2배'가 뜨고 대사·연출이 빨라지는지. 다시 누르면 원래 속도로.",
+    scene: "BattleScene",
+    data: { wild: true, testParty: true, backdrop: "route" },
+  },
   // ── 0802 옵션 — 타이틀 '옵션'과 인게임 '설정'이 토스트만 띄우던 것을 실제 화면으로 ──
   //   항목은 원본 UI_Options.rb에서 **우리 게임에 붙일 데가 있는 것만** 가져왔다(빠진 것과 이유는 systems/settings.ts).
   {

@@ -4,6 +4,7 @@ import { stopBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
 import { DEFAULT_DIFFICULTY } from "../systems/difficulty";
 import { START_BAG, START_MONEY, startPlayClock } from "../systems/save";
+import { bindActions } from "../systems/input";
 
 // 게임 인트로 — 옛날 픽셀 포켓몬 게임 오프닝 감성.
 // 어두운 스포트라이트 배경 → "…" → "여기는 어디지…?" → 오박사 등장 →
@@ -285,10 +286,9 @@ export default class IntroScene extends Phaser.Scene {
       let i = 0;
       let typing = true;
 
+      let offKeys = () => { /* waitInput=false면 아무것도 안 걸었다 */ };
       const cleanup = () => {
-        this.input.keyboard!.off("keydown-SPACE", onAdvance);
-        this.input.keyboard!.off("keydown-ENTER", onAdvance);
-        this.input.keyboard!.off("keydown-Z", onAdvance);
+        offKeys();
         this.input.off("pointerdown", onAdvance);
       };
       const finishTyping = () => {
@@ -307,9 +307,8 @@ export default class IntroScene extends Phaser.Scene {
         else if (waitInput) { playSfx(this, SFX.decision, 0.4); cleanup(); resolve(); }
       };
       if (waitInput) {
-        this.input.keyboard!.on("keydown-SPACE", onAdvance);
-        this.input.keyboard!.on("keydown-ENTER", onAdvance);
-        this.input.keyboard!.on("keydown-Z", onAdvance);
+        // 확인키(기본 C·Enter·Space) — 실제 키는 옵션의 키 설정을 따른다.
+        offKeys = bindActions(this, { USE: onAdvance });
         this.input.on("pointerdown", onAdvance);
       }
     });
@@ -424,15 +423,13 @@ export default class IntroScene extends Phaser.Scene {
         const g: Gender = idx === 0 ? "boy" : "girl";
         this.input.keyboard!.off("keydown-LEFT", goLeft);
         this.input.keyboard!.off("keydown-RIGHT", goRight);
-        this.input.keyboard!.off("keydown-ENTER", confirm);
-        this.input.keyboard!.off("keydown-Z", confirm);
+        offKeys();
         boy.destroy(); girl.destroy(); cursor.destroy(); help.destroy();
         resolve(g);
       };
       this.input.keyboard!.on("keydown-LEFT", goLeft);
       this.input.keyboard!.on("keydown-RIGHT", goRight);
-      this.input.keyboard!.on("keydown-ENTER", confirm);
-      this.input.keyboard!.on("keydown-Z", confirm);
+      const offKeys = bindActions(this, { USE: confirm });
       cards.forEach((c, i) => {
         c.on("pointerover", () => { idx = i; refresh(); });
         c.on("pointerout", () => { idx = -1; refresh(); });
@@ -487,7 +484,7 @@ export default class IntroScene extends Phaser.Scene {
     });
   }
 
-  // 예/아니오 선택 — 대화박스 위 오른쪽에 작은 메뉴. ↑↓/클릭 + Enter.
+  // 예/아니오 선택 — 대화박스 위 오른쪽에 작은 메뉴. ↑↓/클릭 + 확인키.
   private askYesNo(): Promise<boolean> {
     const { width, height } = this.scale;
     const font = this.boxRect.font;
@@ -527,13 +524,13 @@ export default class IntroScene extends Phaser.Scene {
       const confirm = () => {
         this.input.keyboard!.off("keydown-UP", up);
         this.input.keyboard!.off("keydown-DOWN", down);
-        this.input.keyboard!.off("keydown-ENTER", confirm);
+        offKeys();
         g.destroy(); rows.forEach((r) => r.destroy()); cursor.destroy();
         resolve(idx === 0);
       };
       this.input.keyboard!.on("keydown-UP", up);
       this.input.keyboard!.on("keydown-DOWN", down);
-      this.input.keyboard!.on("keydown-ENTER", confirm);
+      const offKeys = bindActions(this, { USE: confirm });
       rows.forEach((r, i) => {
         r.setInteractive({ useHandCursor: true });
         r.on("pointerover", () => { idx = i; place(); });

@@ -4,6 +4,7 @@ import {
   Settings, settings, setSetting, DEFAULTS,
   TEXT_SPEED_LABEL, BATTLE_STYLE_LABEL, MOVE_STYLE_LABEL,
 } from "../systems/settings";
+import { bindActions, keysLabel } from "../systems/input";
 
 // 옵션 화면 — 타이틀의 '옵션'과 인게임 메뉴의 '설정'이 같은 화면을 쓴다.
 //
@@ -22,7 +23,8 @@ export interface OptionsInit {
 type Row =
   | { key: "musicVolume" | "seVolume"; label: string; kind: "range"; desc: string }
   | { key: "textSpeed" | "battleStyle" | "moveStyle"; label: string; kind: "choice"; values: string[]; desc: string }
-  | { key: "battleEffects"; label: string; kind: "bool"; desc: string };
+  | { key: "battleEffects"; label: string; kind: "bool"; desc: string }
+  | { key: "keys"; label: string; kind: "screen"; desc: string };
 
 const ROWS: Row[] = [
   { key: "musicVolume", label: "음악 볼륨", kind: "range", desc: "배경 음악의 크기를 조절한다." },
@@ -30,7 +32,9 @@ const ROWS: Row[] = [
   { key: "textSpeed", label: "텍스트 속도", kind: "choice", values: ["slow", "mid", "fast"], desc: "대사가 찍히는 속도를 고른다." },
   { key: "battleEffects", label: "배틀 이펙트", kind: "bool", desc: "배틀에서 기술 애니메이션을 볼지 고른다." },
   { key: "battleStyle", label: "배틀 스타일", kind: "choice", values: ["switch", "set"], desc: "상대가 쓰러졌을 때 포켓몬을 바꿀지 물어볼지 고른다." },
-  { key: "moveStyle", label: "기본 이동", kind: "choice", values: ["walk", "run"], desc: "기본 이동 속도. 이동 중 X키를 누르면 반대 속도가 된다." },
+  { key: "moveStyle", label: "기본 이동", kind: "choice", values: ["walk", "run"], desc: "기본 이동 속도. 이동 중 취소키를 누르면 반대 속도가 된다." },
+  // 원본은 이 자리에 없고 F1(엔진 창)으로 열지만, 우리는 옵션 안에도 넣는다(F1도 그대로 된다).
+  { key: "keys", label: "키 설정", kind: "screen", desc: "확인·취소·메뉴·가방·배속 키를 바꾼다. (F1로도 열린다)" },
 ];
 
 export default class OptionsScene extends Phaser.Scene {
@@ -70,24 +74,22 @@ export default class OptionsScene extends Phaser.Scene {
       this.rows.push({ bg, name, val });
     }
     this.desc = this.add.text(0, 0, "", { fontFamily: this.FONT, color: "#3c5580" }).setOrigin(0.5, 0).setDepth(2);
-    this.hint = this.add.text(0, 0, "↑↓ 항목  ·  ←→ 값 바꾸기  ·  ESC 닫기  ·  R 기본값으로",
+    this.hint = this.add.text(0, 0, "↑↓ 항목  ·  ←→ 값 바꾸기  ·  취소키 닫기  ·  R 기본값으로",
       { fontFamily: this.FONT, color: "#2f6fd0" }).setOrigin(0.5, 0).setDepth(2);
 
     this.layout();
     this.scale.on("resize", this.layout, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off("resize", this.layout, this));
+    // 키 설정 화면에서 돌아오면 '키 설정' 줄에 보이는 키 이름을 새로 그린다.
+    this.events.on(Phaser.Scenes.Events.RESUME, () => this.paint());
 
     const kb = this.input.keyboard!;
     kb.on("keydown-UP", () => this.move(-1));
     kb.on("keydown-DOWN", () => this.move(1));
     kb.on("keydown-LEFT", () => this.bump(-1));
     kb.on("keydown-RIGHT", () => this.bump(1));
-    kb.on("keydown-ENTER", () => this.bump(1));
-    kb.on("keydown-Z", () => this.bump(1));
-    kb.on("keydown-SPACE", () => this.bump(1));
     kb.on("keydown-R", () => this.resetAll());
-    kb.on("keydown-ESC", () => this.close());
-    kb.on("keydown-X", () => this.close());
+    bindActions(this, { USE: () => this.bump(1), BACK: () => this.close() });
   }
 
   private layout = (): void => {
@@ -118,6 +120,7 @@ export default class OptionsScene extends Phaser.Scene {
   /** 지금 값의 표시 문자열. 볼륨은 원본처럼 눈금 막대로 보여준다. */
   private valueText(r: Row): string {
     const s: Settings = settings();
+    if (r.kind === "screen") return `${keysLabel("USE")}  ▶`;   // 지금 확인키를 미리 보여준다
     if (r.kind === "range") {
       const v = s[r.key] as number;
       return `${"■".repeat(v)}${"□".repeat(10 - v)}  ${v * 10}%`;
@@ -149,6 +152,13 @@ export default class OptionsScene extends Phaser.Scene {
   private bump(d: number): void {
     const r = ROWS[this.idx];
     const s = settings();
+    if (r.kind === "screen") {
+      // 키 설정은 값이 아니라 화면 — 이 화면을 멈추고 위에 띄운다(닫으면 여기로 돌아온다).
+      playSfx(this, SFX.decision, 0.5);
+      this.scene.pause();
+      this.scene.launch("KeyConfigScene", { from: "OptionsScene" });
+      return;
+    }
     if (r.kind === "range") {
       const v = Phaser.Math.Clamp((s[r.key] as number) + d, 0, 10);
       setSetting(r.key, v);

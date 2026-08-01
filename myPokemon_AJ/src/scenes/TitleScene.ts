@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { playBgm } from "../game/bgm";
+import { bindActions } from "../systems/input";
 
 // 게임 메인(타이틀) 화면 — 가장 먼저 뜨는 화면.
 // 노을 마을 배경 + "Pokémon With" 로고 + 아래에 PRESS START! 안내.
@@ -95,11 +96,11 @@ export default class TitleScene extends Phaser.Scene {
       onUpdate: () => { press.setAlpha(blink.v); check?.setAlpha(0.5 * blink.v); },
     });
 
-    // 입력(어나더레드식 키보드 전용): 스페이스/엔터/Z → 메인 메뉴로. (마우스 안 씀)
-    const start = () => this.scene.start("MainMenuScene");
-    this.input.keyboard!.once("keydown-SPACE", start);
-    this.input.keyboard!.once("keydown-ENTER", start);
-    this.input.keyboard!.once("keydown-Z", start);
+    // 입력(어나더레드식 키보드 전용): 확인키(기본 C·Enter·Space) → 메인 메뉴로. (마우스 안 씀)
+    let started = false;
+    const off = bindActions(this, {
+      USE: () => { if (started) return; started = true; off(); this.scene.start("MainMenuScene"); },
+    });
 
     // 개발용 — D 키로 씬 바로가기 메뉴(매번 처음부터 안 거치고 특정 화면 확인)
     this.input.keyboard!.once("keydown-D", () => this.scene.start("DebugMenuScene"));

@@ -4,6 +4,7 @@ import {
   SlotInfo, SlotId, listSlots, loadGame, saveGame, lastSlot, playTimeText, slotLabel,
 } from "../systems/save";
 import { josa } from "../data/josa";
+import { bindActions } from "../systems/input";
 
 // 세이브 슬롯 화면 — 이어하기(불러오기)와 인게임 저장이 같은 화면을 쓴다.
 //
@@ -85,11 +86,7 @@ export default class SaveSlotScene extends Phaser.Scene {
     const kb = this.input.keyboard!;
     kb.on("keydown-UP", () => this.move(-1));
     kb.on("keydown-DOWN", () => this.move(1));
-    kb.on("keydown-ENTER", () => this.choose());
-    kb.on("keydown-SPACE", () => this.choose());
-    kb.on("keydown-Z", () => this.choose());
-    kb.on("keydown-ESC", () => this.cancel());
-    kb.on("keydown-X", () => this.cancel());
+    bindActions(this, { USE: () => this.choose(), BACK: () => this.cancel() });
   }
 
   private layout = (): void => {

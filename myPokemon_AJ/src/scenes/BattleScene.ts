@@ -26,8 +26,11 @@ import {
 import { playBgm, stopBgm } from "../game/bgm";
 import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 import { playMoveAnimation, playCommonAnimation, loadAnimIndex } from "../game/battleAnim";
+import { bindActions, onAction } from "../systems/input";
 
 const FONT = "Galmuri11";
+// 배속(Q) 배율 — 원본은 엔진 프레임스킵이라 실측 불가. 우리는 시간 2배로 잡았다.
+const BATTLE_SPEED_FACTOR = 2;
 const SPRITE_ZOOM = 2;   // AR 배틀 스프라이트 확대 배율(원본 프레임 44~48px)
 const MAX_PARTY = 6;     // 파티 상한. 이 게임엔 아직 박스가 없어서 꽉 차면 포획을 거절한다.
 // 상대 포켓몬이 서는 자리(AR 좌표계 512x384 기준). 등장·포획 실패 복귀가 같은 값을 써야 해서 상수로 둔다.
@@ -134,6 +137,7 @@ export default class BattleScene extends Phaser.Scene {
   // 디버그 데모(확인 항목에서 들어왔을 때만). null이면 평소대로 배틀을 진행한다.
   private demo: { kind: DemoKind; move: string; common: string; byAlly: boolean } | null = null;
   private demoDead = false;   // 씬이 내려가면 true — 데모 루프가 파괴된 객체를 건드리지 않게 멈춘다.
+  private speedUp = false;    // 배속(Q) 켜짐 여부. 씬 재사용에 대비해 create에서 매번 끈다.
 
   constructor() { super("BattleScene"); }
 
@@ -270,6 +274,7 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     this.view = new BattleView(this);
+    this.setupSpeedToggle();
     this.buildBackground();
     this.buildSprites();
     this.buildHud();
@@ -282,6 +287,29 @@ export default class BattleScene extends Phaser.Scene {
       return;
     }
     this.runBattle().catch((e) => console.error("[BattleScene] 진행 오류:", e));
+  }
+
+  /**
+   * 배속(기본 Q) — **배틀에서만** 듣는다(원본 안내문 그대로: "배속은 배틀 시에만 적용됩니다").
+   *  원본의 배속은 스크립트가 아니라 mkxp 엔진의 프레임 스킵이라 배율을 실측할 수 없다
+   *  (그래서 원본 안내문도 "포켓몬 애니메이션이 멈춘다"고 적혀 있다).
+   *  우리는 대신 **씬의 시간을 2배로 돌린다** — 타이머(대사 타자기·연출 대기)와 트윈이 함께 빨라진다.
+   *  스프라이트 프레임 애니는 건드리지 않는다(원본에서도 배속 중엔 애니가 제대로 안 나온다).
+   */
+  private setupSpeedToggle(): void {
+    const label = this.add.text(this.scale.width - 10, 8, "≫ 배속 2배", {
+      fontFamily: FONT, fontSize: "16px", color: "#ffe27a", backgroundColor: "#00000088", padding: { x: 6, y: 3 },
+    }).setOrigin(1, 0).setScrollFactor(0).setDepth(900).setVisible(false);
+    const apply = (on: boolean) => {
+      this.speedUp = on;
+      this.time.timeScale = on ? BATTLE_SPEED_FACTOR : 1;
+      this.tweens.timeScale = on ? BATTLE_SPEED_FACTOR : 1;
+      label.setPosition(this.scale.width - 10, 8).setVisible(on);
+    };
+    apply(false);   // 씬은 재사용된다 → 지난 배틀에서 켜 둔 배속이 남지 않게 매번 되돌린다
+    onAction(this, "SPEED", () => { apply(!this.speedUp); playSfx(this, SFX.cursor, 0.4); });
+    // 배틀을 나갈 때도 원래 속도로(다른 씬의 타이머까지 빨라지면 안 된다).
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.time.timeScale = 1; this.tweens.timeScale = 1; });
   }
 
   // ── 화면 구성 (전부 AR 원본 에셋 — 직접 그리는 도형 없음) ──
@@ -1189,12 +1217,12 @@ export default class BattleScene extends Phaser.Scene {
       this.msgArrow?.setVisible(true);   // 키를 기다리는 동안만 화살표가 깜빡인다
       const kb = this.input.keyboard!;
       const done = () => {
-        kb.off("keydown-ENTER", done); kb.off("keydown-Z", done); kb.off("keydown-SPACE", done);
+        offKeys();
         playSfx(this, SFX.decision, 0.35);
         this.msgArrow?.setVisible(false);
         resolve();                        // ★ 창은 그대로 둔다 — 다음 대사/기술 애니 동안 계속 보인다
       };
-      kb.on("keydown-ENTER", done); kb.on("keydown-Z", done); kb.on("keydown-SPACE", done);
+      const offKeys = bindActions(this, { USE: done });
     });
   }
 
@@ -1236,16 +1264,14 @@ export default class BattleScene extends Phaser.Scene {
       const up = () => move(-1), down = () => move(1);
       const pick = () => {
         kb.off("keydown-UP", up); kb.off("keydown-DOWN", down);
-        kb.off("keydown-ENTER", pick); kb.off("keydown-Z", pick); kb.off("keydown-SPACE", pick);
-        kb.off("keydown-X", no); kb.off("keydown-ESC", no);
+        offKeys();
         playSfx(this, SFX.decision, 0.35);
         layer.destroy();
         resolve(idx === 0);
       };
       const no = () => { idx = 1; pick(); };
       kb.on("keydown-UP", up); kb.on("keydown-DOWN", down);
-      kb.on("keydown-ENTER", pick); kb.on("keydown-Z", pick); kb.on("keydown-SPACE", pick);
-      kb.on("keydown-X", no); kb.on("keydown-ESC", no);
+      const offKeys = bindActions(this, { USE: pick, BACK: no });
       void items;
     });
   }
@@ -1289,14 +1315,14 @@ export default class BattleScene extends Phaser.Scene {
       const onConfirm = () => {
         kb.off("keydown-LEFT", onLeft); kb.off("keydown-RIGHT", onRight);
         kb.off("keydown-UP", onUp); kb.off("keydown-DOWN", onDown);
-        kb.off("keydown-ENTER", onConfirm); kb.off("keydown-Z", onConfirm); kb.off("keydown-SPACE", onConfirm);
+        offKeys();
         playSfx(this, SFX.decision, 0.4);
         layer.destroy();
         resolve(idx);
       };
       kb.on("keydown-LEFT", onLeft); kb.on("keydown-RIGHT", onRight);
       kb.on("keydown-UP", onUp); kb.on("keydown-DOWN", onDown);
-      kb.on("keydown-ENTER", onConfirm); kb.on("keydown-Z", onConfirm); kb.on("keydown-SPACE", onConfirm);
+      const offKeys = bindActions(this, { USE: onConfirm });
     });
   }
 
@@ -1387,16 +1413,14 @@ export default class BattleScene extends Phaser.Scene {
       const cleanup = () => {
         kb.off("keydown-LEFT", onLeft); kb.off("keydown-RIGHT", onRight);
         kb.off("keydown-UP", onUp); kb.off("keydown-DOWN", onDown);
-        kb.off("keydown-ENTER", onConfirm); kb.off("keydown-Z", onConfirm); kb.off("keydown-SPACE", onConfirm);
-        kb.off("keydown-X", onCancel); kb.off("keydown-ESC", onCancel);
+        offKeys();
         layer.destroy();
       };
       const onConfirm = () => { playSfx(this, SFX.decision, 0.4); const r = idx; cleanup(); resolve(r); };
       const onCancel = () => { playSfx(this, SFX.cancel, 0.4); cleanup(); resolve(-1); };
       kb.on("keydown-LEFT", onLeft); kb.on("keydown-RIGHT", onRight);
       kb.on("keydown-UP", onUp); kb.on("keydown-DOWN", onDown);
-      kb.on("keydown-ENTER", onConfirm); kb.on("keydown-Z", onConfirm); kb.on("keydown-SPACE", onConfirm);
-      kb.on("keydown-X", onCancel); kb.on("keydown-ESC", onCancel);
+      const offKeys = bindActions(this, { USE: onConfirm, BACK: onCancel });
     });
   }
 

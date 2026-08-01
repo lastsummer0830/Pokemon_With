@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { textDelayMs } from "../systems/settings";
 import { playSfx, SFX } from "../game/sfx";
+import { bindActions } from "../systems/input";
 
 // 공용 HGSS 감성 대화창 — 집(InteriorScene)/인트로/연구소가 같은 박스를 쓰도록 뽑아낸 컴포넌트.
 //  스타일 기준: 크림 테두리(0xf6efd8) + 남색 본문(0x21314f) + 파란 내부선, 타자기 출력, 이름창, 예/아니오.
@@ -94,12 +95,11 @@ export default class DialogBox {
     this.setVisible(true);
     this.speaker = speaker; this.applySpeaker();
     return new Promise((resolve) => {
-      const kb = this.scene.input.keyboard!;
       this.arrow.setVisible(false);
       this.boxText.setText("");
       let i = 0; let typing = true;
       const cleanup = () => {
-        kb.off("keydown-SPACE", onAdvance); kb.off("keydown-ENTER", onAdvance); kb.off("keydown-Z", onAdvance);
+        offKeys();
         this.scene.input.off("pointerdown", onAdvance);
       };
       const finishTyping = () => { timer.remove(); this.boxText.setText(text); typing = false; this.arrow.setVisible(true); };
@@ -107,7 +107,8 @@ export default class DialogBox {
         delay: textDelayMs(), loop: true, callback: () => { i++; this.boxText.setText(text.slice(0, i)); if (i >= text.length) finishTyping(); },
       });
       const onAdvance = () => { if (typing) finishTyping(); else { playSfx(this.scene, SFX.decision, 0.4); cleanup(); resolve(); } };
-      kb.on("keydown-SPACE", onAdvance); kb.on("keydown-ENTER", onAdvance); kb.on("keydown-Z", onAdvance);
+      // 확인키(기본 C·Enter·Space)로 넘긴다 — 실제 키는 옵션의 키 설정을 따른다.
+      const offKeys = bindActions(this.scene, { USE: onAdvance });
       this.scene.input.on("pointerdown", onAdvance);
     });
   }
@@ -118,7 +119,7 @@ export default class DialogBox {
   }
 
   /**
-   * 선택지 메뉴 — 대화박스 위 오른쪽. ↑↓ + Enter/Z. 고른 항목의 **인덱스**를 준다.
+   * 선택지 메뉴 — 대화박스 위 오른쪽. ↑↓ + 확인키. 고른 항목의 **인덱스**를 준다.
    * 상자 폭은 실제 글자 너비에서 잰다(긴 선택지가 상자 밖으로 삐져나오지 않게).
    */
   askChoice(opts: string[]): Promise<number> {
@@ -151,12 +152,12 @@ export default class DialogBox {
       const confirm = () => {
         playSfx(this.scene, SFX.decision, 0.4);
         kb.off("keydown-UP", up); kb.off("keydown-DOWN", down);
-        kb.off("keydown-ENTER", confirm); kb.off("keydown-Z", confirm); kb.off("keydown-SPACE", confirm);
+        offKeys();
         g.destroy(); rows.forEach((r) => r.destroy()); cursor.destroy();
         resolve(idx);
       };
       kb.on("keydown-UP", up); kb.on("keydown-DOWN", down);
-      kb.on("keydown-ENTER", confirm); kb.on("keydown-Z", confirm); kb.on("keydown-SPACE", confirm);
+      const offKeys = bindActions(this.scene, { USE: confirm });
     });
   }
 

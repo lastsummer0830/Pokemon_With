@@ -33,6 +33,10 @@ export interface RegionMap {
   // 전경(priority) 레이어 PNG가 있으면 true. AR의 나무 캐노피·지붕처럼 **캐릭터 위에** 그려지는 타일 모음
   //  (extract-map.py가 <name>_over.png로 뽑는다). WorldScene이 캐릭터보다 높은 depth로 덮어 그린다.
   overImg?: string;
+  // 움직이는 오토타일(물결)이 있는 맵. tools/ar-map/extract-water.py가 <animFile>.png/.json을 만든다.
+  //  ⚠️ 원본에서 **실제로 움직이는 맵만** true다 — 태초마을 물(NOANIMSEA)은 원본도 1프레임이라 정지다.
+  animWater?: boolean;
+  animFile?: string;
   // 이 맵의 고정 날씨 (AR map_metadata의 `weather` = `[:Rain, 100]` 형식 그대로 = [심볼, 확률%]).
   //  ⚠️ 원본 382맵 중 이게 있는 맵은 3개뿐이다(Route 2·15번도로·쌍둥이섬 지하4층).
   //     우리가 지금 쓰는 3맵은 전부 없음 = **항상 맑음이 원본 그대로**다. 날씨 있는 맵을 추가하면 여기 적으면 된다.
@@ -48,6 +52,8 @@ export const REGION_MAPS: RegionMap[] = [
     img: "assets/world/viridian_city.png", data: "assets/world/viridian_city.json",
     overImg: "assets/world/viridian_city_over.png",
     ox: 0, oy: 0, cols: 52, rows: 40, battleBg: "town", bgm: "bgm_viridian",
+    // 움직이는 물결 30칸(원본 오토타일 STILL = 11프레임). tools/ar-map/extract-water.py가 뽑는다.
+    animWater: true, animFile: "viridian_city_anim",
   },
   {
     name: "route1", label: "1번도로",

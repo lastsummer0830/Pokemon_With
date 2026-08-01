@@ -5,8 +5,9 @@ import { iconPath, makePartyIcon } from "../game/pokemonSprite";
 import { playSfx, playMe, preloadCommonAudio, SFX } from "../game/sfx";
 import { saveGame } from "../systems/save";
 import { josa } from "../data/josa";
+import { bindActions } from "../systems/input";
 
-// 인게임 스타트 메뉴 (오버레이). 필드(WorldScene 등)에서 Enter/X로 연다.
+// 인게임 스타트 메뉴 (오버레이). 필드(WorldScene 등)에서 메뉴키(기본 Z·Enter)로 연다.
 //  상태: main(하단 바: 도감/포켓몬/가방/저장/설정) → party(파티 목록).
 //  한 마리 상세는 이 씬이 아니라 별도 오버레이 씬(SummaryScene)이 담당한다.
 const FONT = "Galmuri11";
@@ -107,11 +108,7 @@ export default class MenuScene extends Phaser.Scene {
     kb.on("keydown-DOWN", () => this.nav("down"));
     kb.on("keydown-LEFT", () => this.nav("left"));
     kb.on("keydown-RIGHT", () => this.nav("right"));
-    kb.on("keydown-ENTER", () => this.confirm());
-    kb.on("keydown-Z", () => this.confirm());
-    kb.on("keydown-SPACE", () => this.confirm());
-    kb.on("keydown-X", () => this.cancel());
-    kb.on("keydown-ESC", () => this.cancel());
+    bindActions(this, { USE: () => this.confirm(), BACK: () => this.cancel() });
 
     // 창 크기 바뀌면 다시 그린다(전체화면 시 오른쪽이 검게 비는 것 방지).
     this.scale.on("resize", this.onResize, this);

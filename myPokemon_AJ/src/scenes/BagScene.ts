@@ -3,6 +3,7 @@ import { Pokemon, displayName } from "../data/Pokemon";
 import { josa } from "../data/josa";
 import { itemsByPocket, POCKETS, POCKET_NAME, removeItem } from "../data/Bag";
 import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
+import { bindActions } from "../systems/input";
 
 // 가방 화면 (오버레이). 메뉴 → "가방" 또는 디버그에서 연다.
 //
@@ -129,11 +130,7 @@ export default class BagScene extends Phaser.Scene {
     kb.on("keydown-DOWN", () => this.move(1));
     kb.on("keydown-LEFT", () => this.switchPocket(-1));
     kb.on("keydown-RIGHT", () => this.switchPocket(1));
-    kb.on("keydown-ENTER", () => this.confirm());
-    kb.on("keydown-Z", () => this.confirm());
-    kb.on("keydown-SPACE", () => this.confirm());
-    kb.on("keydown-X", () => this.cancel());
-    kb.on("keydown-ESC", () => this.cancel());
+    bindActions(this, { USE: () => this.confirm(), BACK: () => this.cancel() });
 
     this.scale.on("resize", this.render, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off("resize", this.render, this));

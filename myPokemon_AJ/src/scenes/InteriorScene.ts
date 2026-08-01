@@ -10,6 +10,10 @@ import { HouseLayout, canPlace, furnitureAt } from "../data/HouseLayout";
 import { conditionCap, emptyHouse, sleepAtHome, furnitureHint, CONDITION_MAX } from "../systems/homeBonus";
 import { bondOf } from "../systems/bond";
 import { HOME_BOND_HINT, momMorningLines, momTalkLine } from "../data/story";
+import { bindActions, isActionJustDown, keysLabel, onAction } from "../systems/input";
+
+// 화면 안내에 쓸 "지금 확인키" 한 글자(옵션에서 바꾸면 안내도 같이 바뀐다).
+const useKey = (): string => keysLabel("USE").split(" · ")[0];
 
 // ⚠️ 검증용 임시 오버레이 — 충돌(빨강)·워프(초록) 칸을 화면에 그린다. 확인 끝나면 false로.
 const DEBUG_COLLISION = false;
@@ -33,7 +37,7 @@ const DEBUG_COLLISION = false;
 // climb = 워프 칸 기준 오르는 경로. 한 칸이면 [dx,dy], 여러 칸이면 [[dx,dy],[dx,dy],...] (계단 발판을 따라).
 // climbFace = 계단을 오르는 동안 바라보는 방향(기본 "up" = 계단을 정면으로 바라봄).
 interface Warp { x: number; y: number; to: string; ax?: number; ay?: number; kind?: string; dir?: Dir; face?: Dir; climb?: number[] | number[][]; climbFace?: Dir; map?: string; spawn?: [number, number] }
-// bed = 침대 사각형 [x, y, w, h] — 앞에서 Space를 누르면 잠자기(컨디션 회복). 침실에만 있다.
+// bed = 침대 사각형 [x, y, w, h] — 앞에서 확인키를 누르면 잠자기(컨디션 회복). 침실에만 있다.
 interface RoomDef { img: string; cols: number; rows: number; blocked: number[][]; start: [number, number]; warps: Warp[]; bed?: number[] }
 type Rooms = Record<string, RoomDef>;
 type Dir = "down" | "left" | "right" | "up";
@@ -103,7 +107,7 @@ export default class InteriorScene extends Phaser.Scene {
   private ghost?: Phaser.GameObjects.Image;            // 놓기 미리보기(반투명)
   private cursorG?: Phaser.GameObjects.Graphics;       // 커서 사각형(초록=놓을 수 있음/빨강=불가)
   private decoText?: Phaser.GameObjects.Text;          // 꾸미기 안내/설명 바
-  private keys!: Record<"space" | "f" | "r" | "q" | "e" | "esc", Phaser.Input.Keyboard.Key>;
+  private keys!: Record<"f" | "r" | "q" | "e" | "esc", Phaser.Input.Keyboard.Key>;
 
   constructor() {
     super("InteriorScene");
@@ -184,19 +188,19 @@ export default class InteriorScene extends Phaser.Scene {
     this.momSpr = this.add.sprite(0, 0, "mom", this.idleFrame.down).setOrigin(0.5, 1).setDepth(9).setVisible(false);
     // (가구 전경 오버레이 방식은 back wall/소품까지 캐릭터 머리를 가려 '대가리 잘림'이 생겨 폐기. 캐릭터를 그냥 앞에 그린다. AGENTS.md 참고.)
     this.cursors = this.input.keyboard!.createCursorKeys();
-    // 꾸미기·잠자기용 키. (대사창은 keydown 이벤트를 쓰므로, 여기선 update에서 JustDown으로만 읽어 충돌을 피한다)
+    // 꾸미기용 키. (대사창은 keydown 이벤트를 쓰므로, 여기선 update에서 JustDown으로만 읽어 충돌을 피한다)
+    //  말 걸기·잠자기는 이제 개별 키가 아니라 **확인 액션**(systems/input.ts)을 폴링한다 — isActionJustDown.
     const KC = Phaser.Input.Keyboard.KeyCodes;
     this.keys = {
-      space: this.input.keyboard!.addKey(KC.SPACE),
       f: this.input.keyboard!.addKey(KC.F),
       r: this.input.keyboard!.addKey(KC.R),
       q: this.input.keyboard!.addKey(KC.Q),
       e: this.input.keyboard!.addKey(KC.E),
       esc: this.input.keyboard!.addKey(KC.ESC),
     };
-    // 실내에서도 인게임 메뉴 열기(Enter/X). 대사·워프 중(busy)엔 열리지 않도록 openMenu가 가드.
-    this.input.keyboard!.on("keydown-ENTER", () => this.openMenu());
-    this.input.keyboard!.on("keydown-X", () => this.openMenu());
+    // 실내에서도 인게임 메뉴 열기(메뉴키 = 기본 Z). 대사·워프 중(busy)엔 열리지 않도록 openMenu가 가드.
+    onAction(this, "MENU", () => this.openMenu());
+    onAction(this, "BAG", () => this.openBag());
     // 메뉴가 닫혀 이 씬이 재개되면 openMenu에서 껐던 입력을 다시 켠다.
     this.events.on(Phaser.Scenes.Events.RESUME, () => { this.input.enabled = true; });
 
@@ -273,7 +277,7 @@ export default class InteriorScene extends Phaser.Scene {
   private hintFor(key: string): string {
     const name = this.playerName();
     const head = name ? name + "  |  " : "";
-    if (key === "bedroom") return `${head}방향키: 이동  |  침대 앞 Space: 잠자기  |  F: 방 꾸미기  |  계단: 1층으로`;
+    if (key === "bedroom") return `${head}방향키: 이동  |  침대 앞 ${useKey()}: 잠자기  |  F: 방 꾸미기  |  계단: 1층으로`;
     if (key === "living") return `${head}방향키: 이동  |  계단: 내 방으로  |  문: 마을로`;
     return `${head}방향키: 이동  |  문: 마을로`;   // 라이벌집 등 (문 하나뿐인 방)
   }
@@ -292,6 +296,16 @@ export default class InteriorScene extends Phaser.Scene {
     this.cameras.main.resetFX();
     this.scene.pause();
     this.scene.launch("MenuScene", { from: "InteriorScene" });
+  }
+
+  // 가방 단축키(기본 D) — 메뉴를 거치지 않고 가방을 바로 연다. 닫으면 이 방으로 돌아온다.
+  private openBag(): void {
+    if (this.busy || this.moving || this.decorating) return;
+    this.registry.set("saveLoc", { scene: "InteriorScene", room: this.roomKey });
+    this.input.enabled = false;
+    this.cameras.main.resetFX();
+    this.scene.pause();
+    this.scene.launch("BagScene", { from: "InteriorScene" });
   }
 
   private makeWalkAnims(tex: string, prefix: string): void {
@@ -396,7 +410,7 @@ export default class InteriorScene extends Phaser.Scene {
     this.decoText?.destroy(); this.decoText = undefined;
   }
 
-  // 꾸미기 모드 입력 — 방향키: 커서, Q/E: 가구 바꾸기, Space: 놓기, R: 치우기, F/Esc: 끝내기
+  // 꾸미기 모드 입력 — 방향키: 커서, Q/E: 가구 바꾸기, 확인키: 놓기, R: 치우기, F/Esc: 끝내기
   private updateDecorate(justSpace: boolean): void {
     const JD = Phaser.Input.Keyboard.JustDown;
     let moved = false;
@@ -542,7 +556,7 @@ export default class InteriorScene extends Phaser.Scene {
     const why = !ok && def.wallOnly && !this.againstWall(def, this.curX, this.curY)
       ? "  ※ 벽에 등을 붙여야 놓을 수 있다" : "";
     this.decoText
-      .setText(`[방 꾸미기]  ${def.name} — ${furnitureHint(def, party)}${why}\n${capLine}\n←↑↓→ 이동  Q/E 가구바꾸기  Space 놓기  R 치우기  F 끝내기`)
+      .setText(`[방 꾸미기]  ${def.name} — ${furnitureHint(def, party)}${why}\n${capLine}\n←↑↓→ 이동  Q/E 가구바꾸기  ${useKey()} 놓기  R 치우기  F 끝내기`)
       .setPosition(this.scale.width / 2, this.scale.height - 12);
   }
 
@@ -839,7 +853,9 @@ export default class InteriorScene extends Phaser.Scene {
     // 키는 매 프레임 '눌린 순간'을 소비한다 — 대사창(keydown 이벤트)이 끝난 직후의 키가
     // 여기로 새어 들어와 잠자기/꾸미기가 또 발동하는 걸 막는다.
     const JD = Phaser.Input.Keyboard.JustDown;
-    const justSpace = JD(this.keys.space);
+    // 확인키(기본 C·Enter·Space)로 말 걸기·잠자기·가구 놓기.
+    //  ⚠️ except: 기존식 배치에선 Enter가 '확인'이자 '메뉴 열기'라 그대로 두면 한 번 눌러 둘 다 터진다 → 메뉴 쪽만 남긴다.
+    const justSpace = isActionJustDown(this, "USE", { except: ["MENU", "BAG"] });
     const justF = JD(this.keys.f);
     const justEsc = JD(this.keys.esc);
 
@@ -848,7 +864,7 @@ export default class InteriorScene extends Phaser.Scene {
     // ★ 꾸미기 모드 — 방향키는 커서 이동으로 쓰이고, 주인공은 안 움직인다.
     if (this.decorating) {
       if (justF || justEsc) { this.exitDecorate(); return; }
-      this.updateDecorate(justSpace);   // Space는 위에서 이미 소비했으므로 값으로 넘긴다
+      this.updateDecorate(justSpace);   // 확인키는 위에서 이미 소비했으므로 값으로 넘긴다
       return;
     }
     if (justF) { this.toggleDecorate(); return; }
@@ -1117,8 +1133,7 @@ export default class InteriorScene extends Phaser.Scene {
       this.boxText.setText("");
       let i = 0; let typing = true;
       const cleanup = () => {
-        this.input.keyboard!.off("keydown-SPACE", onAdvance);
-        this.input.keyboard!.off("keydown-ENTER", onAdvance);
+        offKeys();
         this.input.off("pointerdown", onAdvance);
       };
       const finishTyping = () => { timer.remove(); this.boxText.setText(text); typing = false; this.arrow.setVisible(true); };
@@ -1132,13 +1147,13 @@ export default class InteriorScene extends Phaser.Scene {
         if (typing) finishTyping();
         else { cleanup(); resolve(); }
       };
-      this.input.keyboard!.on("keydown-SPACE", onAdvance);
-      this.input.keyboard!.on("keydown-ENTER", onAdvance);
+      // 확인키(기본 C·Enter·Space)로 넘긴다 — 실제 키는 옵션의 키 설정을 따른다.
+      const offKeys = bindActions(this, { USE: onAdvance });
       this.input.on("pointerdown", onAdvance);
     });
   }
 
-  // 예/아니오 선택 — 대화박스 위 오른쪽 작은 메뉴. ↑↓/클릭 + Enter.
+  // 예/아니오 선택 — 대화박스 위 오른쪽 작은 메뉴. ↑↓/클릭 + 확인키.
   private askYesNo(): Promise<boolean> {
     const font = this.boxRect.font;
     const rowH = Math.round(font * 1.9);
@@ -1172,13 +1187,13 @@ export default class InteriorScene extends Phaser.Scene {
       const confirm = () => {
         this.input.keyboard!.off("keydown-UP", up);
         this.input.keyboard!.off("keydown-DOWN", down);
-        this.input.keyboard!.off("keydown-ENTER", confirm);
+        offKeys();
         g.destroy(); rows.forEach((r) => r.destroy()); cursor.destroy();
         resolve(idx === 0);
       };
       this.input.keyboard!.on("keydown-UP", up);
       this.input.keyboard!.on("keydown-DOWN", down);
-      this.input.keyboard!.on("keydown-ENTER", confirm);
+      const offKeys = bindActions(this, { USE: confirm });
       rows.forEach((r, i) => {
         r.setInteractive({ useHandCursor: true });
         r.on("pointerover", () => { idx = i; place(); });

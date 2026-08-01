@@ -17,7 +17,9 @@ import SummaryScene from "./scenes/SummaryScene";
 import DebugCheckBarScene from "./scenes/DebugCheckBarScene";
 import SaveSlotScene from "./scenes/SaveSlotScene";
 import OptionsScene from "./scenes/OptionsScene";
+import KeyConfigScene from "./scenes/KeyConfigScene";
 import { loadArDb } from "./data/ar";
+import { installKeyConfigHotkey } from "./systems/input";
 
 // 게임을 켜는 시작 파일 (예전 스윙의 GameMain 역할)
 const config: Phaser.Types.Core.GameConfig = {
@@ -32,7 +34,7 @@ const config: Phaser.Types.Core.GameConfig = {
     height: "100%",
   },
   // 맨 앞 씬이 가장 먼저 실행됨. Title → Intro(성별·이름) → Interior(시작 집: 방2층↔거실1층) → World 순서.
-  scene: [TitleScene, MainMenuScene, IntroScene, InteriorScene, BedroomScene, DebugMenuScene, WorldScene, LabScene, GymScene, BuildingScene, BattleScene, MenuScene, BagScene, PokedexScene, SummaryScene, DebugCheckBarScene, SaveSlotScene, OptionsScene],
+  scene: [TitleScene, MainMenuScene, IntroScene, InteriorScene, BedroomScene, DebugMenuScene, WorldScene, LabScene, GymScene, BuildingScene, BattleScene, MenuScene, BagScene, PokedexScene, SummaryScene, DebugCheckBarScene, SaveSlotScene, OptionsScene, KeyConfigScene],
 };
 
 // ★ 게임 시작 전에 폰트를 확실히 로드한다.
@@ -41,6 +43,8 @@ const config: Phaser.Types.Core.GameConfig = {
 //   - Galmuri11: 옛날 픽셀 포켓몬 게임 감성의 한글 도트 폰트(인트로 대사용)
 function boot() {
   const game = new Phaser.Game(config);
+  // F1 = 키 설정(원본과 같은 자리). 어느 화면에서 눌러도 그 위에 뜬다.
+  installKeyConfigHotkey(game);
   // dev 전용: 자동 플레이테스트(playwright)에서 씬 상태를 읽기 위해 노출. 배포에 영향 없음.
   (window as unknown as { __game: Phaser.Game }).__game = game;
 }

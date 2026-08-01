@@ -1,0 +1,298 @@
+{
+ "arMap": 10,
+ "events": [
+  {
+   "id": 1,
+   "name": "오박사",
+   "x": 31,
+   "y": 22,
+   "kind": "npc",
+   "graphic": "phone001",
+   "pages": [
+    {
+     "graphic": "phone001",
+     "trigger": 3,
+     "cond": {
+      "switch": 97
+     },
+     "lines": [
+      {
+       "text": "(머리가 아프다. 눈을 떠보니 처음 보는 장소인 듯 하다.)",
+       "speaker": "{PLAYER}"
+      },
+      {
+       "text": "(분명 어제 밤에 내 방에서 잠들었을텐데...)",
+       "speaker": "{PLAYER}"
+      },
+      {
+       "text": "괜찮으세요? 도로에 쓰러져 있으셨어요.",
+       "speaker": "오박사"
+      },
+      {
+       "text": "야생 포켓몬에게 습격이라도 받으셨나요?",
+       "speaker": "오박사"
+      },
+      {
+       "choice": [
+        "포켓몬이요?",
+        "오박사님?"
+       ],
+       "branches": [
+        [
+         {
+          "text": "요새 관동 지방에도 다른 지역의 포켓몬이 발견되고 있어요.",
+          "speaker": "오박사"
+         }
+        ],
+        [
+         {
+          "text": "네, 맞습니다. 요새 관동 지방에도 여러 지역의 포켓몬이 발견되고 있어요.",
+          "speaker": "오박사"
+         }
+        ]
+       ]
+      },
+      {
+       "text": "익숙하지 않은 포켓몬이 나올 수 있으니 주의하셔야 돼요.",
+       "speaker": "오박사"
+      },
+      {
+       "text": "포켓몬도 없이 나오신건가요?",
+       "speaker": "오박사"
+      },
+      {
+       "choice": [
+        "전 포켓몬이 없어요.",
+        "기억이 나지 않아요."
+       ],
+       "branches": [
+        [
+         {
+          "text": "포켓몬이 없이 나왔다고요?",
+          "speaker": "오박사"
+         },
+         {
+          "text": "왜 여기에 계신지도 모르겠다고요?",
+          "speaker": "오박사"
+         },
+         {
+          "text": "흐음...",
+          "speaker": "오박사"
+         }
+        ],
+        [
+         {
+          "text": "기억이 나지 않는다고요?",
+          "speaker": "오박사"
+         },
+         {
+          "text": "단기 기억상실증... 같은 걸까요?",
+          "speaker": "오박사"
+         }
+        ]
+       ]
+      },
+      {
+       "text": "우선 바깥은 위험한 것 같으니 저희 연구소로 가는게 좋겠어요.",
+       "speaker": "오박사"
+      },
+      {
+       "text": "천천히 따라오세요.",
+       "speaker": "오박사"
+      },
+      {
+       "text": "(무슨 상황인지 이해가 되지 않는다.)",
+       "speaker": "{PLAYER}"
+      },
+      {
+       "text": "(누가 오박사 코스프레라도 한건가?)",
+       "speaker": "{PLAYER}"
+      },
+      {
+       "text": "(흐음...)",
+       "speaker": "{PLAYER}"
+      },
+      {
+       "text": "(일단 오박사를 따라가보자.)",
+       "speaker": "{PLAYER}"
+      }
+     ],
+     "partial": true
+    },
+    {
+     "graphic": "",
+     "trigger": 0,
+     "cond": {
+      "selfSwitch": "A"
+     },
+     "lines": []
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "name": "Item",
+   "x": 16,
+   "y": 14,
+   "kind": "item",
+   "graphic": "Object ball",
+   "pages": [
+    {
+     "graphic": "Object ball",
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "item": "POTION"
+      }
+     ]
+    },
+    {
+     "graphic": "",
+     "trigger": 0,
+     "cond": {
+      "selfSwitch": "A"
+     },
+     "lines": []
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "name": "BerryPlant",
+   "x": 16,
+   "y": 7,
+   "kind": "berry",
+   "graphic": "berrytree_ORANBERRY",
+   "pages": [
+    {
+     "graphic": "berrytree_ORANBERRY",
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "berry": "ORANBERRY",
+       "count": 2
+      }
+     ]
+    },
+    {
+     "graphic": "",
+     "trigger": 0,
+     "cond": {
+      "selfSwitch": "A"
+     },
+     "lines": [],
+     "partial": true
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "BerryPlant",
+   "x": 15,
+   "y": 7,
+   "kind": "berry",
+   "graphic": "berrytree_ORANBERRY",
+   "pages": [
+    {
+     "graphic": "berrytree_ORANBERRY",
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "berry": "ORANBERRY",
+       "count": 2
+      }
+     ]
+    },
+    {
+     "graphic": "",
+     "trigger": 0,
+     "cond": {
+      "selfSwitch": "A"
+     },
+     "lines": [],
+     "partial": true
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "name": "Item",
+   "x": 33,
+   "y": 35,
+   "kind": "item",
+   "graphic": "Object ball",
+   "pages": [
+    {
+     "graphic": "Object ball",
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "item": "ANTIDOTE"
+      }
+     ]
+    },
+    {
+     "graphic": "",
+     "trigger": 0,
+     "cond": {
+      "selfSwitch": "A"
+     },
+     "lines": []
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "name": "EV008",
+   "x": 18,
+   "y": 7,
+   "kind": "sign",
+   "graphic": "",
+   "pages": [
+    {
+     "graphic": "",
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "열매를 따고 난 후, 다시 심어보아요!",
+       "center": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "name": "Item",
+   "x": 33,
+   "y": 3,
+   "kind": "item",
+   "graphic": "Object ball",
+   "pages": [
+    {
+     "graphic": "Object ball",
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "item": "POKEBALL"
+      }
+     ]
+    },
+    {
+     "graphic": "",
+     "trigger": 0,
+     "cond": {
+      "selfSwitch": "A"
+     },
+     "lines": []
+    }
+   ]
+  }
+ ]
+}

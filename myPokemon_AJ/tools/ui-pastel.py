@@ -28,12 +28,13 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 #     원본 흰·파란 백팩 그대로 둔다.
 #  bg_8 = 소중한 물건 포켓(스토리 물건이 들어간다). 다른 배경과 같은 규칙으로 리컬러해야
 #  탭을 넘길 때 톤이 튀지 않는다 — 빠뜨리면 그 포켓만 텍스처 로드가 실패한다(실제로 발생).
-BAG_FILES = ["bg_1", "bg_2", "bg_3", "bg_8", "cursor", "icon_pocket", "icon_slider"]
+#  bg_4(기술머신)·bg_5(나무열매) = 2026-08-03 필드 이벤트 이식으로 아이템이 생긴 포켓.
+BAG_FILES = ["bg_1", "bg_2", "bg_3", "bg_4", "bg_5", "bg_8", "cursor", "icon_pocket", "icon_slider"]
 DEX_FILES = ["bg_list", "bg_info", "cursor_list", "icon_slider"]
 
 # sky 변형에서 파일별 목표 색상(hue, 0~1). None = 원래 색상 유지.
 SKY_HUE = {
-    "bg_1": 0.58, "bg_2": 0.58, "bg_3": 0.58, "bg_8": 0.58,   # 가방 배경 = 연하늘
+    "bg_1": 0.58, "bg_2": 0.58, "bg_3": 0.58, "bg_4": 0.58, "bg_5": 0.58, "bg_8": 0.58,   # 가방 배경 = 연하늘
     "bg_list": 0.58, "bg_info": 0.58,             # 도감 배경 = 연하늘
     "cursor": 0.93, "cursor_list": 0.93,          # 커서만 연분홍(선택이 눈에 띄어야 함)
     "icon_slider": 0.62,                          # 슬라이더 = 라벤더
@@ -140,7 +141,9 @@ def recolor(im: Image.Image, mode: str, name: str, folder: str = "bag") -> Image
                     vv2 = min(1.0, vv * CREAM_LIFT[0] + CREAM_LIFT[1])
                 elif is_reddish(hh):   # 빨강 = 포인트. 파스텔이라도 이건 살려야 인상이 남는다
                     hh2, ss2, vv2 = RED_HUE, min(0.78, ss * 0.85), min(1.0, vv * 0.9 + 0.07)
-                elif 0.35 < hh < 0.75 and ss > 0.35:         # '진짜' 파란 아이콘(포켓 탭 등)만 색상 유지 = 정보
+                elif 0.45 < hh < 0.75 and ss > 0.35:         # '진짜' 파란 아이콘(포켓 탭 등)만 색상 유지 = 정보
+                    #  ⚠️ 하한이 0.35였을 땐 **나무열매 포켓 배경의 초록(h=0.38)**까지 아이콘으로 보고 살려
+                    #     그 칸만 초록으로 남았다(2026-08-03). 탭 아이콘은 파랑이라 0.45로 올린다.
                     hh2, ss2, vv2 = hh, ss * 0.75, min(1.0, vv * 0.9 + 0.06)
                     # ⚠️ 예전엔 채도 조건이 없어서 회청색(슬라이더 화살표 같은 '거의 회색')까지 파랑으로 남았다.
                     #    그게 크림 화면에서 회끼로 읽혔다. 채도 낮은 차가운 색은 아래 크림 분기로 내려간다.

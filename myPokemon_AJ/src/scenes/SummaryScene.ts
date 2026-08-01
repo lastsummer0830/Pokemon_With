@@ -6,6 +6,7 @@ import { getMove } from "../data/ar";
 import { pet, bondHearts, bondLabel, BOND_HEARTS, PETTED_KEY } from "../systems/bond";
 import { expForLevel } from "../systems/exp";
 import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
+import { bindActions } from "../systems/input";
 
 // 포켓몬 상세정보(Summary) 화면 — 파티에서 포켓몬을 고르면 열리는 오버레이.
 //
@@ -89,11 +90,7 @@ export default class SummaryScene extends Phaser.Scene {
     kb.on("keydown-RIGHT", () => this.turnPage(1));
     kb.on("keydown-UP", () => this.switchMon(-1));
     kb.on("keydown-DOWN", () => this.switchMon(1));
-    kb.on("keydown-ENTER", () => this.petCurrent());
-    kb.on("keydown-Z", () => this.petCurrent());
-    kb.on("keydown-SPACE", () => this.petCurrent());
-    kb.on("keydown-X", () => this.cancel());
-    kb.on("keydown-ESC", () => this.cancel());
+    bindActions(this, { USE: () => this.petCurrent(), BACK: () => this.cancel() });
 
     this.scale.on("resize", this.render, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off("resize", this.render, this));

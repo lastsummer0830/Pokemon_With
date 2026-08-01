@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
 import { hasSave } from "../systems/save";
+import { bindActions } from "../systems/input";
 
 // 메인 메뉴 화면 — 타이틀(로고+PRESS START)에서 엔터/클릭하면 이 화면이 뜬다.
 // 톤 = 화이트/블루. 밝은 하늘 그라데 배경 + 몬스터볼(우하단) + AR식 가로 메뉴 바.
@@ -58,14 +59,10 @@ export default class MainMenuScene extends Phaser.Scene {
     this.scale.on("resize", this.layout, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off("resize", this.layout, this));
 
-    // 어나더레드식 키보드 전용 조작: ↑↓ 이동 / Z·Enter·Space 확인 / X·Esc 뒤로. (마우스 안 씀)
+    // 어나더레드식 키보드 전용 조작: ↑↓ 이동 / 확인키 결정 / 취소키 뒤로. (마우스 안 씀)
     this.input.keyboard!.on("keydown-UP", () => this.move(-1));
     this.input.keyboard!.on("keydown-DOWN", () => this.move(1));
-    this.input.keyboard!.on("keydown-ENTER", () => this.choose());
-    this.input.keyboard!.on("keydown-SPACE", () => this.choose());
-    this.input.keyboard!.on("keydown-Z", () => this.choose());
-    this.input.keyboard!.on("keydown-X", () => this.scene.start("TitleScene"));
-    this.input.keyboard!.on("keydown-ESC", () => this.scene.start("TitleScene"));
+    bindActions(this, { USE: () => this.choose(), BACK: () => this.scene.start("TitleScene") });
     this.cameras.main.fadeIn(300, 0, 0, 0);
   }
 

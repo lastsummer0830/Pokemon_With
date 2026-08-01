@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { Gender } from "../data/Player";
 import { Pokemon, createFromSpecies } from "../data/Pokemon";
 import { playBgm } from "../game/bgm";
-import { playSfx, preloadCommonAudio, SFX, BGM } from "../game/sfx";
+import { playSfx, playMe, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 import { autoSaveWithToast } from "../game/saveIndicator";
 import DialogBox from "../ui/DialogBox";
 import { REGION_MAPS, REGION_COLS, REGION_ROWS, mapAtGlobal, toGlobal, toLocal, assertRegionMatches, RegionMap } from "../data/region";
@@ -13,6 +13,12 @@ import { attachDayNight, applyDebugBand, BAND_LABEL, DayNightOverlay, TimeBand }
 import { attachWeather, applyDebugWeather, preloadWeather, rollWeather, WeatherKind, WEATHER_LABEL, WeatherOverlay } from "../systems/weather";
 import { preloadVsIntroAll, playVsIntro, vsKeyFromTrainerId } from "../systems/vsIntro";
 import { settings, stepDurationMs } from "../systems/settings";
+import { isActionDown, keysLabel, onAction } from "../systems/input";
+import { activePage, talkablePage, visibleGraphic, setSelfSwitch } from "../systems/mapEvents";
+import type { EventLine, EventPage, MapEvent, MapEventFile } from "../systems/mapEvents";
+import { addItem, POCKET_NAME } from "../data/Bag";
+import { getItem } from "../data/ar";
+import { josa } from "../data/josa";
 
 // 야외 = 어나더레드에서 그대로 추출한 맵 3장을 **하나로 이어붙인 리전**(52×100칸).
 //  - 위에서부터 상록시티(0~39) · 1번도로(40~79) · 태초마을(80~99). 배치 근거는 src/data/region.ts 주석 참고
@@ -24,6 +30,8 @@ import { settings, stepDurationMs } from "../systems/settings";
 //    다른 씬이 "태초마을의 (28,14)"처럼 맵 기준으로 말할 땐 map 이름을 같이 넘긴다(init 참고).
 type Dir = "down" | "left" | "right" | "up";
 interface Warp { x: number; y: number; to: string; dir?: Dir; room?: string }
+/** 맵에 서 있는 원본 이벤트 하나(글로벌 좌표 + 화면에 올린 그림). */
+interface FieldEvent { ev: MapEvent; map: string; gx: number; gy: number; sprite?: Phaser.GameObjects.Sprite }
 
 // 카메라 프레이밍 — 원본(Another Red)은 내부해상도 512×384 / 타일 32px라 **창 크기와 무관하게 항상 16×12칸**이 보인다.
 //  우리는 캔버스가 창 전체(main.ts의 Phaser.Scale.RESIZE)라 SCALE을 2로 고정하면 창이 클수록 보이는 칸이 늘어
@@ -36,6 +44,10 @@ const fitScale = (w: number, h: number): number =>
   //  ⚠️ max로 바꾸면 가로 16칸에 맞춰져 세로가 9칸으로 잘린다(A안 — 사용자가 안 고름).
   Phaser.Math.Clamp(Math.min(w / (VIEW_COLS * 32), h / (VIEW_ROWS * 32)), 1, 8);
 let SCALE = 2;                                // create()에서 창 크기로 다시 계산된다(타일 = 32*SCALE px)
+// 사람·물건은 **아래(칸 y가 큰) 것이 앞에** 그려진다 — 원본 RMXP의 Y정렬 그대로.
+//  (안 하면 위 칸의 몬스터볼이 주인공 머리 위에 덮여 그려진다. 실제로 그렇게 나왔다.)
+//  5 = 캐릭터 층, 전경(나무 캐노피) 층은 6이라 5.x 범위를 넘지 않게 아주 작은 값을 더한다.
+const yDepth = (ty: number): number => 5 + ty * 0.001;
 const START_MAP = "pallet";
 const START_LOCAL = { x: 17, y: 8 };          // 태초마을 기준 우리집 문 앞
 
@@ -67,7 +79,7 @@ export default class WorldScene extends Phaser.Scene {
   private readonly texKey = "hero";
   private idleFrame: Record<Dir, number> = { down: 0, left: 4, right: 8, up: 12 };
   private facing: Dir = "down";
-  private runKeys: Phaser.Input.Keyboard.Key[] = [];   // 눌러 두면 반대 속도(걷기↔달리기)
+  private shiftKey?: Phaser.Input.Keyboard.Key;   // 취소키와 함께 눌러 두면 반대 속도(걷기↔달리기)
 
   // 리전 전체 격자(맵 3장을 이어붙인 것). 좌표는 전부 글로벌.
   private cols = REGION_COLS; private rows = REGION_ROWS;
@@ -104,6 +116,10 @@ export default class WorldScene extends Phaser.Scene {
   private debugVs: [string, string] | null = null;
   private trainers: TrainerNpc[] = [];          // 맵에 서 있는 트레이너들(1번도로 반바지꼬마·짧은치마)
   private setupRun = 0;                         // setupTrainers 실행 번호(씬 재시작 시 옛 실행을 무시하려고)
+  // 필드 이벤트(NPC·팻말·바닥 아이템·열매나무). `events`는 Phaser 씬이 이미 쓰는 이름이라 events2로 둔다.
+  private events2: FieldEvent[] = [];
+  // 이벤트 그림시트를 만드는 중인 작업(그림 이름 → 약속). 텍스처는 **게임 전역**이라 static이다.
+  private static sheetJobs = new Map<string, Promise<void>>();
   private nemona?: Phaser.GameObjects.Sprite;   // 첫 배틀 때 밖에서 기다리는 네모(그 외엔 없음)
   private rival?: { path: [number, number][]; from: "left" | "right" };   // 네모가 걸어올 길(플레이어 기준으로 잡음)
   private dlg!: DialogBox;
@@ -117,7 +133,9 @@ export default class WorldScene extends Phaser.Scene {
     const name = (this.registry.get("playerName") as string) ?? "";
     // 날씨는 맑을 땐 안 적는다(항상 "맑음"이 붙어 있으면 잔소리다).
     const w = this.weather?.kind && this.weather.kind !== "none" ? `  |  ${WEATHER_LABEL[this.weather.kind]}` : "";
-    hud.setText(`${name ? name + "  |  " : ""}방향키: 이동  |  Enter: 메뉴  |  ${BAND_LABEL[this.dayNight.band]}${w}`);
+    // 메뉴 키는 옵션에서 바꿀 수 있으므로 **지금 걸린 키**를 그때그때 적는다(안내가 거짓말이 되지 않게).
+    const menuKey = keysLabel("MENU").split(" · ")[0];
+    hud.setText(`${name ? name + "  |  " : ""}방향키: 이동  |  ${menuKey}: 메뉴  |  ${BAND_LABEL[this.dayNight.band]}${w}`);
   }
   private onResize = (): void => { this.reframe(); this.dlg.layout(); };
 
@@ -178,8 +196,19 @@ export default class WorldScene extends Phaser.Scene {
     //    "고쳤는데 똑같다"가 된다(.claude/rules/maps-collision.md 5번).
     for (const m of REGION_MAPS) {
       this.cache.json.remove(`${m.name}_col`);
+      this.cache.json.remove(`${m.name}_events`);
       this.load.image(m.name, `${m.img}?v=` + Date.now());
       this.load.json(`${m.name}_col`, `${m.data}?v=` + Date.now());
+      // 원본 맵 이벤트(NPC 대사·팻말·바닥 아이템·열매나무) — tools/ar-map/extract-events.py가 뽑은 것.
+      this.load.json(`${m.name}_events`, `${m.data.replace(".json", "_events.json")}?v=` + Date.now());
+      // 움직이는 물결(오토타일) — tools/ar-map/extract-water.py.
+      //  ⚠️ 원본에서 실제로 움직이는 맵만 파일이 있다(상록시티뿐 — 태초마을 물은 원본도 정지 오토타일이다).
+      if (m.animWater) {
+        this.cache.json.remove(`${m.name}_anim`);
+        this.load.json(`${m.name}_anim`, `assets/world/${m.animFile}.json?v=` + Date.now());
+        this.load.spritesheet(`${m.name}_anim`, `assets/world/${m.animFile}.png?v=` + Date.now(),
+          { frameWidth: 32, frameHeight: 32 });
+      }
       // 전경(나무 캐노피·지붕) 레이어 — 있으면 캐릭터 위로 그리려고 따로 불러온다.
       if (m.overImg) this.load.image(`${m.name}_over`, `${m.overImg}?v=` + Date.now());
     }
@@ -248,13 +277,11 @@ export default class WorldScene extends Phaser.Scene {
     this.tx = this.spawn.x; this.ty = this.spawn.y; this.facing = this.spawn.face;
     this.curMap = mapAtGlobal(this.tx, this.ty);   // 시작 시점의 맵(이름 배너는 안 띄운다 — 들어온 게 아니라 원래 거기다)
     this.player = this.add.sprite(this.cx(this.tx), this.cy(this.ty), this.texKey, this.idleFrame[this.facing])
-      .setOrigin(0.5, 1).setScale(SCALE).setDepth(5);
+      .setOrigin(0.5, 1).setScale(SCALE).setDepth(yDepth(this.ty));
     this.cursors = this.input.keyboard!.createCursorKeys();
-    // 이동 중 눌러 두면 '반대 속도'가 되는 키(원본의 Back 버튼 = 우리 취소키 X / Shift).
-    this.runKeys = [
-      this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.X),
-      this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT),
-    ];
+    // 이동 중 눌러 두면 '반대 속도'가 되는 키 = 원본의 Back 버튼(기본 X) — systems/input.ts의 BACK 액션.
+    //  Shift는 원본에 없지만 손에 익은 사람을 위해 함께 받는다.
+    this.shiftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT, false);
     this.dlg = new DialogBox(this);
     // ⚠️ this.scale은 씬이 아니라 게임 전역 이벤트원이다 → off("resize")를 콜백 없이 부르면 '다른 씬 리스너까지' 다 지운다.
     this.scale.on("resize", this.onResize);
@@ -299,9 +326,12 @@ export default class WorldScene extends Phaser.Scene {
       fontFamily: "Galmuri11, sans-serif", fontSize: "16px", color: "#ffffff", backgroundColor: "#00000088", padding: { x: 8, y: 4 },
     }).setScrollFactor(0).setDepth(100).setName("hud");
     this.updateHudTime();
-    // Enter/X = 인게임 메뉴(포켓몬/가방/저장) 오버레이 열기.
-    this.input.keyboard!.on("keydown-ENTER", () => this.openMenu());
-    this.input.keyboard!.on("keydown-X", () => this.openMenu());
+    // 메뉴(기본 Z·Enter) = 인게임 메뉴(포켓몬/가방/저장) 오버레이 열기. 가방(기본 D)은 바로 가방으로.
+    //  ⚠️ 원본도 필드 메뉴는 Input::ACTION(물리 Z)이다(Scene_Map.rb의 menu_calling).
+    // 확인키(기본 C·Enter·Space) = 앞칸의 NPC·팻말·아이템에 말 걸기(원본 Input::USE → interact_calling).
+    onAction(this, "USE", () => this.interact());
+    onAction(this, "MENU", () => this.openMenu());
+    onAction(this, "BAG", () => this.openMenu("bag"));
     // 메뉴 닫혀 이 씬이 재개되면 입력을 다시 켠다.
     this.events.on(Phaser.Scenes.Events.RESUME, () => { this.input.enabled = true; });
 
@@ -340,6 +370,179 @@ export default class WorldScene extends Phaser.Scene {
 
     // 트레이너 배치는 AR DB(비동기 fetch)가 있어야 알 수 있다 → 따로 띄운다.
     this.setupTrainers().catch((e) => console.error("[WorldScene] 트레이너 배치 실패:", e));
+    this.setupEvents();   // 원본 맵 이벤트(NPC 대사·팻말·바닥 아이템·열매나무)
+    this.setupWater();    // 움직이는 물결(원본 오토타일 애니)
+  }
+
+  // ── 물결(움직이는 오토타일) ──────────────────────────────
+  /**
+   * 원본의 움직이는 오토타일을 그 칸 위에 얹어 돌린다.
+   *  · 맵 PNG는 오토타일의 **첫 프레임**만 구워져 있다(extract-map.py) → 그 위에 같은 크기로 덮는다.
+   *  · 속도는 원본 `TilemapRenderer.rb`의 `AUTOTILE_FRAME_DURATION = 5`(1/20초) = **프레임당 0.25초**.
+   *  · 상록시티 30칸뿐이다 — 태초마을 물(NOANIMSEA)은 **원본도 안 움직인다**(1프레임짜리 그림).
+   */
+  private setupWater(): void {
+    for (const m of REGION_MAPS) {
+      if (!m.animWater) continue;
+      const meta = this.cache.json.get(`${m.name}_anim`) as
+        { frameMs: number; frames: number; rows: number; cells: { x: number; y: number; row: number }[] } | undefined;
+      if (!meta || !this.textures.exists(`${m.name}_anim`)) continue;
+      this.textures.get(`${m.name}_anim`).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      // 모양(줄)마다 애니를 하나씩 만든다. 애니는 게임 전역이라 씬을 다시 열어도 남아 있다.
+      for (let row = 0; row < meta.rows; row++) {
+        const key = `water_${m.name}_${row}`;
+        if (this.anims.exists(key)) continue;
+        this.anims.create({
+          key,
+          frames: this.anims.generateFrameNumbers(`${m.name}_anim`, {
+            frames: Array.from({ length: meta.frames }, (_, f) => row * meta.frames + f),
+          }),
+          frameRate: 1000 / meta.frameMs,   // 0.25초 → 4fps
+          repeat: -1,
+        });
+      }
+      for (const c of meta.cells) {
+        const [gx, gy] = toGlobal(m.name, c.x, c.y);
+        // depth 1 = 맵 바닥(0)보다 위, 캐릭터(5)·전경보다 아래.
+        this.add.sprite(this.cx(gx), this.cy(gy), `${m.name}_anim`)
+          .setOrigin(0.5, 1).setScale(SCALE).setDepth(1).play(`water_${m.name}_${c.row}`);
+      }
+    }
+  }
+
+  // ── 필드 이벤트(NPC·팻말·바닥 아이템·열매나무) ──────────────
+  //  원본 이벤트를 그대로 뽑아 온 것이다(systems/mapEvents.ts 머리말 참고).
+  //  ⚠️ 스프라이트시트 칸 크기는 파일마다 다르다 — AR 캐릭터 시트는 **가로 4칸 × 세로 4칸**이 규칙이라
+  //     그림을 받아 크기를 재서 잘라야 한다(NPC 29는 48x48, 볼은 32x32, 열매나무는 32x64다).
+  private setupEvents(): void {
+    this.events2 = [];
+    for (const m of REGION_MAPS) {
+      const file = this.cache.json.get(`${m.name}_events`) as MapEventFile | undefined;
+      if (!file?.events) continue;
+      for (const ev of file.events) {
+        const page = activePage(this.registry, m.name, ev);
+        if (!page) continue;                     // 지금 조건에 맞는 페이지가 없다(스토리 진행 전 NPC 등)
+        // 그림도 없고 말도 못 거는 페이지 = 지금은 없는 셈(원본이 NPC를 숨기는 방법).
+        if (!page.graphic && !talkablePage(this.registry, m.name, ev)) continue;
+        const [gx, gy] = toGlobal(m.name, ev.x, ev.y);
+        const entry: FieldEvent = { ev, map: m.name, gx, gy };
+        this.events2.push(entry);
+        if (!page.graphic) continue;             // 팻말 — 이미 벽인 타일 위에 얹힌 것이라 그릴 것도 막을 것도 없다
+        // 사람·볼·나무가 선 칸은 지나갈 수 없다(원본 이벤트도 통행 불가).
+        if (this.blocked[gy]) this.blocked[gy][gx] = 1;
+        void this.drawEventSprite(entry, page.graphic);
+      }
+    }
+  }
+
+  /** 이벤트 그림 한 장을 화면에 올린다(그림을 받아 4×4로 잘라 정지 프레임만 쓴다). */
+  private async drawEventSprite(entry: FieldEvent, gfx: string): Promise<void> {
+    const run = this.setupRun;
+    const sheetKey = `ev_${gfx}`;
+    // ⚠️ 같은 그림을 쓰는 이벤트가 여럿이다(볼 4개·열매나무 2그루) → 동시에 만들면
+    //    "Texture key already in use"가 난다. 그림마다 **만드는 작업 하나**를 기억해 두고 같이 기다린다.
+    let job = WorldScene.sheetJobs.get(sheetKey);
+    if (!job) {
+      job = (async () => {
+        const imgKey = `evimg_${gfx}`;
+        if (!this.textures.exists(imgKey)) {
+          await new Promise<void>((resolve) => {
+            this.load.image(imgKey, `assets/characters/${gfx}.png`);
+            this.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());
+            this.load.start();
+          });
+        }
+        if (!this.textures.exists(sheetKey) && this.textures.exists(imgKey)) {
+          const src = this.textures.get(imgKey).getSourceImage() as HTMLImageElement;
+          this.textures.addSpriteSheet(sheetKey, src, { frameWidth: src.width / 4, frameHeight: src.height / 4 });
+        }
+      })();
+      WorldScene.sheetJobs.set(sheetKey, job);
+    }
+    await job;
+    if (!this.textures.exists(sheetKey)) return;
+    if (run !== this.setupRun || !this.scene.isActive()) return;
+    this.textures.get(sheetKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    // 원본은 서 있을 때 첫 칸(아래를 본 모습)을 쓴다.
+    entry.sprite = this.add.sprite(this.cx(entry.gx), this.cy(entry.gy), sheetKey, 0)
+      .setOrigin(0.5, 1).setScale(SCALE).setDepth(yDepth(entry.gy));
+  }
+
+  /** 지금 바라보는 칸에 있는 이벤트(말 걸기용). 팻말처럼 그림 없는 것도 좌표로 찾는다. */
+  private eventInFront(): FieldEvent | undefined {
+    const d = { down: [0, 1], up: [0, -1], left: [-1, 0], right: [1, 0] }[this.facing];
+    const fx = this.tx + d[0], fy = this.ty + d[1];
+    return this.events2.find((e) => e.gx === fx && e.gy === fy);
+  }
+
+  /** 확인키 — 앞칸의 이벤트에 말을 건다. */
+  private interact(): void {
+    if (this.busy || this.moving) return;
+    const entry = this.eventInFront();
+    if (!entry) return;
+    const page = talkablePage(this.registry, entry.map, entry.ev);
+    if (!page) return;
+    this.busy = true;
+    this.runEventPage(entry, page)
+      .catch((e) => console.error("[WorldScene] 이벤트 오류:", e))
+      .finally(() => { this.dlg.hide(); this.busy = false; });
+  }
+
+  /** 이벤트 한 페이지를 위에서부터 실행한다(대사 → 선택지 → 아이템/열매). */
+  private async runEventPage(entry: FieldEvent, page: EventPage): Promise<void> {
+    const you = (this.registry.get("playerName") as string) ?? "나";
+    const fill = (t: string) => t.replace(/\{PLAYER\}/g, you);
+    const runLines = async (lines: EventLine[]): Promise<void> => {
+      for (const l of lines) {
+        if (l.text) {
+          await this.dlg.say(fill(l.text), l.speaker ? fill(l.speaker) : null);
+        } else if (l.choice?.length) {
+          const pick = await this.dlg.askChoice(l.choice.map(fill));
+          await runLines(l.branches?.[pick] ?? []);
+        } else if (l.item) {
+          await this.pickUp(entry, l.item, 1);
+        } else if (l.berry) {
+          await this.pickBerry(entry, l.berry, l.count ?? 1);
+        }
+      }
+    };
+    await runLines(page.lines);
+    // 아이템·열매는 한 번만 — 원본도 셀프스위치 A를 켜서 빈 페이지로 넘긴다.
+    if (entry.ev.kind === "item" || entry.ev.kind === "berry") this.refreshEvent(entry);
+  }
+
+  /** 바닥 아이템 줍기 — 문구는 원본 `pbItemBall`(Overworld.rb) 그대로 두 줄이다. */
+  private async pickUp(entry: FieldEvent, itemId: string, n: number): Promise<void> {
+    const def = getItem(itemId);
+    const name = def?.name ?? itemId;
+    playMe(this, SFX.pkmnGet, 0.5);   // 원본 ME "Item get" 자리
+    await this.dlg.say(`${name}${josa(name, "을를")} 주웠다!`);
+    addItem(this.registry, itemId, n);
+    const pocket = POCKET_NAME[def?.pocket ?? 1] ?? "일반";
+    await this.dlg.say(`${name}${josa(name, "을를")} 가방의\n${pocket} 포켓에 넣었다.`);
+    setSelfSwitch(this.registry, entry.map, entry.ev.id, "A");
+  }
+
+  /** 열매 따기 — 원본 `pbPickBerry`: 몇 개 열렸는지 묻고, 예를 고르면 딴다. */
+  private async pickBerry(entry: FieldEvent, itemId: string, n: number): Promise<void> {
+    const def = getItem(itemId);
+    const name = def?.name ?? itemId;
+    await this.dlg.say(`${name}${josa(name, "이가")} ${n}개 열려있다!\n열매를 딸까?`);
+    if (!(await this.dlg.askYesNo())) return;
+    playMe(this, SFX.pkmnGet, 0.5);   // 원본 ME "Berry get" 자리
+    addItem(this.registry, itemId, n);
+    await this.dlg.say(`${name}${josa(name, "을를")} ${n}개 땄다!`);
+    setSelfSwitch(this.registry, entry.map, entry.ev.id, "A");
+  }
+
+  /** 셀프스위치가 바뀐 뒤 모습을 다시 정한다(주운 볼은 사라지고, 그 칸도 다시 지나갈 수 있게 된다). */
+  private refreshEvent(entry: FieldEvent): void {
+    const gfx = visibleGraphic(this.registry, entry.map, entry.ev);
+    if (gfx) return;                       // 아직 보이는 페이지가 있다
+    entry.sprite?.destroy();
+    entry.sprite = undefined;
+    if (this.blocked[entry.gy]) this.blocked[entry.gy][entry.gx] = 0;
+    this.events2 = this.events2.filter((e) => e !== entry);
   }
 
   // ── 트레이너 ────────────────────────────────────────────
@@ -367,7 +570,7 @@ export default class WorldScene extends Phaser.Scene {
         this.textures.get(sheet).setFilter(Phaser.Textures.FilterMode.NEAREST);
         this.mkTrainerAnims(sheet);
         const sprite = this.add.sprite(this.cx(gx), this.cy(gy), sheet, this.idleFrame[spot.dir])
-          .setOrigin(0.5, 1).setScale(SCALE).setDepth(5);
+          .setOrigin(0.5, 1).setScale(SCALE).setDepth(yDepth(gy));
         // 트레이너가 선 칸은 막는다(원본 이벤트도 통과 못 한다).
         this.blocked[gy][gx] = 1;
         this.trainers.push({ spot, gx, gy, sheet, sprite, defeated: done.includes(spot.id) });
@@ -591,7 +794,7 @@ export default class WorldScene extends Phaser.Scene {
    * (원본 설명 그대로: "Hold Back while moving to move at the other speed").
    */
   private stepMs(): number {
-    const held = this.runKeys.some(k => k.isDown);
+    const held = isActionDown(this, "BACK") || !!this.shiftKey?.isDown;
     const running = settings().moveStyle === "run" ? !held : held;
     return stepDurationMs(running);
   }
@@ -605,6 +808,7 @@ export default class WorldScene extends Phaser.Scene {
   /** 한 칸(또는 점프 후) 도착 처리 — 걷기와 점프가 똑같이 쓴다. */
   private landOn(tx: number, ty: number): void {
     this.tx = tx; this.ty = ty; this.moving = false;
+    this.player.setDepth(yDepth(this.ty));   // 아래 칸으로 갈수록 앞에(원본 Y정렬)
     this.onEnterTile();   // 맵 경계를 넘었는지 확인(암전 없이 그냥 넘어간다) + 풀숲 조우 판정
     // 조우가 걸렸으면(busy) 워프는 건너뛴다 — 지금은 풀숲과 워프 칸이 겹치지 않지만,
     //  겹치는 순간 배틀과 문 진입이 동시에 scene.start 되어 화면이 뒤엉킨다.
@@ -640,7 +844,8 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   // 인게임 메뉴 열기: 이 씬을 멈추고 입력을 끈 뒤 MenuScene을 오버레이로 띄운다.
-  private openMenu(): void {
+  //  what="bag"이면 메뉴를 거치지 않고 가방을 바로 연다(가방 단축키 — 닫으면 필드로 바로 돌아온다).
+  private openMenu(what: "menu" | "bag" = "menu"): void {
     if (this.busy || this.moving) return;
     // 저장 위치 기록(메뉴 '저장'이 이 값을 직렬화한다). 월드는 정확한 타일·방향까지 저장.
     // ⚠️ 저장은 **맵 이름 + 그 맵 기준 로컬 좌표**로 남긴다(글로벌로 남기면 나중에 맵을 끼워넣을 때 옛 세이브가 전부 어긋난다).
@@ -649,7 +854,8 @@ export default class WorldScene extends Phaser.Scene {
     this.input.enabled = false;
     this.cameras.main.resetFX();  // 진행 중이던 fadeIn(400ms)이 pause로 얼어 월드가 어둑하게 멈추는 것 방지
     this.scene.pause();
-    this.scene.launch("MenuScene", { from: "WorldScene" });
+    if (what === "bag") this.scene.launch("BagScene", { from: "WorldScene" });
+    else this.scene.launch("MenuScene", { from: "WorldScene" });
   }
 
   // 야생 배틀 시작: 조우표가 뽑은 종족·레벨로 상대를 만들고, 내 파티 선두를 아군으로 넘긴다.

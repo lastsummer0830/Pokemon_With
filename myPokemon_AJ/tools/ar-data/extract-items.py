@@ -36,6 +36,10 @@ WHITELIST = [
     # 소중한 물건(포켓8) — 스토리 진행용. 오박사가 스타터와 함께 주고, 상록체육관에서 그린에게 보여준다.
     #  ⚠️ 원본에 실제로 있는 아이템이다(:OAKSINTRODUCTION = "오박사의 소개장"). 우리가 지어낸 게 아니다.
     "OAKSINTRODUCTION",
+    # 필드 이벤트가 실제로 주는 것 (2026-08-03 원본 맵 이벤트 전수 대조에서 추가).
+    #  1번도로 열매나무 2그루 = ORANBERRY(포켓5) · 상록시티 바닥 = TM09(포켓4).
+    #  ⚠️ 이 둘이 없으면 이름을 못 찾아 화면에 "ORANBERRY를 2개 땄다!"처럼 영어 id가 그대로 나온다.
+    "ORANBERRY", "TM09",
 ]
 
 # ── 원본 값을 일부러 덮어쓰는 가격 ────────────────────────────
@@ -105,6 +109,8 @@ def main():
     ko_name, ko_desc = load_messages()
 
     src = loads(open(os.path.join(DATA, "items.dat"), "rb").read())
+    # 기술머신 아이콘은 "그 기술의 타입" 그림을 쓴다(원본 Item.rb) → moves.dat도 함께 읽는다.
+    moves = {str(k): v for k, v in loads(open(os.path.join(DATA, "moves.dat"), "rb").read()).items()}
     # items.dat 는 {Symbol -> GameData::Item}. Symbol 키에는 콜론이 붙으므로 .name 으로 맞춘다.
     by_id = {sym(k): v for k, v in src.items()}
 
@@ -131,6 +137,18 @@ def main():
         }
         # 아이콘: 파일명이 곧 아이템 id (별도 인덱스 매핑 불필요)
         png = os.path.join(ICONS_SRC, f"{iid}.png")
+        # ⭐ 기술머신(TM)은 자기 이름의 그림이 없다 — 원본 `Item.rb`의 규칙대로
+        #    **그 기술의 타입 아이콘**(machine_<타입>)을 쓴다. (TM09=씨뿌리기 → GRASS → machine_GRASS.png)
+        if not os.path.exists(png):
+            mv = a.get("@move")
+            if mv:
+                mv_id = str(mv).lstrip(":")
+                mdef = moves.get(f":{mv_id}") or moves.get(mv_id)
+                mtype = str(mdef.attributes.get("@type")).lstrip(":") if mdef is not None else None
+                if mtype:
+                    cand = os.path.join(ICONS_SRC, f"machine_{mtype}.png")
+                    if os.path.exists(cand):
+                        png = cand
         if os.path.exists(png):
             shutil.copy2(png, os.path.join(OUT_ICON, f"{iid}.png"))
             copied += 1

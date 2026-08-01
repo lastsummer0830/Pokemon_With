@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { dexCounts, dexEntries, DexEntry } from "../data/Pokedex";
 import { frontPath, makeStillFront } from "../game/pokemonSprite";
 import { playSfx, preloadCommonAudio, SFX } from "../game/sfx";
+import { bindActions } from "../systems/input";
 
 // 도감 화면 (오버레이). 메뉴 → "도감" 또는 디버그에서 연다. 목록 ↔ 상세 두 뷰.
 //
@@ -70,11 +71,7 @@ export default class PokedexScene extends Phaser.Scene {
     kb.on("keydown-DOWN", () => this.move(1));
     kb.on("keydown-LEFT", () => this.move(-ROWS));
     kb.on("keydown-RIGHT", () => this.move(ROWS));
-    kb.on("keydown-ENTER", () => this.confirm());
-    kb.on("keydown-Z", () => this.confirm());
-    kb.on("keydown-SPACE", () => this.confirm());
-    kb.on("keydown-X", () => this.cancel());
-    kb.on("keydown-ESC", () => this.cancel());
+    bindActions(this, { USE: () => this.confirm(), BACK: () => this.cancel() });
 
     this.scale.on("resize", this.render, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off("resize", this.render, this));

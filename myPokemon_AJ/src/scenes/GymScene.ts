@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { Gender } from "../data/Player";
 import { josa } from "../data/josa";
 import DialogBox from "../ui/DialogBox";
+import { onAction } from "../systems/input";
 import { playBgm } from "../game/bgm";
 import { playSfx, playMe, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 import { autoSaveWithToast } from "../game/saveIndicator";
@@ -131,9 +132,8 @@ export default class GymScene extends Phaser.Scene {
     this.scale.on("resize", this.layout, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.scale.off("resize", this.layout, this); this.dlg.destroy(); });
 
-    this.input.keyboard!.on("keydown-SPACE", this.onKey, this);
-    this.input.keyboard!.on("keydown-ENTER", this.onKey, this);
-    this.input.keyboard!.on("keydown-Z", this.onKey, this);
+    // 확인키(기본 C·Enter·Space) — 실제 키는 옵션의 키 설정을 따른다.
+    onAction(this, "USE", () => this.onKey());
 
     this.cameras.main.fadeIn(400, 0, 0, 0);
 
