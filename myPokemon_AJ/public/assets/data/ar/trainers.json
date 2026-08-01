@@ -36,6 +36,54 @@
     }
    ]
   },
+  "ILLA:???": {
+   "type": "ILLA",
+   "typeName": "포켓몬 트레이너",
+   "name": "???",
+   "baseMoney": 32,
+   "loseText": "으으으, 안 돼!!",
+   "sprite": "ILLA",
+   "team": [
+    {
+     "id": "PHANPY",
+     "level": 4
+    },
+    {
+     "id": "WHISMUR",
+     "level": 4
+    },
+    {
+     "id": "PANCHAM",
+     "level": 5
+    }
+   ]
+  },
+  "CAMPER:경호": {
+   "type": "CAMPER",
+   "typeName": "캠프보이",
+   "name": "경호",
+   "baseMoney": 16,
+   "loseText": "너 꽤 강하구나?",
+   "sprite": "CAMPER",
+   "team": [
+    {
+     "id": "DRILBUR",
+     "level": 7
+    },
+    {
+     "id": "RATTATA",
+     "level": 8
+    },
+    {
+     "id": "ARON",
+     "level": 8
+    },
+    {
+     "id": "MAKUHITA",
+     "level": 8
+    }
+   ]
+  },
   "LEADER_Green:그린": {
    "type": "LEADER_Green",
    "typeName": "체육관 관장",
