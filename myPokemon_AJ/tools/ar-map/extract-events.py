@@ -214,9 +214,19 @@ def extract(ar: str, mid: int, out_name: str, out_dir: str):
             # 서 있는 방향(RMXP 방향번호 2=아래 4=왼쪽 6=오른쪽 8=위). 원본에서 벽을 보고 선 사람,
             #  마주 보고 선 두 사람이 있어 이걸 안 옮기면 전부 정면을 보고 서 버린다.
             face = int(str(pg.attributes["@graphic"].attributes["@direction"]))
+            # 제자리 발동작(원본 step_anime) — 열매나무가 바람에 흔들리는 것이 이거다.
+            #  ⚠️ 열매나무는 세로 4줄이 **성장 단계**고 가로 4칸이 흔들림 프레임이다(시트 실측).
+            step = str(pg.attributes["@step_anime"]) == "True"
+            # 방향 고정(원본 direction_fix) — 켜져 있으면 말을 걸어도 돌아보지 않는다.
+            #  열매나무가 이걸 켜 둔 이유가 위와 같다(돌아보면 '방향'=성장단계가 바뀌어 딴 그림이 된다).
+            fixed = str(pg.attributes["@direction_fix"]) == "True"
             if skipped:
                 notes.append(f"[{eid}]{name}({x},{y}) p{len(pages)+1}: 못 옮긴 것 — " + " / ".join(skipped[:3]))
             page = {"graphic": gfx, "dir": face, "trigger": trig, "cond": page_condition(pg), "lines": lines}
+            if step:
+                page["step"] = True
+            if fixed:
+                page["fixed"] = True
             # ⚠️ 조건분기·이동경로처럼 못 옮긴 명령이 섞인 페이지는 **반쪽짜리**다.
             #    그대로 쓰면 갈래별 대사가 한 줄로 이어져 "그래? / 그래?"처럼 이상하게 나온다.
             #    → partial로 찍어 두고 게임에선 건너뛴다(스토리로 제대로 붙일 때 이 표시를 지운다).

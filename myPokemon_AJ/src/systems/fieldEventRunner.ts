@@ -4,7 +4,7 @@ import { addItem, POCKET_NAME } from "../data/Bag";
 import { getItem } from "../data/ar";
 import { josa } from "../data/josa";
 import { playMe, playSfx, SFX } from "../game/sfx";
-import { setSelfSwitch, setArSwitch } from "./mapEvents";
+import { setSelfSwitch, setArSwitch, dirFrame } from "./mapEvents";
 import type { EventLine, EventPage, MapEvent } from "./mapEvents";
 
 // 원본 맵 이벤트 한 페이지를 **실제로 실행**하는 곳 — 대사·선택지·아이템·효과음.
@@ -65,6 +65,31 @@ export async function loadEventSheet(scene: Phaser.Scene, gfx: string): Promise<
   if (!scene.textures.exists(sheetKey)) return null;
   scene.textures.get(sheetKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
   return sheetKey;
+}
+
+/**
+ * 이벤트 스프라이트에 **지금 보여야 할 모습**을 입힌다 — 정지 프레임이거나, 제자리 발동작(원본 step_anime).
+ *
+ * 시트는 가로 4칸(모습 변형) × 세로 4줄(방향). 제자리 발동작은 그 줄의 4칸을 도는 것이다.
+ * 속도도 원본 값: `Game_Character#pattern_update_speed = move_time * 2`, 한 칸당 그 값의 1/4.
+ * 걷기 속도(move_speed 3)면 move_time 0.25초 → 한 칸 0.125초 = **8fps**.
+ *
+ * ⚠️ 열매나무는 세로 4줄이 방향이 아니라 **성장 단계**다(시트 실측: 새싹→봉오리→꽃→열매).
+ *    그래서 원본이 direction_fix로 방향을 잠가 뒀다 — 우리도 그 값(page.fixed)을 그대로 따른다.
+ */
+export function applyEventSprite(
+  scene: Phaser.Scene, sprite: Phaser.GameObjects.Sprite, sheetKey: string, page: EventPage, dir?: number,
+): void {
+  const base = dirFrame(dir ?? page.dir);
+  if (!page.step) { sprite.stop(); sprite.setFrame(base); return; }
+  const key = `evstep_${sheetKey}_${base}`;
+  if (!scene.anims.exists(key)) {
+    scene.anims.create({
+      key, frameRate: 8, repeat: -1,
+      frames: scene.anims.generateFrameNumbers(sheetKey, { frames: [base, base + 1, base + 2, base + 3] }),
+    });
+  }
+  sprite.play(key);
 }
 
 /**

@@ -5,9 +5,9 @@ import DialogBox from "../ui/DialogBox";
 import { onAction } from "../systems/input";
 import { playBgm } from "../game/bgm";
 import { playSfx, playMe, preloadCommonAudio, SFX, BGM } from "../game/sfx";
-import { activePage, talkablePage, visibleGraphic, dirFrame } from "../systems/mapEvents";
+import { activePage, talkablePage, visibleGraphic, faceDirToward } from "../systems/mapEvents";
 import type { MapEvent, MapEventFile } from "../systems/mapEvents";
-import { loadEventSheet, preloadEventAudio, runEventPage } from "../systems/fieldEventRunner";
+import { applyEventSprite, loadEventSheet, preloadEventAudio, runEventPage } from "../systems/fieldEventRunner";
 
 // 상록시티 실내 건물 — 포켓몬 센터·프렌들리 숍·**민가 4채**를 한 씬으로 겸한다.
 //
@@ -53,7 +53,8 @@ interface MapData { cols: number; rows: number; blocked: number[][]; }
 interface BuildInit { building?: Building; testParty?: boolean; }
 
 // 실내에 세워진 원본 이벤트 하나 — 어디에 섰고 어떤 스프라이트인가.
-interface RoomEvent { ev: MapEvent; sprite?: Phaser.GameObjects.Sprite }
+// faceDir = 말을 건 뒤 향한 방향. 원본은 대화가 끝나도 원래 방향으로 안 돌아간다(mapEvents.faceDirToward).
+interface RoomEvent { ev: MapEvent; sprite?: Phaser.GameObjects.Sprite; faceDir?: number }
 
 const STEP_MS = 150; // 한 칸 걷는 시간 — 다른 씬(월드·연구소·체육관)과 같게
 // y-정렬 기준 depth. 맵=0, 대화창=1000+ 사이. 캐릭터 depth = BASE+발위치행, 전경 스트립 depth = BASE+행+0.5.
@@ -329,8 +330,9 @@ export default class BuildingScene extends Phaser.Scene {
       if (!page.graphic) continue;               // TV·팻말 — 이미 벽인 타일 위에 얹힌 것이라 그릴 게 없다
       void loadEventSheet(this, page.graphic).then((sheet) => {
         if (!sheet || run !== this.setupRun || !this.scene.isActive()) return;
-        entry.sprite = this.add.sprite(this.cx(ev.x), this.cy(ev.y), sheet, dirFrame(page.dir))
+        entry.sprite = this.add.sprite(this.cx(ev.x), this.cy(ev.y), sheet)
           .setOrigin(0.5, 1).setScale(this.zoom * 0.92).setDepth(this.charDepth(ev.y));
+        applyEventSprite(this, entry.sprite, sheet, page, entry.faceDir);
       });
     }
   }
@@ -345,9 +347,9 @@ export default class BuildingScene extends Phaser.Scene {
       this.roomEvents = this.roomEvents.filter((e) => e !== entry);
       return;
     }
-    // 아직 보이지만 **다른 페이지의 다른 그림**일 수 있다(아이가 우는 페이지 등) → 프레임만 다시 맞춘다.
+    // 아직 보이지만 **다른 페이지의 다른 그림**일 수 있다(아이가 우는 페이지 등) → 모습을 다시 맞춘다.
     const page = activePage(this.registry, map, entry.ev);
-    if (entry.sprite && page) entry.sprite.setFrame(dirFrame(page.dir));
+    if (entry.sprite && page) applyEventSprite(this, entry.sprite, `ev_${page.graphic}`, page, entry.faceDir);
   }
 
   // 앞칸 상호작용 — 카운터를 마주보고 A: 센터=회복, 마트=점원. 민가는 앞칸의 원본 이벤트에 말 걸기.
@@ -361,6 +363,11 @@ export default class BuildingScene extends Phaser.Scene {
       const map = this.def.eventsName!;
       const page = talkablePage(this.registry, map, entry.ev);
       if (!page) return;
+      // 원본처럼 말을 걸면 이쪽을 돌아본다(대화가 끝나도 그대로 본다 — 원본 `lock`이 그렇다).
+      if (entry.sprite && !page.fixed && page.graphic) {
+        entry.faceDir = faceDirToward(this.facing);
+        applyEventSprite(this, entry.sprite, `ev_${page.graphic}`, page, entry.faceDir);
+      }
       this.busy = true;
       runEventPage(this, this.dlg, map, entry.ev, page)
         .then((changed) => { if (changed) this.refreshEvent(entry); })

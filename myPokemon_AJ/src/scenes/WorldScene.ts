@@ -14,9 +14,9 @@ import { attachWeather, applyDebugWeather, preloadWeather, rollWeather, WeatherK
 import { preloadVsIntroAll, playVsIntro, vsKeyFromTrainerId } from "../systems/vsIntro";
 import { settings, stepDurationMs } from "../systems/settings";
 import { isActionDown, keysLabel, onAction } from "../systems/input";
-import { activePage, talkablePage, visibleGraphic, dirFrame } from "../systems/mapEvents";
+import { activePage, talkablePage, visibleGraphic, faceDirToward } from "../systems/mapEvents";
 import type { EventPage, MapEvent, MapEventFile } from "../systems/mapEvents";
-import { loadEventSheet, preloadEventAudio, runEventPage } from "../systems/fieldEventRunner";
+import { applyEventSprite, loadEventSheet, preloadEventAudio, runEventPage } from "../systems/fieldEventRunner";
 
 // 야외 = 어나더레드에서 그대로 추출한 맵 3장을 **하나로 이어붙인 리전**(52×100칸).
 //  - 위에서부터 상록시티(0~39) · 1번도로(40~79) · 태초마을(80~99). 배치 근거는 src/data/region.ts 주석 참고
@@ -29,7 +29,9 @@ import { loadEventSheet, preloadEventAudio, runEventPage } from "../systems/fiel
 type Dir = "down" | "left" | "right" | "up";
 interface Warp { x: number; y: number; to: string; dir?: Dir; room?: string }
 /** 맵에 서 있는 원본 이벤트 하나(글로벌 좌표 + 화면에 올린 그림). */
-interface FieldEvent { ev: MapEvent; map: string; gx: number; gy: number; sprite?: Phaser.GameObjects.Sprite }
+// faceDir = 말을 건 뒤 이 이벤트가 향한 방향. 원본은 대화가 끝나도 원래 방향으로 안 돌아가므로
+//  한 번 정해지면 그대로 남는다(mapEvents.faceDirToward 주석 참고).
+interface FieldEvent { ev: MapEvent; map: string; gx: number; gy: number; sprite?: Phaser.GameObjects.Sprite; faceDir?: number }
 
 // 카메라 프레이밍 — 원본(Another Red)은 내부해상도 512×384 / 타일 32px라 **창 크기와 무관하게 항상 16×12칸**이 보인다.
 //  우리는 캔버스가 창 전체(main.ts의 Phaser.Scale.RESIZE)라 SCALE을 2로 고정하면 창이 클수록 보이는 칸이 늘어
@@ -432,20 +434,22 @@ export default class WorldScene extends Phaser.Scene {
         if (!page.graphic) continue;             // 팻말 — 이미 벽인 타일 위에 얹힌 것이라 그릴 것도 막을 것도 없다
         // 사람·볼·나무가 선 칸은 지나갈 수 없다(원본 이벤트도 통행 불가).
         if (this.blocked[gy]) this.blocked[gy][gx] = 1;
-        void this.drawEventSprite(entry, page.graphic, page.dir);
+        void this.drawEventSprite(entry, page);
       }
     }
   }
 
   /** 이벤트 그림 한 장을 화면에 올린다(시트 만드는 일은 fieldEventRunner가 게임 전역으로 관리한다). */
-  private async drawEventSprite(entry: FieldEvent, gfx: string, dir?: number): Promise<void> {
+  private async drawEventSprite(entry: FieldEvent, page: EventPage): Promise<void> {
     const run = this.setupRun;
-    const sheetKey = await loadEventSheet(this, gfx);
+    const sheetKey = await loadEventSheet(this, page.graphic);
     if (!sheetKey) return;
     if (run !== this.setupRun || !this.scene.isActive()) return;
     // 원본이 정해둔 방향으로 세운다(벽을 보고 선 사람·마주 보고 선 사람이 있다).
-    entry.sprite = this.add.sprite(this.cx(entry.gx), this.cy(entry.gy), sheetKey, dirFrame(dir))
+    //  열매나무처럼 제자리 발동작(step_anime)이 켜진 것은 흔들리는 애니로 재생한다.
+    entry.sprite = this.add.sprite(this.cx(entry.gx), this.cy(entry.gy), sheetKey)
       .setOrigin(0.5, 1).setScale(SCALE).setDepth(yDepth(entry.gy));
+    applyEventSprite(this, entry.sprite, sheetKey, page, entry.faceDir);
   }
 
   /** 지금 바라보는 칸에 있는 이벤트(말 걸기용). 팻말처럼 그림 없는 것도 좌표로 찾는다. */
@@ -462,12 +466,20 @@ export default class WorldScene extends Phaser.Scene {
     if (!entry) return;
     const page = talkablePage(this.registry, entry.map, entry.ev);
     if (!page) return;
+    this.turnToPlayer(entry, page);
     this.busy = true;
     // 실제 실행은 씬 밖의 공용 실행기가 한다(실내 민가도 같은 것을 쓴다 — systems/fieldEventRunner.ts).
     runEventPage(this, this.dlg, entry.map, entry.ev, page)
       .then((changed) => { if (changed) this.refreshEvent(entry); })
       .catch((e) => console.error("[WorldScene] 이벤트 오류:", e))
       .finally(() => { this.dlg.hide(); this.busy = false; });
+  }
+
+  /** 말을 걸면 원본처럼 이쪽을 돌아본다 — 그리고 대화가 끝나도 그대로 본다(원본 `lock`이 그렇다). */
+  private turnToPlayer(entry: FieldEvent, page: EventPage): void {
+    if (!entry.sprite || page.fixed || !page.graphic) return;
+    entry.faceDir = faceDirToward(this.facing);
+    applyEventSprite(this, entry.sprite, `ev_${page.graphic}`, page, entry.faceDir);
   }
 
   /** 셀프스위치가 바뀐 뒤 모습을 다시 정한다(주운 볼은 사라지고, 그 칸도 다시 지나갈 수 있게 된다). */

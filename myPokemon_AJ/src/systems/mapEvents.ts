@@ -35,6 +35,8 @@ export interface EventLine {
 export interface EventPage {
   graphic: string;                // AR characters/<이름>.png (빈 문자열 = 안 보이는 페이지)
   dir?: number;                   // 서 있는 방향(RMXP 2=아래 4=왼쪽 6=오른쪽 8=위)
+  step?: boolean;                 // 제자리 발동작(원본 step_anime) — 열매나무가 바람에 흔들리는 것
+  fixed?: boolean;                // 방향 고정(원본 direction_fix) — 말을 걸어도 안 돌아본다
   trigger: number;                // 0=말걸기 1·2=접촉 3=자동실행 4=병렬
   cond: { selfSwitch?: string; switch?: number; switch2?: number; variable?: [number, number] };
   lines: EventLine[];
@@ -110,6 +112,19 @@ export function activePage(reg: Reg, map: string, ev: MapEvent): EventPage | nul
  */
 export function dirFrame(dir?: number): number {
   return { 2: 0, 4: 4, 6: 8, 8: 12 }[dir ?? 2] ?? 0;
+}
+
+/**
+ * 말을 걸었을 때 이벤트가 향할 방향(RMXP 번호).
+ *
+ * 원본은 말을 걸면 **항상 플레이어를 돌아본다** — `Interpreter`가 `event.lock`을 부르고
+ * `Game_Character#lock`이 `turn_toward_player`를 한다. 게다가 `@prelock_direction = 0`이라
+ * 대화가 끝나도 **원래 방향으로 안 돌아간다**(계속 플레이어를 본 채로 있다).
+ * 단 `direction_fix`(우리 `page.fixed`)가 켜진 이벤트는 예외 —
+ * 열매나무가 그렇다(그 그림은 '방향' 줄이 곧 성장 단계라 돌리면 딴 그림이 된다).
+ */
+export function faceDirToward(playerFacing: "up" | "down" | "left" | "right"): number {
+  return { down: 8, up: 2, left: 6, right: 4 }[playerFacing];
 }
 
 /** 지금 화면에 그려야 하는가(=보이는 페이지가 있고 그림이 있는가). */

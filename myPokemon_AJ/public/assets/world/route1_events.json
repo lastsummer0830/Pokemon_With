@@ -194,7 +194,9 @@
        "berry": "ORANBERRY",
        "count": 2
       }
-     ]
+     ],
+     "step": true,
+     "fixed": true
     },
     {
      "graphic": "",
@@ -204,6 +206,7 @@
       "selfSwitch": "A"
      },
      "lines": [],
+     "step": true,
      "partial": true
     }
    ]
@@ -226,7 +229,9 @@
        "berry": "ORANBERRY",
        "count": 2
       }
-     ]
+     ],
+     "step": true,
+     "fixed": true
     },
     {
      "graphic": "",
@@ -236,6 +241,7 @@
       "selfSwitch": "A"
      },
      "lines": [],
+     "step": true,
      "partial": true
     }
    ]
