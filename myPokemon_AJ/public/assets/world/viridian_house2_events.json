@@ -1,0 +1,173 @@
+{
+ "arMap": 161,
+ "events": [
+  {
+   "id": 2,
+   "name": "EV002",
+   "x": 6,
+   "y": 6,
+   "kind": "npc",
+   "graphic": "NPC 02",
+   "pages": [
+    {
+     "graphic": "NPC 02",
+     "dir": 4,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "히히! 생일선물로 받았어!"
+      }
+     ]
+    },
+    {
+     "graphic": "NPC 02",
+     "dir": 4,
+     "trigger": 0,
+     "cond": {
+      "switch": 96
+     },
+     "lines": [
+      {
+       "text": "어...? 그거 왜 가져가...?"
+      },
+      {
+       "text": "그거 내 생일 선물인데...?"
+      },
+      {
+       "text": "(돌려줄까...?)",
+       "speaker": "{PLAYER}"
+      },
+      {
+       "choice": [
+        "아니오",
+        "아니오"
+       ],
+       "branches": [
+        [
+         {
+          "text": "(현실은 잔혹한 법이지...)",
+          "speaker": "{PLAYER}"
+         }
+        ],
+        [
+         {
+          "text": "(현실은 잔혹한 법이지...)",
+          "speaker": "{PLAYER}"
+         }
+        ]
+       ]
+      },
+      {
+       "text": "으아아아앙!!"
+      },
+      {
+       "setSelf": "A"
+      }
+     ]
+    },
+    {
+     "graphic": "NPC 02",
+     "dir": 4,
+     "trigger": 0,
+     "cond": {
+      "selfSwitch": "A",
+      "switch": 96
+     },
+     "lines": [
+      {
+       "text": "내 선물을 뺏겼어..."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "name": "Item",
+   "x": 5,
+   "y": 6,
+   "kind": "item",
+   "graphic": "Object ball",
+   "pages": [
+    {
+     "graphic": "Object ball",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "item": "POKEDOLL"
+      },
+      {
+       "setSelf": "A"
+      },
+      {
+       "setSwitch": [
+        96,
+        true
+       ]
+      },
+      {
+       "text": "어...? 그거 내 생일 선물인데...?",
+       "speaker": "아이"
+      }
+     ]
+    },
+    {
+     "graphic": "",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {
+      "selfSwitch": "A"
+     },
+     "lines": []
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "EV004",
+   "x": 9,
+   "y": 2,
+   "kind": "sign",
+   "graphic": "",
+   "pages": [
+    {
+     "graphic": "",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "(화면에는 특집 방송이 나오고 있다.)",
+       "speaker": "{PLAYER}"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "name": "EV005",
+   "x": 10,
+   "y": 2,
+   "kind": "sign",
+   "graphic": "",
+   "pages": [
+    {
+     "graphic": "",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "(화면에는 특집 방송이 나오고 있다.)",
+       "speaker": "{PLAYER}"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

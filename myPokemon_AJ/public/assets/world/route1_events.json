@@ -11,6 +11,7 @@
    "pages": [
     {
      "graphic": "phone001",
+     "dir": 6,
      "trigger": 3,
      "cond": {
       "switch": 97
@@ -101,6 +102,12 @@
        "speaker": "오박사"
       },
       {
+       "setSwitch": [
+        1,
+        true
+       ]
+      },
+      {
        "text": "(무슨 상황인지 이해가 되지 않는다.)",
        "speaker": "{PLAYER}"
       },
@@ -115,12 +122,19 @@
       {
        "text": "(일단 오박사를 따라가보자.)",
        "speaker": "{PLAYER}"
+      },
+      {
+       "se": "Door enter"
+      },
+      {
+       "setSelf": "A"
       }
      ],
      "partial": true
     },
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "selfSwitch": "A"
@@ -139,16 +153,21 @@
    "pages": [
     {
      "graphic": "Object ball",
+     "dir": 2,
      "trigger": 0,
      "cond": {},
      "lines": [
       {
        "item": "POTION"
+      },
+      {
+       "setSelf": "A"
       }
      ]
     },
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "selfSwitch": "A"
@@ -167,6 +186,7 @@
    "pages": [
     {
      "graphic": "berrytree_ORANBERRY",
+     "dir": 8,
      "trigger": 0,
      "cond": {},
      "lines": [
@@ -178,6 +198,7 @@
     },
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "selfSwitch": "A"
@@ -197,6 +218,7 @@
    "pages": [
     {
      "graphic": "berrytree_ORANBERRY",
+     "dir": 8,
      "trigger": 0,
      "cond": {},
      "lines": [
@@ -208,6 +230,7 @@
     },
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "selfSwitch": "A"
@@ -227,16 +250,21 @@
    "pages": [
     {
      "graphic": "Object ball",
+     "dir": 2,
      "trigger": 0,
      "cond": {},
      "lines": [
       {
        "item": "ANTIDOTE"
+      },
+      {
+       "setSelf": "A"
       }
      ]
     },
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "selfSwitch": "A"
@@ -255,6 +283,7 @@
    "pages": [
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 0,
      "cond": {},
      "lines": [
@@ -276,16 +305,21 @@
    "pages": [
     {
      "graphic": "Object ball",
+     "dir": 2,
      "trigger": 0,
      "cond": {},
      "lines": [
       {
        "item": "POKEBALL"
+      },
+      {
+       "setSelf": "A"
       }
      ]
     },
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "selfSwitch": "A"

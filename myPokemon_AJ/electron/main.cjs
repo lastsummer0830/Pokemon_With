@@ -15,6 +15,9 @@ function createWindow() {
     width: 1280,
     height: 720,
     title: "PokemonWith",
+    // 창·작업표시줄 아이콘 (01_Resources/Title/Logo/Program_Logo_Transparent.png에서 구운 것).
+    //  ⚠️ exe 파일 자체의 아이콘은 이 값이 아니라 exe에 박힌 리소스가 정한다 → tools/set-exe-icon.sh 참고.
+    icon: path.join(__dirname, "assets", "icon.png"),
     backgroundColor: "#1b1b1b",
     autoHideMenuBar: true,        // 상단 메뉴바 숨김 (게임답게)
     webPreferences: {

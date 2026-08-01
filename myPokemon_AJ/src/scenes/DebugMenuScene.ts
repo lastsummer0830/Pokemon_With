@@ -103,6 +103,11 @@ export default class DebugMenuScene extends Phaser.Scene {
       ["I. 프렌들리 숍(마트)", "BuildingScene", { building: "mart", testParty: true }],
       // 포켓몬 상세정보(Summary) — 파티에서 열리는 오버레이. testParty로 채운 파티의 첫 마리를 연다.
       ["O. 상세정보(Summary)", "SummaryScene", { testParty: true, from: "DebugMenuScene" }],
+      // 상록시티 민가 4채(AR Map160~163) — 방 그림은 넷 다 같고 안에 있는 사람·물건만 다르다.
+      ["P. 민가1(원예사·물뿌리개)", "BuildingScene", { building: "house1", testParty: true }],
+      ["A. 민가2(아이·포켓인형)", "BuildingScene", { building: "house2", testParty: true }],
+      ["S. 민가3(피카츄)", "BuildingScene", { building: "house3", testParty: true }],
+      ["D. 민가4(젬 상점)", "BuildingScene", { building: "house4", testParty: true }],
     ];
     const go = (key: string, data?: object) => {
       // 테스트용 기본값 — 인트로를 건너뛰어도 씬이 동작하도록(가방·소지금·도감 기록까지 채운다).
@@ -123,7 +128,7 @@ export default class DebugMenuScene extends Phaser.Scene {
     };
 
     // 숫자 10개로는 모자라 알파벳까지 쓴다(항목 순서 = 이 배열 순서).
-    const keyNames = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "ZERO", "Q", "W", "E", "R", "T", "Y", "U", "I", "O"];
+    const keyNames = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "ZERO", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "A", "S", "D"];
     // 항목 수에 맞춰 자동으로 화면 안에 다 들어오게(캔버스라 스크롤 없음).
     const startY = height * 0.22;
     const gap = Math.min(height * 0.06, (height * 0.72) / scenes.length);

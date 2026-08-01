@@ -14,11 +14,9 @@ import { attachWeather, applyDebugWeather, preloadWeather, rollWeather, WeatherK
 import { preloadVsIntroAll, playVsIntro, vsKeyFromTrainerId } from "../systems/vsIntro";
 import { settings, stepDurationMs } from "../systems/settings";
 import { isActionDown, keysLabel, onAction } from "../systems/input";
-import { activePage, talkablePage, visibleGraphic, setSelfSwitch } from "../systems/mapEvents";
-import type { EventLine, EventPage, MapEvent, MapEventFile } from "../systems/mapEvents";
-import { addItem, POCKET_NAME } from "../data/Bag";
-import { getItem } from "../data/ar";
-import { josa } from "../data/josa";
+import { activePage, talkablePage, visibleGraphic, dirFrame } from "../systems/mapEvents";
+import type { EventPage, MapEvent, MapEventFile } from "../systems/mapEvents";
+import { loadEventSheet, preloadEventAudio, runEventPage } from "../systems/fieldEventRunner";
 
 // 야외 = 어나더레드에서 그대로 추출한 맵 3장을 **하나로 이어붙인 리전**(52×100칸).
 //  - 위에서부터 상록시티(0~39) · 1번도로(40~79) · 태초마을(80~99). 배치 근거는 src/data/region.ts 주석 참고
@@ -106,6 +104,11 @@ export default class WorldScene extends Phaser.Scene {
     // 상록 포켓몬센터(AR Map158)·프렌들리 숍(AR Map159) — 문 칸도 Map56 transfer 값 그대로.
     { map: "viridian_city", x: 26, y: 25, to: "pc", dir: "up" },
     { map: "viridian_city", x: 35, y: 25, to: "mart", dir: "up" },
+    // 민가 4채(AR Map160·161·162·163) — 문 칸도 Map56의 'Home door' 이벤트 transfer 값 그대로다.
+    { map: "viridian_city", x: 26, y: 18, to: "house1", dir: "up" },
+    { map: "viridian_city", x: 35, y: 18, to: "house2", dir: "up" },
+    { map: "viridian_city", x: 26, y: 11, to: "house3", dir: "up" },
+    { map: "viridian_city", x: 8, y: 27, to: "house4", dir: "up" },
   ];
   private warps: Warp[] = [];   // create()에서 글로벌로 변환된 것
 
@@ -118,8 +121,6 @@ export default class WorldScene extends Phaser.Scene {
   private setupRun = 0;                         // setupTrainers 실행 번호(씬 재시작 시 옛 실행을 무시하려고)
   // 필드 이벤트(NPC·팻말·바닥 아이템·열매나무). `events`는 Phaser 씬이 이미 쓰는 이름이라 events2로 둔다.
   private events2: FieldEvent[] = [];
-  // 이벤트 그림시트를 만드는 중인 작업(그림 이름 → 약속). 텍스처는 **게임 전역**이라 static이다.
-  private static sheetJobs = new Map<string, Promise<void>>();
   private nemona?: Phaser.GameObjects.Sprite;   // 첫 배틀 때 밖에서 기다리는 네모(그 외엔 없음)
   private rival?: { path: [number, number][]; from: "left" | "right" };   // 네모가 걸어올 길(플레이어 기준으로 잡음)
   private dlg!: DialogBox;
@@ -213,6 +214,7 @@ export default class WorldScene extends Phaser.Scene {
       if (m.overImg) this.load.image(`${m.name}_over`, `${m.overImg}?v=` + Date.now());
     }
     preloadCommonAudio(this);
+    preloadEventAudio(this);   // 원본 이벤트가 내는 소리(피카츄 울음 등)
     // VS 연출 — 월드에선 누구와 눈이 마주칠지 미리 모르므로 초상까지 전부 받아 둔다(그림 5장, 가볍다).
     preloadVsIntroAll(this);
     preloadWeather(this);   // 날씨 그림(AR 원본) — 맵에 날씨가 없으면 안 쓰이고 로드만 된다
@@ -430,41 +432,19 @@ export default class WorldScene extends Phaser.Scene {
         if (!page.graphic) continue;             // 팻말 — 이미 벽인 타일 위에 얹힌 것이라 그릴 것도 막을 것도 없다
         // 사람·볼·나무가 선 칸은 지나갈 수 없다(원본 이벤트도 통행 불가).
         if (this.blocked[gy]) this.blocked[gy][gx] = 1;
-        void this.drawEventSprite(entry, page.graphic);
+        void this.drawEventSprite(entry, page.graphic, page.dir);
       }
     }
   }
 
-  /** 이벤트 그림 한 장을 화면에 올린다(그림을 받아 4×4로 잘라 정지 프레임만 쓴다). */
-  private async drawEventSprite(entry: FieldEvent, gfx: string): Promise<void> {
+  /** 이벤트 그림 한 장을 화면에 올린다(시트 만드는 일은 fieldEventRunner가 게임 전역으로 관리한다). */
+  private async drawEventSprite(entry: FieldEvent, gfx: string, dir?: number): Promise<void> {
     const run = this.setupRun;
-    const sheetKey = `ev_${gfx}`;
-    // ⚠️ 같은 그림을 쓰는 이벤트가 여럿이다(볼 4개·열매나무 2그루) → 동시에 만들면
-    //    "Texture key already in use"가 난다. 그림마다 **만드는 작업 하나**를 기억해 두고 같이 기다린다.
-    let job = WorldScene.sheetJobs.get(sheetKey);
-    if (!job) {
-      job = (async () => {
-        const imgKey = `evimg_${gfx}`;
-        if (!this.textures.exists(imgKey)) {
-          await new Promise<void>((resolve) => {
-            this.load.image(imgKey, `assets/characters/${gfx}.png`);
-            this.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());
-            this.load.start();
-          });
-        }
-        if (!this.textures.exists(sheetKey) && this.textures.exists(imgKey)) {
-          const src = this.textures.get(imgKey).getSourceImage() as HTMLImageElement;
-          this.textures.addSpriteSheet(sheetKey, src, { frameWidth: src.width / 4, frameHeight: src.height / 4 });
-        }
-      })();
-      WorldScene.sheetJobs.set(sheetKey, job);
-    }
-    await job;
-    if (!this.textures.exists(sheetKey)) return;
+    const sheetKey = await loadEventSheet(this, gfx);
+    if (!sheetKey) return;
     if (run !== this.setupRun || !this.scene.isActive()) return;
-    this.textures.get(sheetKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
-    // 원본은 서 있을 때 첫 칸(아래를 본 모습)을 쓴다.
-    entry.sprite = this.add.sprite(this.cx(entry.gx), this.cy(entry.gy), sheetKey, 0)
+    // 원본이 정해둔 방향으로 세운다(벽을 보고 선 사람·마주 보고 선 사람이 있다).
+    entry.sprite = this.add.sprite(this.cx(entry.gx), this.cy(entry.gy), sheetKey, dirFrame(dir))
       .setOrigin(0.5, 1).setScale(SCALE).setDepth(yDepth(entry.gy));
   }
 
@@ -483,56 +463,11 @@ export default class WorldScene extends Phaser.Scene {
     const page = talkablePage(this.registry, entry.map, entry.ev);
     if (!page) return;
     this.busy = true;
-    this.runEventPage(entry, page)
+    // 실제 실행은 씬 밖의 공용 실행기가 한다(실내 민가도 같은 것을 쓴다 — systems/fieldEventRunner.ts).
+    runEventPage(this, this.dlg, entry.map, entry.ev, page)
+      .then((changed) => { if (changed) this.refreshEvent(entry); })
       .catch((e) => console.error("[WorldScene] 이벤트 오류:", e))
       .finally(() => { this.dlg.hide(); this.busy = false; });
-  }
-
-  /** 이벤트 한 페이지를 위에서부터 실행한다(대사 → 선택지 → 아이템/열매). */
-  private async runEventPage(entry: FieldEvent, page: EventPage): Promise<void> {
-    const you = (this.registry.get("playerName") as string) ?? "나";
-    const fill = (t: string) => t.replace(/\{PLAYER\}/g, you);
-    const runLines = async (lines: EventLine[]): Promise<void> => {
-      for (const l of lines) {
-        if (l.text) {
-          await this.dlg.say(fill(l.text), l.speaker ? fill(l.speaker) : null);
-        } else if (l.choice?.length) {
-          const pick = await this.dlg.askChoice(l.choice.map(fill));
-          await runLines(l.branches?.[pick] ?? []);
-        } else if (l.item) {
-          await this.pickUp(entry, l.item, 1);
-        } else if (l.berry) {
-          await this.pickBerry(entry, l.berry, l.count ?? 1);
-        }
-      }
-    };
-    await runLines(page.lines);
-    // 아이템·열매는 한 번만 — 원본도 셀프스위치 A를 켜서 빈 페이지로 넘긴다.
-    if (entry.ev.kind === "item" || entry.ev.kind === "berry") this.refreshEvent(entry);
-  }
-
-  /** 바닥 아이템 줍기 — 문구는 원본 `pbItemBall`(Overworld.rb) 그대로 두 줄이다. */
-  private async pickUp(entry: FieldEvent, itemId: string, n: number): Promise<void> {
-    const def = getItem(itemId);
-    const name = def?.name ?? itemId;
-    playMe(this, SFX.pkmnGet, 0.5);   // 원본 ME "Item get" 자리
-    await this.dlg.say(`${name}${josa(name, "을를")} 주웠다!`);
-    addItem(this.registry, itemId, n);
-    const pocket = POCKET_NAME[def?.pocket ?? 1] ?? "일반";
-    await this.dlg.say(`${name}${josa(name, "을를")} 가방의\n${pocket} 포켓에 넣었다.`);
-    setSelfSwitch(this.registry, entry.map, entry.ev.id, "A");
-  }
-
-  /** 열매 따기 — 원본 `pbPickBerry`: 몇 개 열렸는지 묻고, 예를 고르면 딴다. */
-  private async pickBerry(entry: FieldEvent, itemId: string, n: number): Promise<void> {
-    const def = getItem(itemId);
-    const name = def?.name ?? itemId;
-    await this.dlg.say(`${name}${josa(name, "이가")} ${n}개 열려있다!\n열매를 딸까?`);
-    if (!(await this.dlg.askYesNo())) return;
-    playMe(this, SFX.pkmnGet, 0.5);   // 원본 ME "Berry get" 자리
-    addItem(this.registry, itemId, n);
-    await this.dlg.say(`${name}${josa(name, "을를")} ${n}개 땄다!`);
-    setSelfSwitch(this.registry, entry.map, entry.ev.id, "A");
   }
 
   /** 셀프스위치가 바뀐 뒤 모습을 다시 정한다(주운 볼은 사라지고, 그 칸도 다시 지나갈 수 있게 된다). */
@@ -959,6 +894,8 @@ export default class WorldScene extends Phaser.Scene {
       else if (w.to === "gym") this.scene.start("GymScene");
       else if (w.to === "pc") this.scene.start("BuildingScene", { building: "pc" });
       else if (w.to === "mart") this.scene.start("BuildingScene", { building: "mart" });
+      // 상록시티 민가 4채 — 센터·마트와 같은 실내 씬을 쓴다(building 이름만 다르다).
+      else if (/^house[1-4]$/.test(w.to)) this.scene.start("BuildingScene", { building: w.to });
       else if (w.to === "house") this.scene.start("InteriorScene", { room: w.room ?? "living", skipIntro: true });
       else {
         // 모르는 to = 워프를 추가하며 분기를 안 넣은 것. 그냥 두면 **암전된 채 얼어붙는다**

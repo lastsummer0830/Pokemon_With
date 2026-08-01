@@ -25,10 +25,16 @@ AR_CANDIDATES = [
 ]
 
 # 우리가 이식한 맵 → 출력 파일 이름(public/assets/world/<이름>_events.json)
+#  ⚠️ 상록시티 민가 4채(160~163)는 **방 그림·충돌이 원본에서 완전히 같은 한 장**이다(맵데이터 md5 동일).
+#     그래서 그림은 viridian_house.png 하나를 넷이 같이 쓰고, **다른 건 이벤트뿐**이라 여기만 4개다.
 MAPS = {
     10: "route1",
     55: "pallet_town",
     56: "viridian_city",
+    160: "viridian_house1",   # 원예사(물뿌리개)·로젤리아·여행자·도박사
+    161: "viridian_house2",   # 아이와 포켓인형(가져가면 아이가 운다)
+    162: "viridian_house3",   # 피카츄와 주인·부인
+    163: "viridian_house4",   # 젬 상점 아주머니
 }
 
 PLAYER_TOKEN = "{PLAYER}"   # 런타임에 플레이어 이름으로 바꾼다
@@ -69,10 +75,28 @@ def read_page(page):
     lines, skipped = [], []
     choice = None          # 선택지 진행 중 {"opts": [...], "branches": {i: [lines]}}
     branch_idx = None
+    mart = None            # pbPokemonMart([ … ]) 를 여러 줄(655)에 걸쳐 모으는 중
+
+    def emit(line):
+        """지금 자리에 한 줄 넣는다 — 선택지 갈래 안이면 그 갈래로 들어가야 한다.
+        (예전엔 대사만 갈래를 따졌다 → 갈래 안의 '아이템 받기'가 본문으로 새어 나갔다.)"""
+        if branch_idx is None:
+            lines.append(line)
+        else:
+            choice["branches"][branch_idx].append(line)
+
     for c in page.attributes["@list"]:
         ca = c.attributes
         code = int(str(ca["@code"]))
         p = ca["@parameters"]
+        # pbPokemonMart의 상품 목록은 655(스크립트 이어짐)로 여러 줄이다 → `])`를 만날 때까지 모은다.
+        if mart is not None and code == 655:
+            s = b2s(p[0])
+            mart += re.findall(r":([A-Z0-9_]+)", s)
+            if "])" in s:
+                emit({"shop": mart})
+                mart = None
+            continue
         if code in (101, 401):
             sp, t, ac = clean(b2s(p[0]))
             if not t:
@@ -82,10 +106,7 @@ def read_page(page):
                 line["speaker"] = sp
             if ac:
                 line["center"] = True
-            if branch_idx is None:
-                lines.append(line)
-            else:
-                choice["branches"][branch_idx].append(line)
+            emit(line)
         elif code == 102:                      # 선택지 보이기
             opts = [b2s(o) for o in p[0]] if isinstance(p[0], list) else []
             choice = {"opts": opts, "branches": {}}
@@ -100,21 +121,48 @@ def read_page(page):
                 lines.append({"choice": choice["opts"],
                               "branches": [choice["branches"].get(i, []) for i in range(len(choice["opts"]))]})
                 choice, branch_idx = None, None
-        elif code == 111:                      # 조건분기 — 아이템 볼(pbItemBall)만 알아본다
+        elif code == 111:                      # 조건분기 — "아이템을 줬는가"를 묻는 두 가지만 알아본다
             s = b2s(p[1]) if len(p) > 1 else ""
             m = re.search(r"pbItemBall\(:([A-Z0-9_]+)\)", s)
             if m:
-                lines.append({"item": m.group(1)})
+                emit({"item": m.group(1)})     # 바닥에 떨어진 볼 — "○○을 주웠다!"
+                continue
+            m = re.search(r"pbReceiveItem\(:([A-Z0-9_]+)\)", s)
+            if m:
+                emit({"receive": m.group(1)})  # 사람이 건네주는 것 — "○○을 받았다!"
             else:
                 skipped.append(f"조건분기: {s[:40]}")
         elif code == 355 or code == 655:       # 스크립트
             s = b2s(p[0])
             m = re.search(r"pbPickBerry\(:([A-Z0-9_]+),\s*(\d+)\)", s)
             if m:
-                lines.append({"berry": m.group(1), "count": int(m.group(2))})
+                emit({"berry": m.group(1), "count": int(m.group(2))})
+            elif "pbPokemonMart" in s:
+                # 상점 — 상품 목록은 다음 655 줄들에 이어진다(위쪽 mart 처리로 넘어간다).
+                mart = re.findall(r":([A-Z0-9_]+)", s)
+                if "])" in s:
+                    emit({"shop": mart}); mart = None
             elif s.strip():
                 skipped.append(f"스크립트: {s[:40]}")
-        elif code in (0, 412, 123, 108, 408):  # 빈 줄·분기끝·셀프스위치·주석 — 우리 쪽에서 알아서 한다
+        elif code == 121:                      # 스위치 조작 — 원본 전역 스위치를 그대로 켠다/끈다
+            a, b = int(str(p[0])), int(str(p[1]))
+            on = int(str(p[2])) == 0           # RMXP: 0=ON, 1=OFF
+            for sid in range(a, b + 1):
+                emit({"setSwitch": [sid, on]})
+        elif code == 250:                      # 효과음 — 이름만 넘기고, 파일이 있는 것만 게임에서 울린다
+            nm = p[0].attributes.get("@name") if hasattr(p[0], "attributes") else None
+            nm = b2s(nm) if nm is not None else ""
+            if nm:
+                emit({"se": nm})
+        elif code == 123:                      # 셀프스위치 — "이 사람은 이제 다음 페이지로 넘어간다"
+            # ⚠️ 예전엔 통째로 무시했다(바닥 아이템은 게임 쪽에서 알아서 켜니까). 그런데 **사람**도
+            #    한 번 주고 나면 셀프스위치로 다음 페이지로 넘어간다 — 무시하면 원예사가 물뿌리개를
+            #    말 걸 때마다 무한히 준다. 원본이 켜는 자리에서 그대로 켠다.
+            if int(str(p[1])) == 0:            # RMXP: 0=ON, 1=OFF
+                emit({"setSelf": b2s(p[0])})
+        elif code in (0, 412, 108, 408):       # 빈 줄·분기끝·주석 — 옮길 것이 없다
+            continue
+        elif code in (209, 509):               # 이동경로 지정/끝 — 연출(고개 돌리기·점프)이라 없어도 뜻이 통한다
             continue
         elif code == 201:
             skipped.append("이동(문) — 워프는 WorldScene의 warpDefs가 따로 들고 있다")
@@ -163,9 +211,12 @@ def extract(ar: str, mid: int, out_name: str, out_dir: str):
             lines, skipped = read_page(pg)
             gfx = b2s(pg.attributes["@graphic"].attributes["@character_name"])
             trig = int(str(pg.attributes["@trigger"]))
+            # 서 있는 방향(RMXP 방향번호 2=아래 4=왼쪽 6=오른쪽 8=위). 원본에서 벽을 보고 선 사람,
+            #  마주 보고 선 두 사람이 있어 이걸 안 옮기면 전부 정면을 보고 서 버린다.
+            face = int(str(pg.attributes["@graphic"].attributes["@direction"]))
             if skipped:
                 notes.append(f"[{eid}]{name}({x},{y}) p{len(pages)+1}: 못 옮긴 것 — " + " / ".join(skipped[:3]))
-            page = {"graphic": gfx, "trigger": trig, "cond": page_condition(pg), "lines": lines}
+            page = {"graphic": gfx, "dir": face, "trigger": trig, "cond": page_condition(pg), "lines": lines}
             # ⚠️ 조건분기·이동경로처럼 못 옮긴 명령이 섞인 페이지는 **반쪽짜리**다.
             #    그대로 쓰면 갈래별 대사가 한 줄로 이어져 "그래? / 그래?"처럼 이상하게 나온다.
             #    → partial로 찍어 두고 게임에선 건너뛴다(스토리로 제대로 붙일 때 이 표시를 지운다).
@@ -173,7 +224,10 @@ def extract(ar: str, mid: int, out_name: str, out_dir: str):
                 page["partial"] = True
             pages.append(page)
         # 대사도 아이템도 없는 페이지뿐이면(스토리 스위치 전용) 건너뛴다.
-        if not any(p["lines"] for p in pages):
+        #  ⚠️ 효과음·스위치처럼 **혼자서는 아무것도 안 보여주는 줄**은 "있는 셈" 치면 안 된다
+        #     (집 나가는 문 이벤트가 문소리 하나로 살아남아 이벤트 목록에 끼었다).
+        speaks = ("text", "choice", "item", "berry", "receive", "shop")
+        if not any(any(k in l for k in speaks) for p in pages for l in p["lines"]):
             notes.append(f"[{eid}]{name}({x},{y}) — 대사 없음(스토리 전용) → 제외")
             continue
         gfx0 = next((p["graphic"] for p in pages if p["graphic"]), "")

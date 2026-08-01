@@ -29,12 +29,13 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 #  bg_8 = 소중한 물건 포켓(스토리 물건이 들어간다). 다른 배경과 같은 규칙으로 리컬러해야
 #  탭을 넘길 때 톤이 튀지 않는다 — 빠뜨리면 그 포켓만 텍스처 로드가 실패한다(실제로 발생).
 #  bg_4(기술머신)·bg_5(나무열매) = 2026-08-03 필드 이벤트 이식으로 아이템이 생긴 포켓.
-BAG_FILES = ["bg_1", "bg_2", "bg_3", "bg_4", "bg_5", "bg_8", "cursor", "icon_pocket", "icon_slider"]
+#  bg_7(배틀아이템) = 2026-08-04 상록시티 민가2의 삐삐인형(원본 pocket 7)으로 열린 포켓.
+BAG_FILES = ["bg_1", "bg_2", "bg_3", "bg_4", "bg_5", "bg_7", "bg_8", "cursor", "icon_pocket", "icon_slider"]
 DEX_FILES = ["bg_list", "bg_info", "cursor_list", "icon_slider"]
 
 # sky 변형에서 파일별 목표 색상(hue, 0~1). None = 원래 색상 유지.
 SKY_HUE = {
-    "bg_1": 0.58, "bg_2": 0.58, "bg_3": 0.58, "bg_4": 0.58, "bg_5": 0.58, "bg_8": 0.58,   # 가방 배경 = 연하늘
+    "bg_1": 0.58, "bg_2": 0.58, "bg_3": 0.58, "bg_4": 0.58, "bg_5": 0.58, "bg_7": 0.58, "bg_8": 0.58,   # 가방 배경 = 연하늘
     "bg_list": 0.58, "bg_info": 0.58,             # 도감 배경 = 연하늘
     "cursor": 0.93, "cursor_list": 0.93,          # 커서만 연분홍(선택이 눈에 띄어야 함)
     "icon_slider": 0.62,                          # 슬라이더 = 라벤더

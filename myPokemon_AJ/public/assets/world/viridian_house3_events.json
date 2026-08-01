@@ -1,0 +1,115 @@
+{
+ "arMap": 162,
+ "events": [
+  {
+   "id": 2,
+   "name": "EV002",
+   "x": 7,
+   "y": 6,
+   "kind": "npc",
+   "graphic": "Pokemon 01",
+   "pages": [
+    {
+     "graphic": "Pokemon 01",
+     "dir": 6,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "피카피"
+      },
+      {
+       "se": "PIKACHU"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "name": "EV003",
+   "x": 9,
+   "y": 6,
+   "kind": "npc",
+   "graphic": "trainer_LASS",
+   "pages": [
+    {
+     "graphic": "trainer_LASS",
+     "dir": 4,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "내 피카츄 너무 귀엽지 않니?"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "EV004",
+   "x": 15,
+   "y": 4,
+   "kind": "npc",
+   "graphic": "NPC 04",
+   "pages": [
+    {
+     "graphic": "NPC 04",
+     "dir": 6,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "우리 남편은 언제 들어올련지..."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "name": "EV005",
+   "x": 9,
+   "y": 2,
+   "kind": "sign",
+   "graphic": "",
+   "pages": [
+    {
+     "graphic": "",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "(화면에는 특집 방송이 나오고 있다.)",
+       "speaker": "{PLAYER}"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "name": "EV006",
+   "x": 10,
+   "y": 2,
+   "kind": "sign",
+   "graphic": "",
+   "pages": [
+    {
+     "graphic": "",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "(화면에는 특집 방송이 나오고 있다.)",
+       "speaker": "{PLAYER}"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

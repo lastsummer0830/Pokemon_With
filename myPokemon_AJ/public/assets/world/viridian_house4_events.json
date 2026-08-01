@@ -1,0 +1,88 @@
+{
+ "arMap": 163,
+ "events": [
+  {
+   "id": 2,
+   "name": "EV002",
+   "x": 9,
+   "y": 2,
+   "kind": "sign",
+   "graphic": "",
+   "pages": [
+    {
+     "graphic": "",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "(화면에는 특집 방송이 나오고 있다.)",
+       "speaker": "{PLAYER}"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "name": "EV003",
+   "x": 10,
+   "y": 2,
+   "kind": "sign",
+   "graphic": "",
+   "pages": [
+    {
+     "graphic": "",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "(화면에는 특집 방송이 나오고 있다.)",
+       "speaker": "{PLAYER}"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "EV004",
+   "x": 6,
+   "y": 6,
+   "kind": "npc",
+   "graphic": "trainer_LADY",
+   "pages": [
+    {
+     "graphic": "trainer_LADY",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "shop": [
+        "FIREGEM",
+        "WATERGEM",
+        "ELECTRICGEM",
+        "GRASSGEM",
+        "ICEGEM",
+        "FIGHTINGGEM",
+        "POISONGEM",
+        "GROUNDGEM",
+        "FLYINGGEM",
+        "PSYCHICGEM",
+        "BUGGEM",
+        "ROCKGEM",
+        "GHOSTGEM",
+        "DRAGONGEM",
+        "DARKGEM",
+        "STEELGEM",
+        "FAIRYGEM"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

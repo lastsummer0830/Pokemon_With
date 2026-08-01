@@ -25,10 +25,16 @@ export interface EventLine {
   berry?: string; count?: number; // pbPickBerry — 열매나무
   choice?: string[];              // 선택지
   branches?: EventLine[][];
+  receive?: string;               // pbReceiveItem — 사람이 건네주는 물건("○○을 받았다!")
+  se?: string;                    // 원본 효과음 이름(AR Audio/SE/<이름>) — 우리에게 있는 것만 울린다
+  shop?: string[];                // pbPokemonMart — 상점(아직 미구현이라 안내만 한다)
+  setSelf?: string;               // 셀프스위치 켜기(A~D) — "이 사람은 이제 다음 페이지"
+  setSwitch?: [number, boolean];  // 원본 전역 스위치 켜기/끄기
 }
 
 export interface EventPage {
   graphic: string;                // AR characters/<이름>.png (빈 문자열 = 안 보이는 페이지)
+  dir?: number;                   // 서 있는 방향(RMXP 2=아래 4=왼쪽 6=오른쪽 8=위)
   trigger: number;                // 0=말걸기 1·2=접촉 3=자동실행 4=병렬
   cond: { selfSwitch?: string; switch?: number; switch2?: number; variable?: [number, number] };
   lines: EventLine[];
@@ -61,6 +67,26 @@ export function setSelfSwitch(reg: Reg, map: string, id: number, ch = "A"): void
 }
 
 /**
+ * 원본(RPG Maker XP)의 **전역 스위치**. 세이브에 남는다. 키 = 원본 스위치 번호.
+ *
+ * ⚠️ 우리가 스토리를 다 옮긴 게 아니므로 **원본이 켜는 자리에서 우리도 켤 때만** 켜진다
+ *    (예: 상록시티 민가2에서 포켓인형을 가져가면 96번이 켜져 아이가 우는 페이지로 넘어간다).
+ *    아직 안 옮긴 스토리 스위치는 영영 꺼져 있고, 그 조건이 걸린 페이지는 없는 셈이 된다 — 예전과 같다.
+ */
+export const AR_SWITCH_KEY = "arSwitches";
+
+export function arSwitchOn(reg: Reg, id: number): boolean {
+  const set = reg.get(AR_SWITCH_KEY) as Record<number, boolean> | undefined;
+  return !!set?.[id];
+}
+
+export function setArSwitch(reg: Reg, id: number, on: boolean): void {
+  const set = (reg.get(AR_SWITCH_KEY) as Record<number, boolean> | undefined) ?? {};
+  set[id] = on;
+  reg.set(AR_SWITCH_KEY, set);
+}
+
+/**
  * 지금 보여줄 페이지를 고른다 — **원본과 같이 뒤 페이지부터** 검사한다.
  * 우리가 못 다루는 페이지(partial·전역 스위치 조건)는 없는 셈 친다.
  */
@@ -69,11 +95,21 @@ export function activePage(reg: Reg, map: string, ev: MapEvent): EventPage | nul
     const p = ev.pages[i];
     if (p.partial) continue;
     const c = p.cond;
-    if (c.switch !== undefined || c.switch2 !== undefined || c.variable !== undefined) continue;  // 스토리 조건 — 아직 없음
+    if (c.variable !== undefined) continue;                                   // 변수 조건 — 아직 못 옮긴다
+    if (c.switch !== undefined && !arSwitchOn(reg, c.switch)) continue;       // 원본 전역 스위치
+    if (c.switch2 !== undefined && !arSwitchOn(reg, c.switch2)) continue;
     if (c.selfSwitch && !selfSwitchOn(reg, map, ev.id, c.selfSwitch)) continue;
     return p;
   }
   return null;
+}
+
+/**
+ * 원본 방향번호 → AR 캐릭터 시트의 정지 프레임 번호.
+ * 시트는 가로 4칸 × 세로 4칸(아래·왼쪽·오른쪽·위 순)이라 각 줄의 첫 칸이 정지 모습이다.
+ */
+export function dirFrame(dir?: number): number {
+  return { 2: 0, 4: 4, 6: 8, 8: 12 }[dir ?? 2] ?? 0;
 }
 
 /** 지금 화면에 그려야 하는가(=보이는 페이지가 있고 그림이 있는가). */

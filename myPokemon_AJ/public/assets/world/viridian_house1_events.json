@@ -1,0 +1,235 @@
+{
+ "arMap": 160,
+ "events": [
+  {
+   "id": 2,
+   "name": "EV002",
+   "x": 6,
+   "y": 9,
+   "kind": "npc",
+   "graphic": "trainer_PSYCHIC_F",
+   "pages": [
+    {
+     "graphic": "trainer_PSYCHIC_F",
+     "dir": 6,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "나도 언젠가 여행을 떠날거야!"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "name": "EV003",
+   "x": 14,
+   "y": 5,
+   "kind": "npc",
+   "graphic": "trainer_GAMBLER",
+   "pages": [
+    {
+     "graphic": "trainer_GAMBLER",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "왕년엔 나도 배지를 7개나 모았었다오."
+      },
+      {
+       "text": "그런데 상록시티 체육관은... 관장이 바뀌기 전에도 후에도 배지를 따지 못 했다우."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "EV004",
+   "x": 9,
+   "y": 2,
+   "kind": "sign",
+   "graphic": "",
+   "pages": [
+    {
+     "graphic": "",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "(화면에는 특집 방송이 나오고 있다.)",
+       "speaker": "{PLAYER}"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "name": "EV005",
+   "x": 10,
+   "y": 2,
+   "kind": "sign",
+   "graphic": "",
+   "pages": [
+    {
+     "graphic": "",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "(화면에는 특집 방송이 나오고 있다.)",
+       "speaker": "{PLAYER}"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "name": "EV006",
+   "x": 7,
+   "y": 4,
+   "kind": "npc",
+   "graphic": "trainer_AROMALADY",
+   "pages": [
+    {
+     "graphic": "trainer_AROMALADY",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "안녕? 난 원예사야!"
+      },
+      {
+       "text": "너도 길거리에서 열매를 따 본 적 있니?"
+      },
+      {
+       "text": "다시 심은 열매에 물을 주면 열매가 빨리 자란단다!"
+      },
+      {
+       "text": "내가 모으고 있는 물뿌리개를 하나 나눠줄게!"
+      },
+      {
+       "text": "어떤 물뿌리개가 갖고싶니?"
+      },
+      {
+       "choice": [
+        "꼬부기물뿌리개",
+        "고라파덕물뿌리개",
+        "고래왕물뿌리개",
+        "연꽃몬물뿌리개"
+       ],
+       "branches": [
+        [
+         {
+          "receive": "SQUIRTBOTTLE"
+         }
+        ],
+        [
+         {
+          "receive": "SPRAYDUCK"
+         }
+        ],
+        [
+         {
+          "receive": "WAILMERPAIL"
+         }
+        ],
+        [
+         {
+          "receive": "SPRINKLOTAD"
+         }
+        ]
+       ]
+      },
+      {
+       "setSelf": "A"
+      },
+      {
+       "setSwitch": [
+        101,
+        true
+       ]
+      }
+     ]
+    },
+    {
+     "graphic": "trainer_AROMALADY",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {
+      "selfSwitch": "A"
+     },
+     "lines": [
+      {
+       "text": "나무열매에 물을 주자!"
+      }
+     ]
+    },
+    {
+     "graphic": "trainer_AROMALADY",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {
+      "variable": [
+       124,
+       3
+      ]
+     },
+     "lines": [
+      {
+       "text": "안녕? 오랜만이네!"
+      },
+      {
+       "text": "뭐? 내게 줄 물건이 있다고?"
+      },
+      {
+       "text": "(전해줄 물건을 원예사에게 건내주었다.)",
+       "speaker": "{PLAYER}"
+      },
+      {
+       "text": "어머, 고마워라! 내가 주문한 새 스마트폰이네!"
+      },
+      {
+       "text": "고마워, 이건 수고비야!"
+      },
+      {
+       "text": "(원예사에게 수고비 3000원을 받았다!)",
+       "speaker": "{PLAYER}"
+      }
+     ],
+     "partial": true
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "name": "EV007",
+   "x": 8,
+   "y": 4,
+   "kind": "npc",
+   "graphic": "ROSELIA",
+   "pages": [
+    {
+     "graphic": "ROSELIA",
+     "dir": 2,
+     "trigger": 0,
+     "cond": {},
+     "lines": [
+      {
+       "text": "(로젤리아가 몸을 흔들고 있다.)",
+       "speaker": "{PLAYER}"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

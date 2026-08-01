@@ -11,12 +11,14 @@
    "pages": [
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 0,
      "cond": {},
      "lines": []
     },
     {
      "graphic": "새조련사",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "switch": 7
@@ -32,6 +34,7 @@
     },
     {
      "graphic": "새조련사",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "switch": 77
@@ -54,12 +57,19 @@
       },
       {
        "text": "이용하고 싶을 때, 말을 걸거나 전화로 호출해줘!"
+      },
+      {
+       "setSwitch": [
+        75,
+        true
+       ]
       }
      ],
      "partial": true
     },
     {
      "graphic": "새조련사",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "switch": 75
@@ -79,21 +89,45 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -103,6 +137,7 @@
     },
     {
      "graphic": "새조련사",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "switch": 74
@@ -122,21 +157,45 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -149,6 +208,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -158,6 +223,7 @@
     },
     {
      "graphic": "새조련사",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "switch": 73
@@ -177,21 +243,45 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -205,11 +295,23 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -219,6 +321,7 @@
     },
     {
      "graphic": "새조련사",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "switch": 72
@@ -238,21 +341,45 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -266,11 +393,23 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -283,6 +422,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -292,6 +437,7 @@
     },
     {
      "graphic": "새조련사",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "switch": 71
@@ -311,21 +457,45 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -339,11 +509,23 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -356,6 +538,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -368,6 +556,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -377,6 +571,7 @@
     },
     {
      "graphic": "새조련사",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "switch": 70
@@ -396,21 +591,45 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -424,11 +643,23 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -441,6 +672,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -453,6 +690,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -465,6 +708,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -474,6 +723,7 @@
     },
     {
      "graphic": "새조련사",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "switch": 69
@@ -493,21 +743,45 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -521,11 +795,23 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -538,6 +824,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -550,6 +842,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -562,6 +860,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -574,6 +878,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -583,6 +893,7 @@
     },
     {
      "graphic": "새조련사",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "switch": 150
@@ -602,21 +913,45 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -630,11 +965,23 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ],
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -647,6 +994,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -659,6 +1012,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -671,6 +1030,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -683,6 +1048,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -698,6 +1069,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -710,6 +1087,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -722,6 +1105,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -734,6 +1123,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -746,6 +1141,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -758,6 +1159,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -770,6 +1177,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -782,6 +1195,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -794,6 +1213,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -806,6 +1231,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -818,6 +1249,12 @@
         [
          {
           "text": "그럼 출발할게!!"
+         },
+         {
+          "se": "CORVIKNIGHT"
+         },
+         {
+          "se": "Player fall"
          }
         ]
        ]
@@ -837,22 +1274,26 @@
    "pages": [
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 0,
      "cond": {},
      "lines": []
     },
     {
      "graphic": "CORVIKNIGHT",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "switch": 7
      },
      "lines": [
       {
+       "se": "CORVIKNIGHT"
+      },
+      {
        "text": "까악"
       }
-     ],
-     "partial": true
+     ]
     }
    ]
   },
@@ -866,6 +1307,7 @@
    "pages": [
     {
      "graphic": "Anime NPC 27",
+     "dir": 8,
      "trigger": 3,
      "cond": {},
      "lines": [
@@ -900,12 +1342,16 @@
       {
        "text": "그... 그냥 조용히 지나가!",
        "speaker": "???"
+      },
+      {
+       "setSelf": "A"
       }
      ],
      "partial": true
     },
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "selfSwitch": "A"
@@ -924,6 +1370,7 @@
    "pages": [
     {
      "graphic": "NPC 29",
+     "dir": 2,
      "trigger": 0,
      "cond": {},
      "lines": [
@@ -933,11 +1380,15 @@
       {
        "text": "(길 안 막고 계시네...)",
        "speaker": "{PLAYER}"
+      },
+      {
+       "setSelf": "A"
       }
      ]
     },
     {
      "graphic": "NPC 29",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "selfSwitch": "A"
@@ -950,6 +1401,7 @@
     },
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "switch": 109
@@ -968,6 +1420,7 @@
    "pages": [
     {
      "graphic": "NPC 05",
+     "dir": 6,
      "trigger": 0,
      "cond": {},
      "lines": [
@@ -995,6 +1448,9 @@
          },
          {
           "text": "어... 알겠어..."
+         },
+         {
+          "setSelf": "A"
          }
         ]
        ]
@@ -1003,6 +1459,7 @@
     },
     {
      "graphic": "NPC 05",
+     "dir": 6,
      "trigger": 0,
      "cond": {
       "selfSwitch": "A"
@@ -1026,6 +1483,7 @@
    "pages": [
     {
      "graphic": "trainer_CAMPER",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "switch": 4
@@ -1051,6 +1509,7 @@
    "pages": [
     {
      "graphic": "trainer_CAMPER",
+     "dir": 2,
      "trigger": 0,
      "cond": {},
      "lines": [
@@ -1105,12 +1564,16 @@
          }
         ]
        ]
+      },
+      {
+       "setSelf": "A"
       }
      ],
      "partial": true
     },
     {
      "graphic": "trainer_CAMPER",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "selfSwitch": "A"
@@ -1137,6 +1600,12 @@
        "speaker": "경호"
       },
       {
+       "setSwitch": [
+        95,
+        true
+       ]
+      },
+      {
        "text": "트레이너들을 모두 쓰러뜨리고 다시 오렴.",
        "speaker": "경호"
       },
@@ -1157,6 +1626,7 @@
     },
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "switch": 95
@@ -1175,6 +1645,7 @@
    "pages": [
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 3,
      "cond": {
       "switch": 4
@@ -1207,12 +1678,16 @@
       {
        "text": "(일단 모르겠고, 관동지방을 마저 여행해보자.)",
        "speaker": "{PLAYER}"
+      },
+      {
+       "setSelf": "A"
       }
      ],
      "partial": true
     },
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "selfSwitch": "A"
@@ -1231,6 +1706,7 @@
    "pages": [
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 0,
      "cond": {},
      "lines": [
@@ -1252,16 +1728,21 @@
    "pages": [
     {
      "graphic": "Object ball",
+     "dir": 2,
      "trigger": 0,
      "cond": {},
      "lines": [
       {
        "item": "TM09"
+      },
+      {
+       "setSelf": "A"
       }
      ]
     },
     {
      "graphic": "",
+     "dir": 2,
      "trigger": 0,
      "cond": {
       "selfSwitch": "A"
