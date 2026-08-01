@@ -19,19 +19,32 @@ type Dir = "down" | "left" | "right" | "up";
 interface LabMap { img: string; cols: number; rows: number; blocked: number[][]; spawn: [number, number]; exit: { x: number; y: number; toTown: [number, number] }; }
 interface PreviewData { preview?: boolean; pick?: number; }
 
-interface StarterDef { key: string; name: string; type: string; id: number; category: string; height: string; weight: string; dex: string; }
+// kind = 분류의 '어간'만 담는다(예: "도롱뇽"). 화면에 쓸 땐 `${kind} 포켓몬`으로 띄어서 붙인다 — 아래 주석 참고.
+interface StarterDef { key: string; name: string; type: string; id: number; kind: string; height: string; weight: string; dex: string; }
+
+/** 분류 표기 — 원본과 똑같이 **어간 + 공백 + "포켓몬"**. (PokedexScene도 같은 형식으로 그린다.) */
+function kindText(d: StarterDef): string { return `${d.kind} 포켓몬`; }
 // 타입 표준색 — 설명카드 타입칩 배경(관용 팔레트).
 const TYPE_COLOR: Record<string, number> = { "풀": 0x78c850, "불꽃": 0xf08030, "물": 0x6890f0 };
 // 분류·도감·키·무게 = PokeAPI/공식 SV 데이터 원문(추측 아님).
-// ⚠️ 파이리 분류 `도롱뇽포켓몬`은 오타가 아니다(0801 웹 대조 확인).
-//    일본판 とかげ(도마뱀)·영문 Lizard의 오역이지만 **포켓몬코리아 공식 도감 표기가 도롱뇽포켓몬**이라
-//    공식 표기를 따른다(AGENTS.md §1.5 "실제 게임의 공식 표기"). '도마뱀포켓몬'으로 고치지 말 것.
+//
+// ⚠️ 분류는 **"도롱뇽 포켓몬"처럼 띄어 쓴다**(0801 사용자 지적 → 원본 데이터로 확인).
+//    근거: AR 원본은 종족 데이터에 어간만 갖고 있고(`species.json`의 `kind: "도롱뇽"`),
+//    한국어 번역파일 `Data/messages_kor_core.dat`에 **`{1} 포켓몬`**(영문 `{1} Pokémon`)이 있다.
+//    즉 원본 화면 표기 = `도롱뇽 포켓몬`. 우리 PokedexScene도 예전부터 `${kind} 포켓몬`으로 그리고 있었고,
+//    여기(LabScene)만 하드코딩하면서 붙여 써서 두 화면이 서로 달랐다. (0728 일지의 "붙여쓰는 게 맞다"는 **틀린 서술**.)
+//
+// ⚠️ '도롱뇽'이라는 단어 자체는 오타가 아니다 — 일본판 とかげ(도마뱀)·영문 Lizard의 오역이지만
+//    **포켓몬코리아 공식 도감 표기가 도롱뇽**이라 공식 표기를 따른다. '도마뱀'으로 고치지 말 것.
+//
+// ⚠️ 왜 AR 데이터를 안 읽고 하드코딩인가: 파이리·개구마르는 AR에 한국어(`도롱뇽`·`거품개구리`)가 있지만
+//    **9세대인 나오하는 AR이 영어(`Grass Cat`)에 도감설명도 비어 있다.** 셋을 같은 품질로 보여주려면 여기 표가 필요하다.
 const STARTERS: StarterDef[] = [
-  { key: "SPRIGATITO", name: "나오하",  type: "풀",   id: 906, category: "풀고양이포켓몬", height: "0.4m", weight: "4.1kg",
+  { key: "SPRIGATITO", name: "나오하",  type: "풀",   id: 906, kind: "풀고양이", height: "0.4m", weight: "4.1kg",
     dex: "몸에서 나오는 달콤한 향기로 주위를 매료시킨다. 햇빛에 닿으면 향기가 더욱 강해진다." },
-  { key: "CHARMANDER", name: "파이리",  type: "불꽃", id: 4,   category: "도롱뇽포켓몬",   height: "0.6m", weight: "8.5kg",
+  { key: "CHARMANDER", name: "파이리",  type: "불꽃", id: 4,   kind: "도롱뇽",   height: "0.6m", weight: "8.5kg",
     dex: "태어날 때부터 꼬리의 불꽃이 타오르고 있다. 불꽃이 꺼지면 그 생명이 다하고 만다." },
-  { key: "FROAKIE",    name: "개구마르", type: "물",   id: 656, category: "거품개구리포켓몬", height: "0.3m", weight: "7.0kg",
+  { key: "FROAKIE",    name: "개구마르", type: "물",   id: 656, kind: "거품개구리", height: "0.3m", weight: "7.0kg",
     dex: "가슴과 등에서 거품을 내뿜는다. 탄력 있는 거품으로 공격을 막아내고 데미지를 줄인다." },
 ];
 
@@ -276,7 +289,7 @@ export default class LabScene extends Phaser.Scene {
 
     const you = this.playerName();
     // 1) 공식 도감 소개(나레이션 — 이름창 없음)
-    await this.dlg.say(`${pick.name}. ${pick.type}타입, ${pick.category}.`);
+    await this.dlg.say(`${pick.name}. ${pick.type}타입, ${kindText(pick)}.`);
     await this.dlg.say(pick.dex);
     // 2) 오박사 확인
     await this.dlg.say(`오, ${you}${josa(you, "은는")} ${pick.name}${josa(pick.name, "이가")} 마음에 드는 거니?`, "오박사");
@@ -445,7 +458,7 @@ export default class LabScene extends Phaser.Scene {
     // 하단 전폭: 분류 + 도감 설명(줄간격 넉넉)
     const by = cy + pad + sq + 16;
     g.lineStyle(2, BORDER, 0.55); g.beginPath(); g.moveTo(cx + pad, by); g.lineTo(cx + cw - pad, by); g.strokePath();
-    this.cardText(cx + pad, by + 14, d.category, { fontStyle: "bold", fontSize: "21px", color: DARK });
+    this.cardText(cx + pad, by + 14, kindText(d), { fontStyle: "bold", fontSize: "21px", color: DARK });
     this.cardText(cx + pad, by + 46, d.dex, { fontSize: "20px", color: DARK, lineSpacing: 8, wordWrap: { width: cw - pad * 2 } });
   }
 
