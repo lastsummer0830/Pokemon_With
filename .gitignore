@@ -17,12 +17,25 @@ Thumbs.db
 !.vscode/tasks.json
 
 # =========================
-# Local AI / agent workspace
+# Shared AI / agent control plane
 # =========================
-# AI 도구 설정·프롬프트·훅·계획은 공개 저장소에서 제외한다.
-# (이전엔 .claude/skills·settings.json 을 PC 간 공유용으로 추적했으나 공개 노출 방지를 위해 중단)
-.claude/
-CLAUDE.md
+# Canonical project skills and curated Claude adapters are shareable.
+# Personal settings, verification artifacts, archived hooks, and backups stay local.
+.claude/*
+!.claude/settings.json
+!.claude/rules/
+!.claude/rules/*.md
+!.claude/hooks/
+.claude/hooks/*
+!.claude/hooks/recall-path-rules.sh
+!.claude/skills/
+!.claude/skills/**
+.claude/settings.local.json
+.claude/.verify/
+.claude_backup_*/
+*.backup-*.json
+*.bak-*
+.hermes/
 AGENTS.md
 .omo/
 .sisyphus/
@@ -82,10 +95,6 @@ myPokemon_AJ/src/**/*.js.map
 # =========================
 *.lnk
 
-# UI 렌더링 검증 증거(로컬 전용, .gitkeep만 추적)
-.claude/.verify/*
-!.claude/.verify/.gitkeep
-
-# Python 훅 캐시 (session-guard 등)
+# Python 캐시
 __pycache__/
 *.py[cod]

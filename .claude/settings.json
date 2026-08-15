@@ -1,0 +1,48 @@
+{
+  "autoMemoryEnabled": false,
+  "disableAllHooks": false,
+  "disableClaudeAiConnectors": true,
+  "disableBundledSkills": false,
+  "disableSkillShellExecution": true,
+  "skillListingBudgetFraction": 0.02,
+  "skillListingMaxDescChars": 1536,
+  "permissions": {
+    "deny": [
+      "Agent",
+      "mcp__*",
+      "Read(00_ImportBox/Important/**)",
+      "Edit(00_ImportBox/Important/**)",
+      "Edit(/.git/**)",
+      "Edit(/.claude/**)",
+      "Edit(/.hermes/**)",
+      "Edit(/.hermes.md)",
+      "Edit(/CLAUDE.md)",
+      "Edit(/HERMES_HANDOFF.md)",
+      "Edit(/HERMES_CHECKLIST.md)",
+      "Edit(/scripts/run_claude_worker.py)",
+      "Edit(/scripts/guard_claude_worker_command.py)",
+      "Edit(/scripts/test_claude_worker.py)",
+      "Edit(/scripts/test_claude_worker_guard.py)",
+      "Edit(/scripts/check_agent_skills.py)",
+      "Edit(/scripts/test_agent_skills.py)",
+      "Edit(/scripts/check_hermes_control.py)",
+      "Edit(/scripts/hermes_response_gate.py)",
+      "Edit(/scripts/test_hermes_response_gate.py)",
+      "Edit(/myPokemon_AJ/package.json)",
+      "Edit(/myPokemon_AJ/vite.config.ts)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/recall-path-rules.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
