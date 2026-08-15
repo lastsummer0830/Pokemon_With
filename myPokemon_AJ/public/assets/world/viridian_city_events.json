@@ -1312,8 +1312,22 @@
      "cond": {},
      "lines": [
       {
-       "text": "(누군가가 서있다.)",
-       "speaker": "{PLAYER}"
+       "move": [
+        "turnDown"
+       ]
+      },
+      {
+       "wait": 20
+      },
+      {
+       "bgm": "Game Corner",
+       "bgmVolume": 80
+      },
+      {
+       "emote": 3
+      },
+      {
+       "text": "(누군가가 서있다.)"
       },
       {
        "text": "너!? 너가 어떻게?",
@@ -1332,6 +1346,9 @@
        "speaker": "???"
       },
       {
+       "battle": "ILLA:???"
+      },
+      {
        "text": "...",
        "speaker": "???"
       },
@@ -1344,10 +1361,28 @@
        "speaker": "???"
       },
       {
+       "move": [
+        "speed4",
+        "speed5",
+        "up",
+        "up",
+        "left",
+        "left",
+        "up",
+        "up",
+        "up",
+        "up",
+        "up"
+       ]
+      },
+      {
+       "bgm": "KM_Pallet",
+       "bgmVolume": 100
+      },
+      {
        "setSelf": "A"
       }
-     ],
-     "partial": true
+     ]
     },
     {
      "graphic": "",

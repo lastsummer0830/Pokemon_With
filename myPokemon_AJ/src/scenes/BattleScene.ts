@@ -18,6 +18,8 @@ import { scaledTrainerLevel, leaderBonusForType, DEFAULT_DIFFICULTY } from "../s
 import { settings } from "../systems/settings";
 import type { Difficulty } from "../systems/difficulty";
 import type { BagResult } from "./BagScene";
+// 야외 스토리 이벤트의 '이어실행' 예약 키 — 지면 지워야 한다(endBattle 참고). 정본은 WorldScene에 있다.
+import { EVENT_CONTINUE_KEY } from "./WorldScene";
 import {
   BattleView, DataBox, CMD_SLOTS,
   FIGHT_SLOTS, FIGHT_BTN_W, FIGHT_BTN_H, TYPE_ICON_W, TYPE_ICON_H, PP_COLORS, ppStage, moveNameColor, fightRow,
@@ -518,6 +520,11 @@ export default class BattleScene extends Phaser.Scene {
   // 배틀 종료 처리: 패배=파티 전체 회복 후 집으로(화이트아웃) / 승리·도망=원위치 월드 복귀.
   private async endBattle(): Promise<void> {
     if (this.outcome === "lose") {
+      // 야외 스토리 이벤트(자동실행) 도중의 배틀이었다면 **이어실행 예약을 지운다**.
+      //  원본도 지면 이벤트가 그냥 끝나고(셀프스위치 A가 안 켜진다) 다음에 마주치면 처음부터다.
+      //  안 지우면 화이트아웃 후 집을 나와 다시 그 마을에 들어설 때 **진 배틀의 뒷대사부터** 이어져 버린다.
+      //  (예약은 스토리 이벤트만 남긴다 → 일반 트레이너·체육관전에는 지울 것이 없어 아무 일도 안 한다.)
+      this.registry.remove(EVENT_CONTINUE_KEY);
       await this.loseMoney();
       await this.say("눈앞이 깜깜해졌다...");
       this.party.forEach((p) => { p.currentHp = p.maxHp; p.status = null; }); // 집에서 요양 → 전원 회복
@@ -529,7 +536,12 @@ export default class BattleScene extends Phaser.Scene {
     } else if (this.returnScene) {
       // 실내 씬(체육관)이 부른 배틀 — 그 씬이 뒷대사를 이어간다. 결과를 씬 데이터로 직접 넘긴다(전역 플래그 X).
       //  패배 경로는 여기 안 오므로, 이 데이터를 받은 씬은 "이 배틀에서 실제로 이기고 돌아온 것"이 보장된다.
-      this.time.delayedCall(300, () => this.scene.start(this.returnScene!, { fromBattle: true, battleOutcome: this.outcome }));
+      //  ⚠️ 야외 스토리 이벤트(자동실행)도 이 길로 돌아온다 → **어디로 돌아갈지**(spawn/face)도 같이 넘긴다.
+      //     안 넘기면 WorldScene이 기본 스폰(태초마을 우리집 앞)으로 떨어진다.
+      //     실내 씬(체육관)은 이 둘을 안 읽으므로 예전과 똑같이 동작한다.
+      this.time.delayedCall(300, () => this.scene.start(this.returnScene!, {
+        fromBattle: true, battleOutcome: this.outcome, spawn: this.returnPos, face: this.returnFacing,
+      }));
     } else {
       this.time.delayedCall(300, () =>
         this.scene.start("WorldScene", { spawn: this.returnPos, face: this.returnFacing }));

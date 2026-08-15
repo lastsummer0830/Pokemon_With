@@ -3,7 +3,8 @@ import DialogBox from "../ui/DialogBox";
 import { addItem, POCKET_NAME } from "../data/Bag";
 import { getItem } from "../data/ar";
 import { josa } from "../data/josa";
-import { playMe, playSfx, SFX } from "../game/sfx";
+import { playMe, playSfx, SFX, BGM } from "../game/sfx";
+import { playBgm } from "../game/bgm";
 import { setSelfSwitch, setArSwitch, dirFrame } from "./mapEvents";
 import type { EventLine, EventPage, MapEvent } from "./mapEvents";
 
@@ -19,6 +20,26 @@ import type { EventLine, EventPage, MapEvent } from "./mapEvents";
 const AR_SE: Record<string, string> = {
   PIKACHU: "cry_PIKACHU",   // 상록시티 민가3의 피카츄 울음(AR Audio/SE/PIKACHU.ogg 원본 그대로)
 };
+
+/**
+ * AR BGM 이름 → 우리 곡 키. **여기 없는 이름은 아무 일도 하지 않는다**(원본에만 있는 곡).
+ *
+ * ⚠️ 없는 곡을 playBgm에 그냥 넘기면 안 된다 — playBgm은 캐시를 보기 **전에** 지금 곡을 끈다
+ *    (bgm.ts) → 원본에만 있는 곡 하나 때문에 필드가 통째로 무음이 된다.
+ */
+const AR_BGM: Record<string, string> = {
+  KM_Pallet: BGM.town,   // 태초마을 곡(우리 bgm_town)
+};
+
+/** 원본 BGM 볼륨(0~100)을 우리 필드 BGM 기준(WorldScene이 쓰는 0.35)으로 옮긴다. */
+const FIELD_BGM_VOL = 0.35;
+
+/** 원본 이벤트가 시키는 BGM 교체. 우리에게 없는 곡이면 **지금 곡을 그대로 둔다**. */
+export function playArBgm(scene: Phaser.Scene, name: string, volume = 100): void {
+  const key = AR_BGM[name];
+  if (!key || !scene.cache.audio.exists(key)) return;
+  playBgm(scene, key, FIELD_BGM_VOL * (volume / 100));
+}
 
 /** 효과음 파일 목록 — 씬 preload에서 함께 받아둔다(없으면 그냥 안 울린다). */
 export const AR_SE_FILES: Record<string, string> = {
@@ -38,6 +59,11 @@ export function preloadEventAudio(scene: Phaser.Scene): void {
  * ⚠️ 같은 그림을 쓰는 이벤트가 여럿이면(볼 4개·열매나무 2그루) 동시에 만들다
  *    "Texture key already in use"가 난다 → 그림마다 **만드는 작업 하나**를 기억해 같이 기다린다.
  *    텍스처는 게임 전역이라 이 표도 모듈 전역이다.
+ * ⚠️ 그림을 받는 도중에 씬이 꺼지면(워프·문·디버그 바로가기) 로더가 그 파일을 **취소한다** →
+ *    COMPLETE가 영영 안 오고, 그 약속을 표에 남겨두면 **다음 씬이 죽은 약속을 물려받아** 계속 기다린다.
+ *    (실제로 그랬다: 1번도로에 잠깐 들렀다 상록시티로 바로 가면 아일라 그림이 안 서고,
+ *     그 그림을 기다리던 자동실행이 busy를 켠 채 멈춰 플레이어가 얼어붙었다.)
+ *    → 씬이 꺼질 때 약속을 **풀어주고**, 아직 시트가 안 만들어졌으면 표에서 **그 자리에서 지운다**.
  */
 const sheetJobs = new Map<string, Promise<void>>();
 
@@ -45,21 +71,38 @@ export async function loadEventSheet(scene: Phaser.Scene, gfx: string): Promise<
   const sheetKey = `ev_${gfx}`;
   let job = sheetJobs.get(sheetKey);
   if (!job) {
+    const owner = scene;
+    const made = (): boolean => owner.textures.exists(sheetKey);
+    // 표에서 지우는 일은 **동기로** 해야 한다 — scene.start는 같은 씬 인스턴스를 다시 쓰므로
+    //  다음 create()가 이 자리를 지나기 전에 지워져 있어야 새로 받는다.
+    const drop = (): void => { if (sheetJobs.get(sheetKey) === job && !made()) sheetJobs.delete(sheetKey); };
     job = (async () => {
       const imgKey = `evimg_${gfx}`;
-      if (!scene.textures.exists(imgKey)) {
+      if (!owner.textures.exists(imgKey)) {
         await new Promise<void>((resolve) => {
-          scene.load.image(imgKey, `assets/characters/${gfx}.png`);
-          scene.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());
-          scene.load.start();
+          const done = (): void => {
+            owner.load.off(Phaser.Loader.Events.COMPLETE, done);
+            owner.events.off(Phaser.Scenes.Events.SHUTDOWN, done);
+            owner.events.off(Phaser.Scenes.Events.DESTROY, done);
+            resolve();
+          };
+          owner.load.image(imgKey, `assets/characters/${gfx}.png`);
+          owner.load.once(Phaser.Loader.Events.COMPLETE, done);
+          // 씬이 꺼지면 파일은 취소된다 — 그때도 반드시 풀어준다(안 풀면 기다리던 쪽이 영영 멈춘다).
+          owner.events.once(Phaser.Scenes.Events.SHUTDOWN, done);
+          owner.events.once(Phaser.Scenes.Events.DESTROY, done);
+          owner.load.start();
         });
       }
-      if (!scene.textures.exists(sheetKey) && scene.textures.exists(imgKey)) {
-        const src = scene.textures.get(imgKey).getSourceImage() as HTMLImageElement;
-        scene.textures.addSpriteSheet(sheetKey, src, { frameWidth: src.width / 4, frameHeight: src.height / 4 });
+      if (!owner.textures.exists(sheetKey) && owner.textures.exists(imgKey)) {
+        const src = owner.textures.get(imgKey).getSourceImage() as HTMLImageElement;
+        owner.textures.addSpriteSheet(sheetKey, src, { frameWidth: src.width / 4, frameHeight: src.height / 4 });
       }
     })();
     sheetJobs.set(sheetKey, job);
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, drop);
+    scene.events.once(Phaser.Scenes.Events.DESTROY, drop);
+    void job.then(drop, drop);
   }
   await job;
   if (!scene.textures.exists(sheetKey)) return null;
@@ -93,13 +136,37 @@ export function applyEventSprite(
 }
 
 /**
+ * 씬만 할 수 있는 컷신 동작(원본 자동실행 이벤트용). 씬이 넘겨주면 그 명령이 살아나고,
+ * 안 넘기면 그 줄은 조용히 건너뛴다 — **실행기는 한 벌로 두고** 씬별 복사본을 만들지 않으려는 것이다.
+ */
+export interface EventHost {
+  wait(frames: number): Promise<void>;          // 원본 'Wait'(프레임)
+  emote(ev: MapEvent): void;                    // 원본 이벤트 애니메이션(3 = "!")
+  bgm(name: string, volume: number): void;      // 원본 BGM 교체
+  move(ev: MapEvent, steps: string[]): Promise<void>;   // 원본 이동 루트(완료까지 기다림)
+}
+
+/** 한 페이지를 돌린 결과. */
+export interface EventRunResult {
+  /** 이벤트의 **모습이 바뀌었을 수 있다**(셀프스위치가 켜져 다음 페이지로 넘어감) → 부르는 쪽이 다시 그린다. */
+  changed: boolean;
+  /**
+   * 배틀 명령에서 **멈췄다**. 부르는 쪽이 그 배틀을 걸고, **이기고 돌아와** resumeAt부터 다시 부르면 이어진다.
+   * (지면 원본대로 화이트아웃이라 여기로 돌아오지 않는다 → 셀프스위치가 안 켜져 재도전이 된다.)
+   */
+  battle?: { trainerId: string; resumeAt: number };
+}
+
+/**
  * 이벤트 한 페이지를 위에서부터 실행한다.
- * @returns 이벤트의 **모습이 바뀌었을 수 있으면** true (셀프스위치가 켜져 다음 페이지로 넘어간 경우).
- *          부르는 쪽이 그때 스프라이트를 다시 그리거나 지운다.
+ * @param opts.host    컷신 명령(대기·"!"·BGM·이동)을 실제로 해 줄 씬. 없으면 그 줄은 건너뛴다.
+ * @param opts.startAt 이 줄부터 실행한다(배틀에서 이기고 돌아와 이어서 실행할 때).
  */
 export async function runEventPage(
   scene: Phaser.Scene, dlg: DialogBox, map: string, ev: MapEvent, page: EventPage,
-): Promise<boolean> {
+  opts?: { host?: EventHost; startAt?: number },
+): Promise<EventRunResult> {
+  const host = opts?.host;
   const reg = scene.registry;
   const you = (reg.get("playerName") as string) ?? "나";
   const fill = (t: string) => t.replace(/\{PLAYER\}/g, you);
@@ -107,34 +174,52 @@ export async function runEventPage(
   let took = false;   // 이번에 실제로 물건을 집었나(열매를 "안 딴다"고 하면 false)
 
   const runLines = async (lines: EventLine[]): Promise<void> => {
-    for (const l of lines) {
-      if (l.text) {
-        await dlg.say(fill(l.text), l.speaker ? fill(l.speaker) : null);
-      } else if (l.choice?.length) {
-        const pick = await dlg.askChoice(l.choice.map(fill));
-        await runLines(l.branches?.[pick] ?? []);
-      } else if (l.item) {
-        await pickUp(scene, dlg, l.item, 1);
-        took = true;
-      } else if (l.berry) {
-        // ⚠️ "안 딸래"를 고르면 열매는 그대로 남아야 한다 — 여기서 딴 경우만 표시한다.
-        if (await pickBerry(scene, dlg, l.berry, l.count ?? 1)) took = true;
-      } else if (l.receive) {
-        await receiveItem(scene, dlg, l.receive, 1);
-      } else if (l.shop) {
-        // 상점(pbPokemonMart)은 아직 안 만들었다 — 마트 점원과 같은 안내로 통일한다.
-        await dlg.say("(상점은 아직 준비 중이다.)");
-      } else if (l.se) {
-        playSfx(scene, AR_SE[l.se] ?? "", 0.5);
-      } else if (l.setSelf) {
-        setSelfSwitch(reg, map, ev.id, l.setSelf);
-        changed = true;
-      } else if (l.setSwitch) {
-        setArSwitch(reg, l.setSwitch[0], l.setSwitch[1]);
-      }
+    for (const l of lines) await runLine(l);
+  };
+
+  const runLine = async (l: EventLine): Promise<void> => {
+    if (l.text) {
+      await dlg.say(fill(l.text), l.speaker ? fill(l.speaker) : null);
+    } else if (l.choice?.length) {
+      const pick = await dlg.askChoice(l.choice.map(fill));
+      await runLines(l.branches?.[pick] ?? []);
+    } else if (l.item) {
+      await pickUp(scene, dlg, l.item, 1);
+      took = true;
+    } else if (l.berry) {
+      // ⚠️ "안 딸래"를 고르면 열매는 그대로 남아야 한다 — 여기서 딴 경우만 표시한다.
+      if (await pickBerry(scene, dlg, l.berry, l.count ?? 1)) took = true;
+    } else if (l.receive) {
+      await receiveItem(scene, dlg, l.receive, 1);
+    } else if (l.shop) {
+      // 상점(pbPokemonMart)은 아직 안 만들었다 — 마트 점원과 같은 안내로 통일한다.
+      await dlg.say("(상점은 아직 준비 중이다.)");
+    } else if (l.se) {
+      playSfx(scene, AR_SE[l.se] ?? "", 0.5);
+    } else if (l.setSelf) {
+      setSelfSwitch(reg, map, ev.id, l.setSelf);
+      changed = true;
+    } else if (l.setSwitch) {
+      setArSwitch(reg, l.setSwitch[0], l.setSwitch[1]);
+    // ── 아래는 씬(EventHost)이 있어야 하는 컷신 명령 ─────────────────
+    } else if (l.move) {
+      await host?.move(ev, l.move);
+    } else if (l.wait !== undefined) {
+      await host?.wait(l.wait);
+    } else if (l.emote !== undefined) {
+      host?.emote(ev);
+    } else if (l.bgm) {
+      host?.bgm(l.bgm, l.bgmVolume ?? 100);
     }
   };
-  await runLines(page.lines);
+
+  // 최상위 줄만 **배틀에서 멈출 수 있다**(원본도 조건분기 안이 아니라 페이지 본문에서 부른다).
+  //  선택지 안쪽(runLines)은 예전 그대로 — 거기서 배틀을 부르는 이벤트는 아직 없다.
+  for (let i = opts?.startAt ?? 0; i < page.lines.length; i++) {
+    const l = page.lines[i];
+    if (l.battle) return { changed, battle: { trainerId: l.battle, resumeAt: i + 1 } };
+    await runLine(l);
+  }
 
   // 바닥 아이템·열매는 원본도 셀프스위치 A를 켜서 빈 페이지로 넘긴다.
   //  (추출기가 그 123 명령을 같이 뽑지만, 조건분기 안에 들어 있어 빠지는 경우가 있어 여기서 한 번 더 확실히 한다.)
@@ -142,7 +227,7 @@ export async function runEventPage(
     setSelfSwitch(reg, map, ev.id, "A");
     changed = true;
   }
-  return changed;
+  return { changed };
 }
 
 /** 바닥 아이템 줍기 — 문구는 원본 `pbItemBall`(Overworld.rb) 그대로 두 줄이다. */

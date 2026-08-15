@@ -370,7 +370,8 @@ export default class BuildingScene extends Phaser.Scene {
       }
       this.busy = true;
       runEventPage(this, this.dlg, map, entry.ev, page)
-        .then((changed) => { if (changed) this.refreshEvent(entry); })
+        // 실내엔 컷신(EventHost)을 안 넘긴다 — 민가 이벤트는 대사·아이템뿐이다.
+        .then((r) => { if (r.changed) this.refreshEvent(entry); })
         .catch((e) => console.error("[BuildingScene] 이벤트 오류:", e))
         .finally(() => { this.dlg.hide(); this.busy = false; });
       return;

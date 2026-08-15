@@ -30,6 +30,15 @@ export interface EventLine {
   shop?: string[];                // pbPokemonMart — 상점(아직 미구현이라 안내만 한다)
   setSelf?: string;               // 셀프스위치 켜기(A~D) — "이 사람은 이제 다음 페이지"
   setSwitch?: [number, boolean];  // 원본 전역 스위치 켜기/끄기
+  // ── 컷신 명령(자동실행 스토리 이벤트) ──────────────────────────────
+  //  씬이 실제 화면을 움직여야 하는 것들이라 **씬이 준 EventHost가 있을 때만** 동작한다
+  //  (fieldEventRunner.EventHost 참고 — 실내 씬은 아직 없고, 그때는 조용히 건너뛴다).
+  wait?: number;                  // 원본 'Wait' — RMXP 프레임 수(원본 40fps)
+  emote?: number;                 // 원본 '이벤트 애니메이션' 번호(3 = 머리 위 "!")
+  bgm?: string;                   // 원본 BGM 이름(AR Audio/BGM/<이름>) — 우리에게 있는 곡만 바뀐다
+  bgmVolume?: number;             // 원본 볼륨(0~100)
+  move?: string[];                // 원본 이동 루트 — "speed<n>" / "turnUp…" / "up|down|left|right"
+  battle?: string;                // 원본 TrainerBattle.start — AR 트레이너 정의 키("ILLA:???")
 }
 
 export interface EventPage {
