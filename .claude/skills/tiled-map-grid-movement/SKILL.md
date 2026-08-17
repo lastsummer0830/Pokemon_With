@@ -1,6 +1,6 @@
 ---
 name: tiled-map-grid-movement
-description: AR 맵·격자 이동·충돌·워프를 좌표로 검증한다.
+description: AR 맵·격자 이동·충돌·워프를 좌표로 검증한다. 트리거 — "맵 붙여줘", "충돌 막아", "문으로 들어가게", "벽을 통과해", "이동이 이상해", 격자·terrain tag·워프 좌표. 화면 눈대중으로 좌표를 찍지 말고 원본 격자와 실제 이동 결과로 확인한다.
 version: 1.0.0
 platforms: [linux, windows]
 metadata:

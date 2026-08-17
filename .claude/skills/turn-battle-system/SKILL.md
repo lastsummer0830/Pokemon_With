@@ -1,6 +1,6 @@
 ---
 name: turn-battle-system
-description: 배틀 규칙·상태·연출을 결정론적으로 구현·검증한다.
+description: 배틀 규칙·상태·연출을 결정론적으로 구현·검증한다. 트리거 — "배틀 제대로 짜줘", "데미지 계산 붙여", "타입 상성 넣어", "기술 추가", "포획 확률", "전투 만들어줘", 배틀 텍스트·연출. 난수는 주입 가능하게 두고 재현 가능한 수치로 확인한다.
 version: 1.0.0
 platforms: [linux, windows]
 metadata:

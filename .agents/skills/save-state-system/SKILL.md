@@ -1,6 +1,6 @@
 ---
 name: save-state-system
-description: 세이브 스키마·마이그레이션·복원을 회귀 검증한다.
+description: 세이브 스키마·마이그레이션·복원을 회귀 검증한다. 트리거 — "저장", "불러오기", "이어하기", "세이브 깨졌어", "슬롯 추가해", 세이브 필드 추가·변경. 기존 세이브 호환을 깨지 않는지 실제 로드까지 확인한다.
 version: 1.0.0
 platforms: [linux, windows]
 metadata:

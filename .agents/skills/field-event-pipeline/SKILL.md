@@ -1,6 +1,6 @@
 ---
 name: field-event-pipeline
-description: AR 필드·스토리 이벤트를 추출·구현·회귀 검증한다.
+description: AR 필드·스토리 이벤트를 추출·구현·회귀 검증한다. 트리거 — "이벤트 넣어줘", "NPC 말 걸면", "팻말", "아이템볼", "열매나무", "오토런으로 말 걸어오게", "스토리 이벤트 붙여", 원본 이벤트 판독·이식·재도전 처리.
 version: 1.0.0
 platforms: [linux, windows]
 metadata:

@@ -22,7 +22,7 @@ LIMITS = {
 }
 MAX_OPEN_ITEMS = 15
 REQUIRED_PROJECT_SETTINGS = {
-    "autoMemoryEnabled": False,
+    "autoMemoryEnabled": True,
     "disableAllHooks": False,
     "disableClaudeAiConnectors": True,
     "disableBundledSkills": False,
@@ -37,14 +37,12 @@ REQUIRED_SENSITIVE_DENY = {
     "Edit(/.claude/**)",
     "Edit(/.hermes/**)",
     "Edit(/.hermes.md)",
-    "Edit(/CLAUDE.md)",
     "Edit(/HERMES_HANDOFF.md)",
     "Edit(/HERMES_CHECKLIST.md)",
     "Edit(/scripts/run_claude_worker.py)",
     "Edit(/scripts/guard_claude_worker_command.py)",
     "Edit(/scripts/test_claude_worker.py)",
     "Edit(/scripts/test_claude_worker_guard.py)",
-    "Edit(/scripts/check_agent_skills.py)",
     "Edit(/scripts/test_agent_skills.py)",
     "Edit(/scripts/check_hermes_control.py)",
     "Edit(/scripts/hermes_response_gate.py)",

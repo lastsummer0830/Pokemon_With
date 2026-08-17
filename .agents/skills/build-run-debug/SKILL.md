@@ -1,6 +1,6 @@
 ---
 name: build-run-debug
-description: 게임 실행·입력·화면·console·build를 검증한다.
+description: 게임 실행·입력·화면·console·build를 검증한다. 트리거 — "실행해줘", "게임 켜봐", "앱으로 켜봐", "빌드 안 돼", "왜 안 떠", "화면이 안 바뀌어", "exe 다시 구워줘", "스크린샷 찍어봐", console error. dev는 5180 포트, exe 갱신은 app:bake.
 version: 1.1.0
 platforms: [linux, windows]
 metadata:

@@ -1,6 +1,6 @@
 ---
 name: home-bonus-system
-description: 집 꾸미기부터 유대와 배틀 보너스까지 검증한다.
+description: 집 꾸미기부터 유대와 배틀 보너스까지 검증한다. 트리거 — "집 꾸미기", "가구 배치", "컨디션 올려", "유대", "집이 배틀에 영향 가게", 방 보너스 계산. 이 게임의 핵심 차별점이라 수치 근거와 실제 배틀 반영까지 확인한다.
 version: 1.0.0
 platforms: [linux, windows]
 metadata:

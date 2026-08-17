@@ -1,6 +1,6 @@
 ---
 name: phaser-scene-builder
-description: Phaser Scene 구조와 전환을 현재 코드에 맞게 만든다.
+description: Phaser Scene 구조와 전환을 현재 코드에 맞게 만든다. 트리거 — "새 화면 만들어", "씬 추가해", "화면 넘어가게", "전환이 이상해", "돌아오면 상태가 날아가", scene 등록·수명주기·데이터 전달. src/main.ts의 현재 등록 상태를 먼저 확인한다.
 version: 1.0.0
 platforms: [linux, windows]
 metadata:

@@ -1,6 +1,6 @@
 ---
 name: game-ui-hud-polish
-description: 포켓몬 UI를 원본 근거와 실제 렌더로 다듬는다.
+description: 포켓몬 UI를 원본 근거와 실제 렌더로 다듬는다. 트리거 — "UI 예쁘게", "메뉴 촌스러워", "간지나게", "글씨 잘려", 텍스트박스·HUD·가방·도감·박스 화면 손질. look이 갈리면 임의 확정 말고 실제 렌더 후보 2~3개를 Pick에 넣어 사용자가 고르게 한다.
 version: 1.0.0
 platforms: [linux, windows]
 metadata:

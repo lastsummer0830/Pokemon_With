@@ -1,6 +1,6 @@
 ---
 name: webapp-testing
-description: 게임 Playwright 요청을 runtime QA 정본으로 연결한다.
+description: 게임 Playwright 요청을 runtime QA 정본으로 연결한다. 트리거 — "자동으로 눌러서 확인", "진짜 되는지 테스트", "콘솔 에러 잡아줘", "이 화면 실제로 동작하는지", "playwright로 눌러봐", 자동 조작 검증. 그냥 켜기·빌드·exe 굽기는 build-run-debug.
 version: 1.1.0
 platforms: [linux, windows]
 metadata:

@@ -1,6 +1,6 @@
 ---
 name: pokemon-asset-pipeline
-description: 픽셀 게임 에셋을 근거와 라이선스를 확인해 이식한다.
+description: 픽셀 게임 에셋을 근거와 라이선스를 확인해 이식한다. 트리거 — "스프라이트 가져와", "타일셋 구해줘", "도감 이미지 받아", "후보 뽑아와", "소스 어디서 났어", 에셋 비교·이식. 인게임은 픽셀 전용이며 공식 일러스트로 대체하지 않는다. 재현 검증은 ar-compare.
 version: 1.0.0
 platforms: [linux, windows]
 metadata:

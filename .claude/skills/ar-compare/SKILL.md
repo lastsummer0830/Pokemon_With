@@ -1,6 +1,6 @@
 ---
 name: ar-compare
-description: AR 원본과 게임 렌더를 픽셀 단위로 대조한다.
+description: AR 원본과 게임 렌더를 픽셀 단위로 대조한다. 트리거 — "원본이랑 비교", "AR이랑 똑같은지", "픽셀 비교", "제대로 이식됐는지 확인", 타일·스프라이트·UI 재현 검증. 눈대중 비교 금지. 소스 후보 수집은 pokemon-asset-pipeline, 동작 확인은 webapp-testing.
 version: 1.0.0
 platforms: [linux, windows]
 metadata:

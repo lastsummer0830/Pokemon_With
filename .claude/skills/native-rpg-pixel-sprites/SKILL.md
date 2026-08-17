@@ -1,6 +1,6 @@
 ---
 name: native-rpg-pixel-sprites
-description: Another Red 원본 기준 네이티브 픽셀 에셋을 만들고 검증한다.
+description: Another Red 원본 기준 네이티브 픽셀 에셋을 만들고 검증한다. 트리거 — "픽셀로 새로 그려", "트레이너 그림 만들어", "도트 찍어", "원본에 없는데 만들어줘", 신규 스프라이트 제작. 매끈한 일러스트 금지. 생성 승인과 runtime 적용 승인은 분리한다.
 version: 1.0.0
 platforms: [linux, windows]
 metadata:

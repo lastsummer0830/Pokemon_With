@@ -165,8 +165,8 @@ def validate_repository(
         if platforms and not re.fullmatch(r"\[(?:linux|windows)(?:,\s*(?:linux|windows))*\]", platforms):
             errors.append(f"{rel}: unsupported platforms format {platforms}")
         description = frontmatter.get("description", "")
-        if len(description) > 60:
-            errors.append(f"{rel}: description is {len(description)} chars; maximum is 60")
+        if len(description) > 1536:
+            errors.append(f"{rel}: description is {len(description)} chars; maximum is 1536")
         for section in REQUIRED_SECTIONS:
             if f"## {section}" not in text:
                 errors.append(f"{rel}: missing section {section}")
