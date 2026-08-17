@@ -67,6 +67,22 @@ CODE_NAME = {
     246: "BGS 페이드아웃", 247: "BGM/BGS 기억", 248: "BGM/BGS 복원", 249: "ME 연주",
     251: "효과음 정지", 351: "메뉴 호출", 352: "저장 화면 호출", 353: "게임 오버", 354: "타이틀로",
 }
+# 추출기가 못 옮기는 명령(컷신·조건분기·배틀)까지 **손으로 옮긴** 이벤트. (원본맵, 이벤트id) → 근거.
+#  왜 HANDLED를 넓히지 않나: HANDLED는 "추출기가 옮긴다"는 뜻이라 거기에 106·207·241을 넣으면
+#  **아직 안 옮긴 다른 이벤트의 같은 명령까지** 같이 숨는다 → 도구가 거짓말을 한다.
+#  그래서 이벤트 단위로 빼고, 그중 **일부러 건너뛴 명령은 아래에 그대로 찍는다**(숨기지 않는다).
+#  ⛔ 안 옮긴 것도 여기 함께 적는다 — 안 적으면 "손으로 옮겼다"가 전부 옮겼다는 뜻으로 읽힌다.
+HAND_PORTED = {
+    (56, 10): '아일라 자동실행 — 2026-08-16 구현, 08-18 원본 순서·주인공 "?"(207[-1,4])·대기 2개 보강.\n'
+              '              ⛔ 안 옮긴 것: 115(패배 시 이벤트 중단 — 우린 배틀에서 지면 씬을 떠나 같은 결과)',
+    (56, 14): '경호 — 2026-08-18 구현(207 "!"/"?" · 106 대기 · 111/411 스위치 87~90 분기 · CAMPER:경호 배틀 · 95번 스위치로 사라짐).\n'
+              '              ⛔ 안 옮긴 것: 223(배틀 뒤 화면 색조 2회 — 우린 암전 없이 바로 사라진다) /\n'
+              '                 207의 원본 대상은 [13](뱃지 뒤에만 보이는 다른 칸의 이벤트) → 작성자 번호 실수로 보고 경호 자신에게 띄웠다 /\n'
+              '              ⛔ 원본과 다르게 through(통과 가능)를 켰다 — 원본 경호는 체육관 문(35,9) 앞을 막는 문지기이고\n'
+              '                 (35,9)로 가는 칸은 (35,10) 하나뿐이다. 22번도로(스위치 87~90)를 이식하기 전에 원본대로 막으면\n'
+              '                 체육관·소개장·배지가 영구 도달 불가가 된다. **22번도로를 이식하면 through를 지워 원본 게이트를 되살릴 것.**',
+}
+
 # 이벤트 이름이 이러면 **JSON이 아니라 다른 방식으로 반영**된 것 — "빠짐"이 아니다.
 #  문 = WorldScene.warpDefs / 실내 씬의 spawn·exit · 트레이너 = trainers.json의 placements · 나무베기 = 미구현(알고 있음)
 ELSEWHERE = ("Home door", "Exit", "CutTree")
@@ -134,6 +150,7 @@ def audit(ar, mid, label, out_name, verbose):
     dropped = []              # 원본엔 있는데 우리 JSON엔 없는 이벤트(다른 방식 반영 제외)
     elsewhere = []            # 문·트레이너처럼 JSON 밖에서 반영한 것
     partial = []              # 반쪽만 옮긴 페이지
+    hand_skipped = {}         # 손으로 옮긴 이벤트에서 **일부러 건너뛴** 명령 (코드 → 개수)
 
     def live_page(eidn, pi):
         """이 페이지가 **지금 우리 게임에서 실제로 도는가**.
@@ -166,7 +183,7 @@ def audit(ar, mid, label, out_name, verbose):
             ourpg = ourpg[pi] if pi < len(ourpg) else {}
             def note_attr(msg):
                 attr_gaps.append(msg)
-                if live:
+                if live and (mid, eidn) not in HAND_PORTED:
                     live_attrs.append(msg)
 
             # ── 페이지 속성 중 우리가 모델링하지 않은 것
@@ -200,7 +217,12 @@ def audit(ar, mid, label, out_name, verbose):
                     if isinstance(pp, (bytes, bytearray)):
                         txt += b2s(pp) + " "
                 missing_codes.setdefault(code, []).append(f"{tag} p{pi} {txt.strip()[:60]}")
-                if live:
+                if not live:
+                    continue
+                # 손으로 옮긴 이벤트는 "구멍"이 아니다 — 대신 건너뛴 명령을 따로 세어 보여준다.
+                if (mid, eidn) in HAND_PORTED:
+                    hand_skipped[code] = hand_skipped.get(code, 0) + 1
+                else:
                     live_codes.setdefault(code, []).append(f"{tag} p{pi} {txt.strip()[:60]}")
 
         # ── 우리 JSON에 들어갔나
@@ -228,6 +250,16 @@ def audit(ar, mid, label, out_name, verbose):
         for a in live_attrs:
             print(f"       속성 {a}")
 
+    # 손으로 옮긴 이벤트 — 사람이 원본과 맞춰 본 것이라 구멍에서 뺀다. 대신 근거와 건너뛴 명령을 남긴다.
+    for (m_, e_), why in HAND_PORTED.items():
+        if m_ == mid:
+            print(f"   ✋ 손으로 옮긴 이벤트 [{e_}]: {why}")
+    if hand_skipped:
+        # ⚠️ "구멍"이 아니다 — 추출기(HANDLED)가 모르는 명령이라 자동 대조가 안 되는 것들이다.
+        #    옮겼는지는 위 근거 줄의 날짜·구현 목록으로 사람이 판단한다.
+        print("      자동 대조 불가(추출기 미지원 명령 — 손으로 대조했다): "
+              + ", ".join(f"{c}({CODE_NAME.get(c, '?')})×{n}" for c, n in sorted(hand_skipped.items())))
+
     # 아래는 참고 — 스토리라 일부러 뺀 페이지·다른 방식으로 반영한 것
     if elsewhere:
         print(f"   · JSON 밖에서 반영(문·트레이너 등) {len(elsewhere)}개: " + ", ".join(elsewhere[:5]) + ("…" if len(elsewhere) > 5 else ""))
@@ -235,8 +267,15 @@ def audit(ar, mid, label, out_name, verbose):
         print(f"   · 우리 JSON에 없는 이벤트 {len(dropped)}개: " + ", ".join(dropped[:6]) + ("…" if len(dropped) > 6 else ""))
     if partial:
         print(f"   · 반쪽만 옮긴 페이지(스토리 대기) {len(partial)}개: " + ", ".join(partial[:5]) + ("…" if len(partial) > 5 else ""))
-    other_codes = sum(len(v) for v in missing_codes.values()) - sum(len(v) for v in live_codes.items() for _ in [0])
-    rest = {c: v for c, v in missing_codes.items() if c not in live_codes}
+    # "안 도는 페이지"에서 손으로 옮긴 이벤트의 명령을 빼야 한다 — 안 빼면 **도는 페이지의 명령이
+    #  안 도는 페이지 몫으로 한 번 더** 찍힌다(경호의 106·207이 양쪽에 나왔다).
+    rest = {}
+    for c, v in missing_codes.items():
+        if c in live_codes:
+            continue
+        keep = [x for x in v if not any(x.startswith(f"[{e_}]") for m_, e_ in HAND_PORTED if m_ == mid)]
+        if keep:
+            rest[c] = keep
     if rest:
         print("   · (참고) 안 도는 페이지의 못 옮긴 명령: "
               + ", ".join(f"{c}({CODE_NAME.get(c, '?')})×{len(v)}" for c, v in sorted(rest.items())))

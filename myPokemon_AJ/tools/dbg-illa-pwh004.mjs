@@ -176,6 +176,8 @@ const advanceToLine = async (want, tries = 12) => {
  *  1순위: 살아 있는 WorldScene이 들고 있는 EV10 entry의 자동실행 페이지(= 실제로 걸린 그 페이지).
  *  2순위: 배틀 등으로 씬을 떠났으면 로더 캐시의 EV10 정의(같은 JSON이다).
  * battle 줄이 없으면 `resumeAt: null`을 돌려주고, 부르는 쪽이 assertion 실패로 남긴다.
+ * ⚠️ 2026-08-18부터 resumeAt은 **줄 번호의 경로(배열)**다 — 조건분기 안에서 배틀이 걸리는 이벤트(경호)가
+ *    생겨서다. EV10의 배틀은 페이지 본문에 있으므로 경로는 한 칸(`[i + 1]`)이다.
  */
 const computeResumeAt = async () => {
   const got = await page.evaluate(([map, id]) => {
@@ -194,7 +196,7 @@ const computeResumeAt = async () => {
   //  trigger가 3이 아니면 WorldScene.resumeEvent가 이어실행을 거부하므로 여기서도 세지 않는다.
   const p = pages.find((x) => x.trigger === 3 && (x.lines ?? []).some((l) => l.battle)) ?? null;
   const index = p ? p.lines.findIndex((l) => l.battle) : -1;
-  return { source: got.source, pages: pages.length, index, resumeAt: index >= 0 ? index + 1 : null };
+  return { source: got.source, pages: pages.length, index, resumeAt: index >= 0 ? [index + 1] : null };
 };
 /**
  * busy 값이 **바뀐 순서만** 모은다(짧은 폴링, bounded).
@@ -326,7 +328,7 @@ await section("1. 상록시티 (23,38) 진입 — EV10 entry·sprite", async () 
   const rs = await computeResumeAt();
   resumeAt = rs.resumeAt;
   ok(resumeAt !== null,
-    `EV10 자동실행 페이지에 battle 줄이 있다 → 이어실행은 lines[${rs.index}] 다음인 ${resumeAt}부터다`
+    `EV10 자동실행 페이지에 battle 줄이 있다 → 이어실행은 lines[${rs.index}] 다음인 [${resumeAt}]부터다`
     + ` (출처: ${rs.source}, 페이지 ${rs.pages}장)`);
 });
 
@@ -417,7 +419,7 @@ await section("4. 승리 후 이어실행 → (21,28)로 비켜서고 셀프스�
   // resumeAt은 상수가 아니라 EV10 페이지의 battle 줄에서 계산한 값이다.
   //  1번에서 못 구했으면(그 구간이 끊겼거나 씬이 없었으면) 로더 캐시로 한 번 더 본다.
   if (resumeAt === null) resumeAt = (await computeResumeAt()).resumeAt;
-  ok(resumeAt !== null, `이어실행 시작 줄을 battle 줄에서 계산했다 (받은 값: ${resumeAt})`);
+  ok(resumeAt !== null, `이어실행 시작 줄을 battle 줄에서 계산했다 (받은 값: [${resumeAt}])`);
   if (resumeAt === null) {
     // battle 줄이 없으면 예약 자체를 만들 수 없다 — 아무 값이나 넣어 진행하지 않고 남은 항목을 실패로 남긴다.
     ok(false, "이어실행 이후 acceptance(이동·최종 좌표·셀프스위치 A·sprite 제거·재진입)를 검증하지 못했다");

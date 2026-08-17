@@ -6,6 +6,7 @@ import { OAKS_LETTER } from "../data/story";
 import { findFurniture } from "../data/furniture";
 import { Difficulty, DEFAULT_DIFFICULTY } from "./difficulty";
 import { emptyHouse } from "./homeBonus";
+import { SELF_SWITCH_KEY, AR_SWITCH_KEY } from "./mapEvents";
 
 // 저장/불러오기 — 브라우저 localStorage.
 //  ⚠️ 실제 런타임 상태는 씬 registry에 있다(파티·이름·성별·라이벌 예약·집인트로 등).
@@ -14,7 +15,10 @@ import { emptyHouse } from "./homeBonus";
 //  v3: 가방·도감·소지금·뱃지 추가. 옛 저장은 아래 마이그레이션이 기본값을 채워 그대로 이어할 수 있다.
 //  v4: 파티 포켓몬에 caughtBall(잡은 볼) 추가. 옛 저장은 몬스터볼로 채운다.
 //  v5: **세이브 슬롯 여러 개** + 플레이 시간(playSeconds). 옛 1칸 저장은 '세이브 A'로 옮긴다.
-const SAVE_VERSION = 5;
+//  v6: **원본 맵 이벤트 진행**(셀프스위치·전역 스위치) 추가. 그전까지는 registry에만 있어서
+//      저장하고 불러오면 아일라·경호·민가2 인형처럼 **한 번 끝낸 이벤트가 원상복구**됐다.
+//      옛 저장에는 이 필드가 없다 → 빈 값으로 채운다(= 지금까지와 똑같은 동작이라 호환이 깨지지 않는다).
+const SAVE_VERSION = 6;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 세이브 슬롯 — 원본(Another Red)의 `Auto Multi Save` 플러그인과 같은 구성이다.
@@ -132,6 +136,10 @@ export interface SaveData {
   savedAt: number;   // 저장 시각(표시용)
   // ── v5부터 ──
   playSeconds?: number;   // 누적 플레이 시간(초) — 원본 로드화면의 "Time"과 같은 자리
+  // ── v6부터: 원본 맵 이벤트 진행 ──
+  //  이 둘이 없으면 "한 번 끝낸 이벤트"가 로드할 때마다 되살아난다(경호·아일라·민가2 인형 등).
+  eventSelfSwitches?: Record<string, boolean>;   // 키 = `<맵>:<이벤트id>:<A~D>` (systems/mapEvents.ts)
+  arSwitches?: Record<number, boolean>;          // 키 = 원본 RMXP 전역 스위치 번호
 }
 
 type Reg = Phaser.Data.DataManager;
@@ -180,6 +188,9 @@ export function saveGame(reg: Reg, slot: SlotId = lastSlot()): void {
     loc: (reg.get("saveLoc") as SaveLoc) ?? { scene: "WorldScene" },
     savedAt: Date.now(),
     playSeconds: currentPlaySeconds(reg),
+    // 이벤트 진행 — registry가 단일 원천이다(mapEvents.setSelfSwitch/setArSwitch가 여기에만 쓴다).
+    eventSelfSwitches: (reg.get(SELF_SWITCH_KEY) as Record<string, boolean>) ?? {},
+    arSwitches: (reg.get(AR_SWITCH_KEY) as Record<number, boolean>) ?? {},
   };
   try { localStorage.setItem(slotKey(slot), JSON.stringify(data)); } catch { return; }
   setLastSlot(slot);
@@ -233,6 +244,11 @@ export function loadGame(reg: Reg, slot: SlotId = lastSlot()): SaveData | null {
   reg.set("dexOwn", data.dexOwn ?? partySpecies);
   reg.set("badges", data.badges ?? []);
   reg.set("trainersDefeated", data.trainersDefeated ?? []);
+  // ── v5 이하 → v6: 이벤트 진행이 없던 저장은 빈 값(= 아무 이벤트도 안 끝낸 상태)으로 채운다.
+  //  ⚠️ arSwitches의 키는 JSON을 거치면 숫자가 문자열이 된다("87"). arSwitchOn(reg, 87)의
+  //     `set[87]`은 JS가 프로퍼티 접근에서 숫자를 문자열로 바꾸므로 그대로 찾힌다 — 변환이 필요 없다.
+  reg.set(SELF_SWITCH_KEY, data.eventSelfSwitches ?? {});
+  reg.set(AR_SWITCH_KEY, data.arSwitches ?? {});
   // ── 소개장 호환 채우기 ──
   //  '오박사의 소개장'은 스타터를 고르는 순간 지급되게 만들었다(LabScene). 그래서 그 기능이 생기기
   //  전에 스타터를 받아 둔 저장에는 소개장이 없고, 상록체육관 컷신("소개장을 그린에게 건냈다!")이

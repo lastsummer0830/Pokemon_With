@@ -5,7 +5,7 @@ import { getItem } from "../data/ar";
 import { josa } from "../data/josa";
 import { playMe, playSfx, SFX, BGM } from "../game/sfx";
 import { playBgm } from "../game/bgm";
-import { setSelfSwitch, setArSwitch, dirFrame } from "./mapEvents";
+import { setSelfSwitch, setArSwitch, arSwitchOn, dirFrame } from "./mapEvents";
 import type { EventLine, EventPage, MapEvent } from "./mapEvents";
 
 // 원본 맵 이벤트 한 페이지를 **실제로 실행**하는 곳 — 대사·선택지·아이템·효과음.
@@ -141,21 +141,32 @@ export function applyEventSprite(
  */
 export interface EventHost {
   wait(frames: number): Promise<void>;          // 원본 'Wait'(프레임)
-  emote(ev: MapEvent): void;                    // 원본 이벤트 애니메이션(3 = "!")
+  /** 원본 '애니메이션 표시'(207). anim 3 = "!", 4 = "?". on = 띄울 대상(없으면 이 이벤트). */
+  emote(ev: MapEvent, anim: number, on?: "player" | number): void;
   bgm(name: string, volume: number): void;      // 원본 BGM 교체
   move(ev: MapEvent, steps: string[]): Promise<void>;   // 원본 이동 루트(완료까지 기다림)
 }
 
 /** 한 페이지를 돌린 결과. */
 export interface EventRunResult {
-  /** 이벤트의 **모습이 바뀌었을 수 있다**(셀프스위치가 켜져 다음 페이지로 넘어감) → 부르는 쪽이 다시 그린다. */
+  /** 이벤트의 **모습이 바뀌었을 수 있다**(셀프스위치·전역 스위치가 켜져 다음 페이지로 넘어감) → 부르는 쪽이 다시 그린다. */
   changed: boolean;
   /**
    * 배틀 명령에서 **멈췄다**. 부르는 쪽이 그 배틀을 걸고, **이기고 돌아와** resumeAt부터 다시 부르면 이어진다.
    * (지면 원본대로 화이트아웃이라 여기로 돌아오지 않는다 → 셀프스위치가 안 켜져 재도전이 된다.)
+   *
+   * resumeAt은 **줄 번호의 경로**다 — `[3]`이면 본문 4번째 줄부터.
+   * 조건분기 안에서 멈추면 `[분기줄, 갈래(0=then·1=else), 그 갈래의 줄]`이 된다(경호 = `[1, 0, 3]`).
+   *
+   * ⚠️ 갈래 번호를 **기록해 두는 것이 핵심**이다. 조건을 다시 보고 고르면, 배틀 사이에 스위치가
+   *    달라졌을 때 엉뚱한 갈래의 그 번째 줄부터 돌거나(짧은 갈래면) 아무것도 안 돌고 조용히 끝난다
+   *    — 이기고 왔는데 뒷대사도 안 나오고 스위치도 안 켜지는 상태가 된다.
    */
-  battle?: { trainerId: string; resumeAt: number };
+  battle?: { trainerId: string; resumeAt: number[] };
 }
+
+/** 배틀에서 멈춘 자리 — 안쪽에서 바깥으로 나오며 줄 번호를 앞에 붙여 경로를 만든다. */
+interface BattleStop { trainerId: string; path: number[] }
 
 /**
  * 이벤트 한 페이지를 위에서부터 실행한다.
@@ -164,7 +175,7 @@ export interface EventRunResult {
  */
 export async function runEventPage(
   scene: Phaser.Scene, dlg: DialogBox, map: string, ev: MapEvent, page: EventPage,
-  opts?: { host?: EventHost; startAt?: number },
+  opts?: { host?: EventHost; startAt?: number[] },
 ): Promise<EventRunResult> {
   const host = opts?.host;
   const reg = scene.registry;
@@ -173,16 +184,45 @@ export async function runEventPage(
   let changed = false;
   let took = false;   // 이번에 실제로 물건을 집었나(열매를 "안 딴다"고 하면 false)
 
-  const runLines = async (lines: EventLine[]): Promise<void> => {
-    for (const l of lines) await runLine(l);
+  /**
+   * 줄 묶음 하나를 위에서부터 실행한다. 배틀에서 멈추면 그 자리를 돌려준다(경로 앞에 이 층의 줄 번호를 붙인다).
+   * @param resume 이어실행 경로. `[i]`면 i번째 줄부터, `[i, …]`면 i번째 줄 **안으로** 나머지를 들고 내려간다.
+   */
+  const runLines = async (lines: EventLine[], resume: number[] = []): Promise<BattleStop | null> => {
+    const start = resume.length ? resume[0] : 0;
+    // 이어실행 자리가 지금 데이터 밖이면 **조용히 아무것도 안 하고 끝나는** 대신 남긴다
+    //  (이벤트 JSON을 고친 뒤 옛 예약이 남았을 때 "이겼는데 뒷대사가 없다"로 나타난다).
+    if (resume.length && start >= lines.length)
+      console.error(`[fieldEventRunner] 이어실행 자리가 데이터 밖이다: ${map} #${ev.id} @${resume.join(".")} (줄 ${lines.length}개)`);
+    for (let i = start; i < lines.length; i++) {
+      const l = lines[i];
+      // 이어실행은 **그 줄 안쪽**으로만 내려간다 — 그 뒤 줄들은 처음부터 돈다.
+      const sub = i === start ? resume.slice(1) : [];
+      // 배틀은 여기서 멈춘다. 이어실행 자리는 **그 다음 줄**이라 다시 걸리지 않는다.
+      if (l.battle && !sub.length) return { trainerId: l.battle, path: [i + 1] };
+      const stop = await runLine(l, sub);
+      if (stop) return { trainerId: stop.trainerId, path: [i, ...stop.path] };
+    }
+    return null;
   };
 
-  const runLine = async (l: EventLine): Promise<void> => {
+  const runLine = async (l: EventLine, resume: number[] = []): Promise<BattleStop | null> => {
+    if (l.ifSwitches) {
+      // 원본 조건분기 — 전역 스위치가 모두 켜져야 then. 안 옮긴 스토리 스위치는 꺼져 있어 else가 돈다.
+      //  이어실행이면 **그때 골랐던 갈래**(resume[0])를 그대로 쓴다 — 조건을 다시 보지 않는다.
+      const branch = resume.length ? resume[0] : (l.ifSwitches.every((s) => arSwitchOn(reg, s)) ? 0 : 1);
+      const stop = await runLines((branch === 0 ? l.then : l.else) ?? [], resume.slice(1));
+      // 갈래 번호를 경로에 남긴다(바깥 runLines가 자기 줄 번호를 앞에 붙인다).
+      return stop ? { trainerId: stop.trainerId, path: [branch, ...stop.path] } : null;
+    }
     if (l.text) {
       await dlg.say(fill(l.text), l.speaker ? fill(l.speaker) : null);
     } else if (l.choice?.length) {
       const pick = await dlg.askChoice(l.choice.map(fill));
-      await runLines(l.branches?.[pick] ?? []);
+      const stop = await runLines(l.branches?.[pick] ?? []);
+      // 선택지 안의 배틀은 이어실행할 수 없다 — 돌아왔을 때 어느 갈래였는지 다시 물을 수밖에 없다.
+      //  조용히 틀리게 도는 것보다 여기서 터지는 게 낫다(지금 그런 이벤트는 없다).
+      if (stop) throw new Error(`선택지 갈래 안의 배틀은 아직 못 이어실행한다 — ${map} #${ev.id}`);
     } else if (l.item) {
       await pickUp(scene, dlg, l.item, 1);
       took = true;
@@ -201,25 +241,23 @@ export async function runEventPage(
       changed = true;
     } else if (l.setSwitch) {
       setArSwitch(reg, l.setSwitch[0], l.setSwitch[1]);
+      // 전역 스위치도 페이지를 바꾼다(경호는 95번이 켜지면 빈 페이지로 넘어가 사라진다) → 다시 그려야 한다.
+      changed = true;
     // ── 아래는 씬(EventHost)이 있어야 하는 컷신 명령 ─────────────────
     } else if (l.move) {
       await host?.move(ev, l.move);
     } else if (l.wait !== undefined) {
       await host?.wait(l.wait);
     } else if (l.emote !== undefined) {
-      host?.emote(ev);
+      host?.emote(ev, l.emote, l.emoteOn);
     } else if (l.bgm) {
       host?.bgm(l.bgm, l.bgmVolume ?? 100);
     }
+    return null;
   };
 
-  // 최상위 줄만 **배틀에서 멈출 수 있다**(원본도 조건분기 안이 아니라 페이지 본문에서 부른다).
-  //  선택지 안쪽(runLines)은 예전 그대로 — 거기서 배틀을 부르는 이벤트는 아직 없다.
-  for (let i = opts?.startAt ?? 0; i < page.lines.length; i++) {
-    const l = page.lines[i];
-    if (l.battle) return { changed, battle: { trainerId: l.battle, resumeAt: i + 1 } };
-    await runLine(l);
-  }
+  const stop = await runLines(page.lines, opts?.startAt ?? []);
+  if (stop) return { changed, battle: { trainerId: stop.trainerId, resumeAt: stop.path } };
 
   // 바닥 아이템·열매는 원본도 셀프스위치 A를 켜서 빈 페이지로 넘긴다.
   //  (추출기가 그 123 명령을 같이 뽑지만, 조건분기 안에 들어 있어 빠지는 경우가 있어 여기서 한 번 더 확실히 한다.)

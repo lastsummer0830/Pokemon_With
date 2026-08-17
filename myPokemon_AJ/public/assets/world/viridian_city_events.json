@@ -1312,6 +1312,9 @@
      "cond": {},
      "lines": [
       {
+       "text": "(누군가가 서있다.)"
+      },
+      {
        "move": [
         "turnDown"
        ]
@@ -1327,11 +1330,18 @@
        "emote": 3
       },
       {
-       "text": "(누군가가 서있다.)"
-      },
-      {
        "text": "너!? 너가 어떻게?",
        "speaker": "???"
+      },
+      {
+       "wait": 20
+      },
+      {
+       "emote": 4,
+       "emoteOn": "player"
+      },
+      {
+       "wait": 20
       },
       {
        "text": "분명 그냥 길바닥에 버려뒀는데...",
@@ -1536,7 +1546,7 @@
   },
   {
    "id": 14,
-   "name": "EV014",
+   "name": "경호",
    "x": 35,
    "y": 10,
    "kind": "npc",
@@ -1549,8 +1559,18 @@
      "cond": {},
      "lines": [
       {
+       "emote": 3
+      },
+      {
        "text": "거기 너!",
        "speaker": "경호"
+      },
+      {
+       "emote": 4,
+       "emoteOn": "player"
+      },
+      {
+       "wait": 20
       },
       {
        "text": "상록체육관 관장은 강하다고!",
@@ -1604,7 +1624,7 @@
        "setSelf": "A"
       }
      ],
-     "partial": true
+     "through": true
     },
     {
      "graphic": "trainer_CAMPER",
@@ -1619,45 +1639,51 @@
        "speaker": "경호"
       },
       {
-       "text": "그래? 잘 됐네!",
-       "speaker": "경호"
-      },
-      {
-       "text": "그럼 마지막 배틀은 바로 나야!",
-       "speaker": "경호"
-      },
-      {
-       "text": "... 뭐? 체육관에 도전하러 온 게 아니라고?",
-       "speaker": "경호"
-      },
-      {
-       "text": "에이, 시간만 뺏겼잖아!",
-       "speaker": "경호"
-      },
-      {
-       "setSwitch": [
-        95,
-        true
+       "ifSwitches": [
+        90,
+        89,
+        88,
+        87
+       ],
+       "then": [
+        {
+         "text": "그래? 잘 됐네!",
+         "speaker": "경호"
+        },
+        {
+         "text": "그럼 마지막 배틀은 바로 나야!",
+         "speaker": "경호"
+        },
+        {
+         "battle": "CAMPER:경호"
+        },
+        {
+         "text": "... 뭐? 체육관에 도전하러 온 게 아니라고?",
+         "speaker": "경호"
+        },
+        {
+         "text": "에이, 시간만 뺏겼잖아!",
+         "speaker": "경호"
+        },
+        {
+         "setSwitch": [
+          95,
+          true
+         ]
+        },
+        {
+         "wait": 20
+        }
+       ],
+       "else": [
+        {
+         "text": "트레이너들을 모두 쓰러뜨리고 다시 오렴.",
+         "speaker": "경호"
+        }
        ]
-      },
-      {
-       "text": "트레이너들을 모두 쓰러뜨리고 다시 오렴.",
-       "speaker": "경호"
-      },
-      {
-       "text": "트레이너들을 모두 쓰러뜨리고 다시 오렴.",
-       "speaker": "경호"
-      },
-      {
-       "text": "트레이너들을 모두 쓰러뜨리고 다시 오렴.",
-       "speaker": "경호"
-      },
-      {
-       "text": "트레이너들을 모두 쓰러뜨리고 다시 오렴.",
-       "speaker": "경호"
       }
      ],
-     "partial": true
+     "through": true
     },
     {
      "graphic": "",

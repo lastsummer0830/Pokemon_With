@@ -14,7 +14,7 @@ import { attachWeather, applyDebugWeather, preloadWeather, rollWeather, WeatherK
 import { preloadVsIntroAll, playVsIntro, vsKeyFromTrainerId } from "../systems/vsIntro";
 import { settings, stepDurationMs } from "../systems/settings";
 import { isActionDown, keysLabel, onAction } from "../systems/input";
-import { activePage, talkablePage, visibleGraphic, faceDirToward } from "../systems/mapEvents";
+import { activePage, talkablePage, visibleGraphic, faceDirToward, setDebugSwitches } from "../systems/mapEvents";
 import type { EventPage, MapEvent, MapEventFile } from "../systems/mapEvents";
 import { applyEventSprite, loadEventSheet, playArBgm, preloadEventAudio, runEventPage } from "../systems/fieldEventRunner";
 import type { EventHost } from "../systems/fieldEventRunner";
@@ -87,7 +87,8 @@ const AUTORUN_RANGE = 4;
  * 지면 이어질 게 없으므로 BattleScene이 패배 경로에서 이 예약을 지운다(원본대로 처음부터 재도전).
  */
 export const EVENT_CONTINUE_KEY = "eventContinue";
-interface EventContinue { map: string; evId: number; resumeAt: number }
+/** resumeAt = 줄 번호의 **경로**(조건분기 안쪽까지) — fieldEventRunner.EventRunResult 참고. */
+interface EventContinue { map: string; evId: number; resumeAt: number[] }
 /** 원본(Essentials) 프레임 → ms. 원본 Graphics.frame_rate = 40. */
 const RMXP_FRAME_MS = 1000 / 40;
 /** 원본 move_speed → 한 칸 이동 시간(ms). `move_time = 2.0 / 2**speed` (fieldEventRunner 머리말과 같은 식). */
@@ -195,14 +196,20 @@ export default class WorldScene extends Phaser.Scene {
   // spawn 좌표의 의미가 두 가지다 — 안 지키면 엉뚱한 맵에 떨어진다:
   //   · map을 같이 주면  → spawn은 **그 맵 기준 로컬** (예: LabScene이 "태초마을 (28,15)"로 내보냄)
   //   · map이 없으면     → spawn은 **리전 글로벌** (예: BattleScene이 돌려주는 returnPos = 배틀 걸린 그 자리)
-  init(data: { spawn?: [number, number]; map?: string; face?: Dir; openMenu?: boolean; debugTimeBand?: TimeBand; debugWeather?: WeatherKind; debugVs?: [string, string] }): void {
+  init(data: { spawn?: [number, number]; map?: string; face?: Dir; openMenu?: boolean; debugTimeBand?: TimeBand; debugWeather?: WeatherKind; debugVs?: [string, string]; debugArSwitches?: number[] }): void {
     // 확인 항목이 시간대·날씨를 강제로 넘겼으면 반영(없으면 실제 시계/맵 설정으로 되돌린다).
     applyDebugBand(this.registry, data);
     applyDebugWeather(this.registry, data);
+    // 확인 항목이 원본 전역 스위치를 미리 켜 달라고 하면 켠다 — 아직 안 이식한 맵이 켜는 스위치
+    //  (경호의 87~90 = 22번도로 트레이너 격파)에 걸린 갈래를 사람이 눌러 볼 수 있게 하는 유일한 길이다.
+    //  ⚠️ **세이브에 실리지 않는 자리**에 켠다(mapEvents.DEBUG_SWITCH_KEY) — 진짜 스위치에 켜면
+    //     확인 항목 한 번 돌린 것이 세이브에 영구히 구워진다(자동저장은 사람이 안 눌러도 돈다).
+    //     목록을 통째로 갈아 끼우므로 확인 항목 없이 들어오면 저절로 비워진다.
+    setDebugSwitches(this.registry, data?.debugArSwitches ?? []);
     // ⚠️ Phaser 함정: `scene.start(key)`를 **data 없이** 부르면 지난번 data를 그대로 다시 넘긴다
     //    (settings.data가 남아 있다). 그래서 디버그로 한 번 밤·비를 강제하면 그 뒤 정상 입장에도
     //    계속 밤비가 따라왔다(실제로 검증에서 잡혔다). 읽은 즉시 지워 **1회용**으로 만든다.
-    if (data) { delete data.debugTimeBand; delete data.debugWeather; }
+    if (data) { delete data.debugTimeBand; delete data.debugWeather; delete data.debugArSwitches; }
     // ⚠️ Phaser는 씬을 다시 시작해도 **같은 인스턴스**를 쓴다 → 클래스 필드(= 위의 `busy = false`)는 다시 초기화되지 않는다.
     //    배틀·워프로 나갈 때 켜둔 busy를 여기서 안 되돌리면 돌아왔을 때 켜진 채로 남아 **플레이어가 영영 얼어붙는다**
     //    (update()가 busy면 입력을 통째로 무시한다). init은 scene.start마다 도는 유일한 자리다.
@@ -475,8 +482,9 @@ export default class WorldScene extends Phaser.Scene {
         this.events2.push(entry);
         if (!page.graphic) continue;             // 팻말 — 이미 벽인 타일 위에 얹힌 것이라 그릴 것도 막을 것도 없다
         // 사람·볼·나무가 선 칸은 지나갈 수 없다(원본 이벤트도 통행 불가).
-        if (this.blocked[gy]) this.blocked[gy][gx] = 1;
-        // 자동실행이 "그림이 선 뒤"에 시작하도록 작업을 남겨 둔다(runAutorun이 기다린다).
+        //  단 원본 through(page.through)면 막지 않는다 — 경호는 우리가 일부러 켜 뒀다(mapEvents.EventPage 주석).
+        if (!page.through && this.blocked[gy]) this.blocked[gy][gx] = 1;
+        // 자동실행이 "그림이 선 뒤"에 시작하도록 작업을 남겨 둔다(runPageLocked가 기다린다).
         entry.draw = this.drawEventSprite(entry, page)
           .catch((e) => console.error("[WorldScene] 이벤트 그림 실패:", e));
       }
@@ -511,12 +519,10 @@ export default class WorldScene extends Phaser.Scene {
     const page = talkablePage(this.registry, entry.map, entry.ev);
     if (!page) return;
     this.turnToPlayer(entry, page);
-    this.busy = true;
-    // 실제 실행은 씬 밖의 공용 실행기가 한다(실내 민가도 같은 것을 쓴다 — systems/fieldEventRunner.ts).
-    runEventPage(this, this.dlg, entry.map, entry.ev, page)
-      .then((r) => { if (r.changed) this.refreshEvent(entry); })
-      .catch((e) => console.error("[WorldScene] 이벤트 오류:", e))
-      .finally(() => { this.dlg.hide(); this.busy = false; });
+    // 실행은 씬 밖의 공용 실행기가 한다(실내 민가도 같은 것을 쓴다 — systems/fieldEventRunner.ts).
+    //  ⚠️ 말 걸기라고 대사만 있는 게 아니다 — 경호(EV14)는 컷신 명령("!"·"?"·대기)과 **도중 배틀**을
+    //     둘 다 쓴다. 그래서 자동실행과 같은 길(runPageLocked)로 보내 host·이어실행 예약을 함께 얻는다.
+    void this.runPageLocked(entry, page, []);
   }
 
   /** 말을 걸면 원본처럼 이쪽을 돌아본다 — 그리고 대화가 끝나도 그대로 본다(원본 `lock`이 그렇다). */
@@ -550,7 +556,7 @@ export default class WorldScene extends Phaser.Scene {
       const page = activePage(this.registry, entry.map, entry.ev);
       if (!page || page.trigger !== 3 || !page.lines.length) continue;
       if (Math.max(Math.abs(entry.gx - this.tx), Math.abs(entry.gy - this.ty)) > AUTORUN_RANGE) continue;
-      void this.runAutorun(entry, page, 0);
+      void this.runPageLocked(entry, page, []);
       return;   // 원본도 자동실행은 한 번에 하나다
     }
   }
@@ -567,22 +573,24 @@ export default class WorldScene extends Phaser.Scene {
     this.resume = null;
     const entry = this.events2.find((e) => e.map === r.map && e.ev.id === r.evId);
     const page = entry ? activePage(this.registry, entry.map, entry.ev) : null;
-    if (!entry || !page || page.trigger !== 3 || r.resumeAt >= page.lines.length) {
-      console.error(`[WorldScene] 이어서 실행할 이벤트가 없다: ${r.map} #${r.evId} @${r.resumeAt}`);
+    // 자동실행(아일라)뿐 아니라 **말 걸기 이벤트도** 배틀 뒤에 이어진다(경호 = trigger 0).
+    //  이어실행은 플레이어 입력 없이 시작하므로 두 경우 다 runPageLocked로 잠근 채 돌린다.
+    if (!entry || !page || !r.resumeAt.length || r.resumeAt[0] >= page.lines.length) {
+      console.error(`[WorldScene] 이어서 실행할 이벤트가 없다: ${r.map} #${r.evId} @${r.resumeAt?.join(".")}`);
       return false;
     }
-    void this.runAutorun(entry, page, r.resumeAt);
+    void this.runPageLocked(entry, page, r.resumeAt);
     return true;
   }
 
   /**
-   * 자동실행 한 페이지를 돌린다 — 말 걸기와 다른 점만:
-   *  · 플레이어 입력 없이 시작하므로 **먼저 busy로 잠근다**(중복 시작·이동·메뉴 금지).
+   * 한 페이지를 **플레이어 입력 없이** 돌린다 — 자동실행 이벤트와 배틀 뒤 이어실행이 이 길로 온다.
+   *  · 먼저 busy로 잠근다(중복 시작·이동·메뉴 금지).
    *  · 도중 배틀이 나오면 이어실행 예약을 남기고 BattleScene으로 넘어간다(busy를 켠 채로 씬을 떠난다).
-   *  · 끝까지 갔는데 셀프스위치가 바뀌었으면(= self A) 그 자리에서 그림을 지우고 칸을 연다.
+   *  · 끝까지 갔는데 스위치가 바뀌었으면 그 자리에서 그림을 지우고 칸을 연다.
    * 예외·중간 오류에서도 finally가 대사창을 닫고 busy를 푼다.
    */
-  private async runAutorun(entry: FieldEvent, page: EventPage, startAt: number): Promise<void> {
+  private async runPageLocked(entry: FieldEvent, page: EventPage, startAt: number[]): Promise<void> {
     this.busy = true;
     const run = this.setupRun;   // await 사이에 씬이 다시 시작되면 이 실행은 옛것이다
     let toBattle = false;
@@ -607,7 +615,7 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   /** 이벤트 도중의 트레이너 배틀 — 이기고 돌아오면 **그 다음 줄부터** 이어지도록 예약을 남긴다. */
-  private startEventBattle(entry: FieldEvent, battle: { trainerId: string; resumeAt: number }): void {
+  private startEventBattle(entry: FieldEvent, battle: { trainerId: string; resumeAt: number[] }): void {
     const cont: EventContinue = { map: entry.map, evId: entry.ev.id, resumeAt: battle.resumeAt };
     this.registry.set(EVENT_CONTINUE_KEY, cont);
     const party = this.registry.get("playerParty") as Pokemon[] | undefined;
@@ -633,23 +641,34 @@ export default class WorldScene extends Phaser.Scene {
       // 원본 'Wait'는 프레임 수다(Graphics.frame_rate = 40).
       wait: (frames) => new Promise<void>((r) => this.time.delayedCall(frames * RMXP_FRAME_MS, r)),
       bgm: (name, volume) => playArBgm(this, name, volume),
-      // 원본 '이벤트 애니메이션'. 우리가 가진 건 3번("!")뿐이고, 실행기는 번호를 넘기지 않는다
-      //  → 지금은 전부 "!"로 본다(원본 EV10이 쓰는 것도 3번이다).
-      emote: (ev) => { const e = find(ev); if (e) this.showExclaim(e); },
+      // 원본 '애니메이션 표시'(207). 번호와 대상을 그대로 받는다 — 3="!"(이벤트) / 4="?"(주인공)이 보통 짝이다.
+      emote: (ev, anim, on) => {
+        const self = find(ev);
+        if (on === "player") { this.showEmote(this.player.x, this.player.y - this.player.displayHeight, anim); return; }
+        const target = typeof on === "number"
+          ? this.events2.find((e) => e.map === self?.map && e.ev.id === on)
+          : self;
+        if (!target) { console.error(`[WorldScene] "${anim}"를 띄울 이벤트가 없다: #${String(on)}`); return; }
+        const sp = target.sprite;
+        this.showEmote(sp ? sp.x : this.cx(target.gx), sp ? sp.y - sp.displayHeight : this.cy(target.gy) - this.tile, anim);
+      },
       move: async (ev, steps) => { const e = find(ev); if (e) await this.moveEvent(e, steps); },
     };
   }
 
   /**
-   * 머리 위 "!" — 원본 애니메이션 3번. 그림 에셋이 없어 흰 말풍선에 검은 "!"로 세우고 짧게 지운다.
-   * 소리는 트레이너가 나를 발견할 때와 **같은 것**을 쓴다(원본도 같은 자리에서 울린다).
+   * 머리 위 말풍선 — 원본 애니메이션 **3번("!") / 4번("?")**. 흰 말풍선에 검은 글자로 세우고 짧게 지운다.
+   *
+   * 원본 Animations 실측: 둘 다 그림은 `Overworld exclaim`, 효과음도 같은 `Exclaim`(볼륨 80)이다.
+   *  → 소리는 트레이너가 나를 발견할 때와 같은 것 하나면 맞다. 그림 에셋은 아직 안 뽑아 글자로 대신한다.
+   * @param top 머리 끝의 화면 y(스프라이트 위쪽) — 이벤트든 주인공이든 부르는 쪽이 계산해 넘긴다.
    */
-  private showExclaim(entry: FieldEvent): void {
+  private showEmote(x: number, top: number, anim: number): void {
+    const glyph = { 3: "!", 4: "?" }[anim];
+    if (!glyph) { console.error(`[WorldScene] 모르는 애니메이션 번호 ${anim}`); return; }
     playSfx(this, SFX.exclaim, 0.5);
-    const sp = entry.sprite;
-    const x = sp ? sp.x : this.cx(entry.gx);
-    const head = (sp ? sp.y - sp.displayHeight : this.cy(entry.gy) - this.tile) - this.tile * 0.15;
-    const mark = this.add.text(x, head, "!", {
+    const head = top - this.tile * 0.15;
+    const mark = this.add.text(x, head, glyph, {
       fontFamily: "Galmuri11, sans-serif", fontSize: `${Math.round(11 * SCALE)}px`, color: "#202020",
       backgroundColor: "#ffffff", padding: { x: 4 * SCALE, y: SCALE },
     }).setOrigin(0.5, 1).setDepth(6.5).setScale(0.6);   // 6.5 = 캐릭터·전경(6)보다 위, HUD(100)보다 아래
@@ -683,9 +702,11 @@ export default class WorldScene extends Phaser.Scene {
       if (!this.walkable(nx, ny) || (nx === this.tx && ny === this.ty))
         throw new Error(`이벤트가 갈 수 없는 칸 (${nx},${ny}) — ${entry.map} #${entry.ev.id}`);
       this.faceEvent(entry, page, RMXP_DIR[step as Dir]);
-      // 떠나는 칸을 먼저 열고 도착 칸을 막는다(원본도 '이벤트가 선 칸'만 막는다).
-      if (this.blocked[entry.gy]) this.blocked[entry.gy][entry.gx] = 0;
-      if (this.blocked[ny]) this.blocked[ny][nx] = 1;
+      // 떠나는 칸을 먼저 열고 도착 칸을 막는다(원본도 '이벤트가 선 칸'만 막는다). through면 애초에 안 막는다.
+      if (!page?.through) {
+        if (this.blocked[entry.gy]) this.blocked[entry.gy][entry.gx] = 0;
+        if (this.blocked[ny]) this.blocked[ny][nx] = 1;
+      }
       entry.gx = nx; entry.gy = ny;
       const ms = moveSpeedMs(speed);
       const sprite = entry.sprite;

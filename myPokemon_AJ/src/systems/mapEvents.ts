@@ -30,11 +30,28 @@ export interface EventLine {
   shop?: string[];                // pbPokemonMart — 상점(아직 미구현이라 안내만 한다)
   setSelf?: string;               // 셀프스위치 켜기(A~D) — "이 사람은 이제 다음 페이지"
   setSwitch?: [number, boolean];  // 원본 전역 스위치 켜기/끄기
+  /**
+   * 원본 조건분기(111) — **전역 스위치가 모두 켜져 있으면** `then`, 아니면 `else`.
+   * 원본은 스위치 하나마다 분기를 겹쳐 쓰지만(경호 = 87·88·89·90 4중 중첩) 뜻은 AND 하나다.
+   * 우리에게 없는 스토리 스위치는 꺼져 있으므로 else가 돈다 — 그게 원본과 같은 결과다.
+   */
+  ifSwitches?: number[];
+  then?: EventLine[];
+  else?: EventLine[];
   // ── 컷신 명령(자동실행 스토리 이벤트) ──────────────────────────────
   //  씬이 실제 화면을 움직여야 하는 것들이라 **씬이 준 EventHost가 있을 때만** 동작한다
   //  (fieldEventRunner.EventHost 참고 — 실내 씬은 아직 없고, 그때는 조용히 건너뛴다).
   wait?: number;                  // 원본 'Wait' — RMXP 프레임 수(원본 40fps)
-  emote?: number;                 // 원본 '이벤트 애니메이션' 번호(3 = 머리 위 "!")
+  /**
+   * 원본 '애니메이션 표시'(207) 번호. AR Animations 실측 — **3 = "!"(Exclaim bubble), 4 = "?"(Question bubble)**.
+   * 둘 다 그림은 `Overworld exclaim`이고 효과음도 같은 `Exclaim`(볼륨 80)이다.
+   */
+  emote?: number;
+  /**
+   * 그 애니메이션을 **누구 머리 위에** 띄우는가. 원본 207의 첫 인자다.
+   *  `"player"` = 원본 -1(주인공) / 숫자 = 그 맵의 이벤트 id / 없으면 이 이벤트 자신.
+   */
+  emoteOn?: "player" | number;
   bgm?: string;                   // 원본 BGM 이름(AR Audio/BGM/<이름>) — 우리에게 있는 곡만 바뀐다
   bgmVolume?: number;             // 원본 볼륨(0~100)
   move?: string[];                // 원본 이동 루트 — "speed<n>" / "turnUp…" / "up|down|left|right"
@@ -46,6 +63,16 @@ export interface EventPage {
   dir?: number;                   // 서 있는 방향(RMXP 2=아래 4=왼쪽 6=오른쪽 8=위)
   step?: boolean;                 // 제자리 발동작(원본 step_anime) — 열매나무가 바람에 흔들리는 것
   fixed?: boolean;                // 방향 고정(원본 direction_fix) — 말을 걸어도 안 돌아본다
+  /**
+   * 통과 가능(원본 through) — 그 칸을 막지 않는다. 서 있고 말도 걸리지만 지나갈 수 있다.
+   *
+   * ⚠️ 경호(EV14)에는 **원본과 다르게** 우리가 켜 뒀다. 원본에서 경호는 상록체육관 문(35,9) 앞
+   *    (35,10)에 서서 **문을 막는 문지기**이고, 22번도로 트레이너 4명(스위치 87~90)을 이긴 뒤
+   *    그를 이겨야(95번) 비켜난다. 우리는 22번도로를 아직 안 이식해 그 스위치가 켜질 자리가 없다
+   *    → 원본대로 막으면 **체육관·소개장·배지가 영구 도달 불가**가 된다((35,9)로 가는 칸은 (35,10) 하나뿐).
+   *    22번도로를 이식하면 경호의 `through`를 지워 원본 게이트를 되살릴 것. 그게 이 필드의 유일한 용도다.
+   */
+  through?: boolean;
   trigger: number;                // 0=말걸기 1·2=접촉 3=자동실행 4=병렬
   cond: { selfSwitch?: string; switch?: number; switch2?: number; variable?: [number, number] };
   lines: EventLine[];
@@ -86,9 +113,27 @@ export function setSelfSwitch(reg: Reg, map: string, id: number, ch = "A"): void
  */
 export const AR_SWITCH_KEY = "arSwitches";
 
+/**
+ * 확인 항목(DebugMenu)이 강제로 켜 둔 스위치. **세이브에 실리지 않는다**(save.ts는 AR_SWITCH_KEY만 쓴다).
+ *
+ * 왜 따로 두나: 아직 안 이식한 맵이 켜는 스위치(경호의 87~90 = 22번도로 격파)에 걸린 갈래를
+ * 사람이 눌러 보려면 강제로 켜야 한다. 그런데 세이브 v6부터 전역 스위치가 저장되므로,
+ * 같은 자리에 켜면 **확인 항목 한 번 돌린 것이 세이브에 영구히 구워진다**(자동저장은 사람이 안 눌러도 돈다).
+ */
+export const DEBUG_SWITCH_KEY = "debugArSwitches";
+
 export function arSwitchOn(reg: Reg, id: number): boolean {
   const set = reg.get(AR_SWITCH_KEY) as Record<number, boolean> | undefined;
-  return !!set?.[id];
+  if (set?.[id]) return true;
+  const dbg = reg.get(DEBUG_SWITCH_KEY) as Record<number, boolean> | undefined;
+  return !!dbg?.[id];
+}
+
+/** 확인 항목용 — 세이브에 남지 않는 자리에 켠다. 목록을 통째로 갈아 끼워 1회용으로 만든다. */
+export function setDebugSwitches(reg: Reg, ids: number[]): void {
+  const set: Record<number, boolean> = {};
+  for (const id of ids) set[id] = true;
+  reg.set(DEBUG_SWITCH_KEY, set);
 }
 
 export function setArSwitch(reg: Reg, id: number, on: boolean): void {
