@@ -49,6 +49,19 @@ const TRAINER_ID = "ILLA:???";      // trainers.json 정의 키(첫 자기소개
 // 셀프스위치 키 형식은 mapEvents.ts의 setSelfSwitch/selfSwitchOn 그대로 = `${map}:${id}:${ch}`
 const SELF_KEY = `${MAP}:${EV_ID}:A`;
 const END_TILE = [21, 28];          // 컷신이 끝난 뒤 아일라가 서 있어야 하는 최종 칸
+// ⚠️ 2026-08-18: 22번도로가 붙으며 상록시티가 **ox=58로 밀렸다.** WorldScene의 tx/ty·events2의 gx/gy는
+//    전부 **글로벌**이라, 위 원본 로컬 좌표와 바로 비교하면 전부 어긋난다(실제로 3건이 깨졌다).
+//    오프셋은 게임에서 읽어 온다 — 숫자를 박으면 다음에 또 밀릴 때 같은 사고가 난다.
+let OFF = [0, 0];
+const readOffset = async (page) => {
+  OFF = await page.evaluate(async (map) => {
+    const { regionMap } = await import("/src/data/region.ts");
+    const m = regionMap(map);
+    return m ? [m.ox, m.oy] : [0, 0];
+  }, MAP);
+};
+const gx_ = (x) => x + OFF[0];      // 로컬 x → 글로벌 x
+const gy_ = (y) => y + OFF[1];
 // ── 0810 시각 결함 2건을 못박는 상수 ──────────────────────────────────────
 //  플레이어는 (23,38), 아일라는 (23,35) = **아일라가 아래(플레이어 쪽)를 봐야** 마주친 그림이 된다.
 //  RMXP 방향 번호(mapEvents.dirFrame): 2=아래, 4=왼, 6=오른, 8=위. 시트 줄 시작 프레임은 2→0, 8→12.
@@ -267,7 +280,9 @@ const stopTilePathLatch = () => page.evaluate(() => {
 
 // ── 0. 부팅 + 결정론 초기화 ───────────────────────────────────────────────
 try {
-  await page.goto("http://localhost:5180", { waitUntil: "networkidle" });
+  await page.goto((process.env.DEV_URL ?? "http://localhost:5180"), { waitUntil: "networkidle" });
+  await page.waitForFunction(() => window.__game?.isBooted, { timeout: 30000 });
+  await readOffset(page);   // 리전 오프셋을 게임에서 읽는다(아래 좌표 비교가 전부 이걸 쓴다)
 } catch {
   console.log("❌ dev 서버(http://localhost:5180)에 못 붙었다 — `npm run dev`를 먼저 띄워라(이 스크립트는 서버를 켜지 않는다).");
   await browser.close();
@@ -307,8 +322,8 @@ await section("0. 결정론 초기화(이름·성별·스위치)와 테스트 �
 await section("1. 상록시티 (23,38) 진입 — EV10 entry·sprite", async () => {
   await goWorld();
   const st = await worldState();
-  ok(!!st && st.tx === SPAWN[0] && st.ty === SPAWN[1],
-    `플레이어가 (${SPAWN}) 칸에 서 있다 (받은 값: ${st ? [st.tx, st.ty] : "없음"})`);
+  ok(!!st && st.tx === gx_(SPAWN[0]) && st.ty === gy_(SPAWN[1]),
+    `플레이어가 (${SPAWN}) 칸에 서 있다 (받은 글로벌: ${st ? [st.tx, st.ty] : "없음"} · 오프셋 ${OFF})`);
   ok(!!st?.walkable, "그 칸은 충돌상 walkable이다(스폰이 벽에 박히지 않았다)");
   // 여기가 (0)번 RED — EV10 1페이지가 partial이라 activePage()가 건너뛰어 entry 자체가 안 생긴다.
   const hasEntry = await until(([map, id]) => {
@@ -322,8 +337,8 @@ await section("1. 상록시티 (23,38) 진입 — EV10 entry·sprite", async () 
   }, [MAP, EV_ID], ENTRY_WAIT);
   ok(hasSprite, "EV10 sprite가 화면에 올라와 있다");
   const now = await worldState();
-  ok(!!now?.ev10 && now.ev10.gy === 35 && now.ev10.gx === 23,
-    `EV10은 원본 자리 (23,35)에 서 있다 (받은 값: ${now?.ev10 ? [now.ev10.gx, now.ev10.gy] : "없음"})`);
+  ok(!!now?.ev10 && now.ev10.gy === gy_(35) && now.ev10.gx === gx_(23),
+    `EV10은 원본 자리 (23,35)에 서 있다 (받은 글로벌: ${now?.ev10 ? [now.ev10.gx, now.ev10.gy] : "없음"})`);
   // 이어실행 줄 번호는 씬이 살아 있는 지금 계산해 둔다 — 4번이 이 값으로 예약을 만든다.
   const rs = await computeResumeAt();
   resumeAt = rs.resumeAt;
@@ -456,7 +471,7 @@ await section("4. 승리 후 이어실행 → (21,28)로 비켜서고 셀프스�
     // 끝 칸 계약은 느슨하게 잡지 않는다: (21,28)이 경로 **어딘가에** 있는 것으로는 부족하고
     //  기록된 **마지막 칸**이어야 한다(지나가다 밟고 딴 데서 멈춘 것은 실패다).
     const endTile = tilePath.length ? tilePath[tilePath.length - 1] : null;
-    const endOk = seen && !!endTile && endTile[0] === END_TILE[0] && endTile[1] === END_TILE[1];
+    const endOk = seen && !!endTile && endTile[0] === gx_(END_TILE[0]) && endTile[1] === gy_(END_TILE[1]);
     ok(endOk, `아일라가 이어실행에서 **마지막으로** 선 칸이 (${END_TILE})다`
       + (endOk ? ` (기록된 칸 ${tilePath.length}개)` : ` — 관찰된 칸 순서: ${JSON.stringify(tilePath)}`));
     ok(await until(([k]) => !!(window.__game.registry.get("eventSelfSwitches") ?? {})[k], [SELF_KEY], 6000),

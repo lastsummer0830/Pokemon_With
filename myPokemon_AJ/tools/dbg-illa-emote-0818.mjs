@@ -20,7 +20,7 @@ page.on("pageerror", (e) => errors.push(String(e)));
 let fail = 0;
 const ok = (c, m) => { console.log(`  ${c ? "OK " : "❌ "}${m}`); if (!c) fail++; };
 
-await page.goto("http://localhost:5180", { waitUntil: "networkidle" });
+await page.goto((process.env.DEV_URL ?? "http://localhost:5180"), { waitUntil: "networkidle" });
 await page.waitForFunction(() => window.__game?.isBooted, { timeout: 30000 });
 await page.waitForFunction(() => window.__game.scene.getScenes(true).length > 0, { timeout: 15000 });
 

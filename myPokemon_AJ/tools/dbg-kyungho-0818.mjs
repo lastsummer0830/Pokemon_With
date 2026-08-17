@@ -28,7 +28,10 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));   // <repo>/myPokemon
 const OUT = path.resolve(HERE, "../../.claude/.verify");     // <repo>/.claude/.verify
 fs.mkdirSync(OUT, { recursive: true });
 
-const MAP = "viridian_city";        // region.ts: ox=0, oy=0 → 이 맵만은 로컬 좌표 = 글로벌 좌표
+// ⚠️ 2026-08-18: 22번도로가 붙으며 상록시티가 **ox=58로 밀렸다**. WorldScene의 tx/ty·blocked·walkable은
+//    전부 **글로벌**이라 로컬 좌표를 그대로 비교하면 22번도로의 엉뚱한 칸을 본다(조용히 통과/실패한다).
+//    오프셋은 게임에서 읽어 온다 — 여기에 58을 박으면 다음에 또 밀릴 때 같은 사고가 난다.
+const MAP = "viridian_city";
 const EV_ID = 14;
 const EV_TILE = [35, 10];           // 원본 EV014 자리
 const SPAWN = [35, 11];             // 바로 아래 칸(blocked=0 실측) — 위를 보면 경호에게 말이 걸린다
@@ -86,6 +89,7 @@ const goWorld = async (extra = {}) => {
   const okScene = await sceneActive("WorldScene");
   ok(okScene, `WorldScene이 ${MAP} (${SPAWN})에서 떴다`);
   if (!okScene) return false;
+  await readOffset();      // 리전 오프셋을 게임에서 읽는다(아래 좌표 비교가 전부 이걸 쓴다)
   const hasSprite = await until(([map, id]) => {
     const s = window.__game.scene.getScene("WorldScene");
     const e = (s?.events2 ?? []).find((x) => x.map === map && x.ev.id === id);
@@ -94,18 +98,30 @@ const goWorld = async (extra = {}) => {
   ok(hasSprite, "경호 sprite가 화면에 올라와 있다");
   return hasSprite;
 };
+/** 이 맵의 리전 오프셋 [ox,oy]. goWorld() 뒤에 채워진다. */
+let OFF = [0, 0];
+const readOffset = async () => {
+  OFF = await page.evaluate(async (map) => {
+    const { regionMap } = await import("/src/data/region.ts");
+    const m = regionMap(map);
+    return m ? [m.ox, m.oy] : [0, 0];
+  }, MAP);
+};
+/** 로컬 → 글로벌. */
+const g = (x, y) => [x + OFF[0], y + OFF[1]];
 const worldState = () => page.evaluate(([map, id, selfKey, goneSw, tile]) => {
   const s = window.__game.scene.getScene("WorldScene");
   if (!s || !s.scene.isActive()) return null;
   const e = (s.events2 ?? []).find((x) => x.map === map && x.ev.id === id);
   return {
-    tx: s.tx, ty: s.ty, busy: !!s.busy,
-    ev: e ? { gx: e.gx, gy: e.gy, sprite: !!e.sprite } : null,
+    // 좌표는 **로컬로 환산**해 돌려준다(원본 좌표와 바로 비교하려고). tile은 이미 글로벌로 받는다.
+    tx: s.tx - tile[2], ty: s.ty - tile[3], busy: !!s.busy,
+    ev: e ? { gx: e.gx - tile[2], gy: e.gy - tile[3], sprite: !!e.sprite } : null,
     tileBlocked: s.blocked?.[tile[1]]?.[tile[0]] === 1,
     selfA: !!(window.__game.registry.get("eventSelfSwitches") ?? {})[selfKey],
     gone: !!(window.__game.registry.get("arSwitches") ?? {})[goneSw],
   };
-}, [MAP, EV_ID, SELF_KEY, GONE_SWITCH, EV_TILE]);
+}, [MAP, EV_ID, SELF_KEY, GONE_SWITCH, [...g(EV_TILE[0], EV_TILE[1]), OFF[0], OFF[1]]]);
 const dialogState = () => page.evaluate(() => {
   const s = window.__game.scene.getScene("WorldScene");
   if (!s || !s.scene.isActive()) return null;
@@ -205,7 +221,7 @@ const resetSwitches = (on = []) => page.evaluate(([sw]) => {
 
 // ── 0. 부팅 + 테스트 파티 ────────────────────────────────────────────────
 try {
-  await page.goto("http://localhost:5180", { waitUntil: "networkidle" });
+  await page.goto((process.env.DEV_URL ?? "http://localhost:5180"), { waitUntil: "networkidle" });
 } catch {
   console.log("❌ dev 서버(http://localhost:5180)에 못 붙었다 — `npm run dev`를 먼저 띄워라.");
   await browser.close();
@@ -256,11 +272,11 @@ await section('1. p0: "!"·"?" 말풍선과 선택지 2갈래', async () => {
     `플레이어가 (${SPAWN})에 서 있다 (받은 값: ${[before?.tx, before?.ty]})`);
   // ⛔ 원본과 다르게 **막지 않는다**(page.through) — 안 그러면 체육관 문이 영구히 닫힌다.
   ok(before?.tileBlocked === false, `경호가 선 칸 (${EV_TILE})은 막히지 않았다(through)`);
-  const gym = await page.evaluate(() => {
+  const gym = await page.evaluate(([dx, dy, fx, fy]) => {
     const s = window.__game.scene.getScene("WorldScene");
     const w = (s.warpDefs ?? []).find((x) => x.to === "gym");
-    return { warp: w ? [w.x, w.y] : null, doorOk: s.walkable(35, 9), frontOk: s.walkable(35, 10) };
-  });
+    return { warp: w ? [w.x, w.y] : null, doorOk: s.walkable(dx, dy), frontOk: s.walkable(fx, fy) };
+  }, [...g(35, 9), ...g(35, 10)]);
   ok(gym.frontOk === true && gym.doorOk === true,
     `상록체육관 문 앞(35,10)과 문(35,9)이 둘 다 지나갈 수 있다 — 체육관이 막히지 않았다 (받은 값: ${JSON.stringify(gym)})`);
 
@@ -290,9 +306,15 @@ await section('1. p0: "!"·"?" 말풍선과 선택지 2갈래', async () => {
     // 선택지 — 2개가 뜨고, 아래쪽(다른 용무)을 고르면 마지막에 한 줄이 더 붙는다.
     const atChoice = await advanceToLine("도전할 생각이야?");
     ok(!!atChoice?.visible, "선택지 앞 대사 \"도전할 생각이야?\"까지 왔다");
-    await press("c", 500);
+    await press("c", 200);
+    // ⚠️ 고정 대기로 한 번만 찍으면 안 된다 — headless swiftshader가 느린 날엔 선택지가 아직 안 떠서
+    //    같은 스크립트가 실패했다 통과했다 한다(2026-08-18 실측: 연속 실행에서 3실패 → 전부통과).
+    //    커서 "▶"가 뜰 때까지 **기다린다**.
+    const choiceUp = await until(() =>
+      (window.__game.scene.getScene("WorldScene")?.children?.list ?? [])
+        .some((o) => o.type === "Text" && o.text === "▶"), undefined, 6000);
     const ch = await dialogState();
-    ok(ch?.choiceOpen && ch.choiceRows.length === 2,
+    ok(choiceUp && ch?.choiceOpen && ch.choiceRows.length === 2,
       `선택지 2개가 떴다 (받은 값: ${JSON.stringify(ch?.choiceRows)})`);
     await press("ArrowDown", 200);
     await press("c", 400);   // "다른 용무로 왔어요." 갈래

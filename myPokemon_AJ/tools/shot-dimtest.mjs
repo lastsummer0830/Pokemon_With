@@ -19,7 +19,7 @@ async function snap(page, path) {
 const b = await chromium.launch({ headless: false,
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader", "--enable-webgl", "--no-sandbox"] });
 const page = await b.newPage({ viewport: { width: 960, height: 640 } });
-await page.goto("http://localhost:5180", { waitUntil: "networkidle" });
+await page.goto((process.env.DEV_URL ?? "http://localhost:5180"), { waitUntil: "networkidle" });
 await page.waitForFunction(() => window.__game && window.__game.isBooted, { timeout: 15000 });
 
 // (1) 메뉴 없이 월드만

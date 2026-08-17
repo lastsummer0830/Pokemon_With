@@ -24,7 +24,7 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 page.on("pageerror", (e) => errors.push(String(e)));
-await page.goto("http://localhost:5180", { waitUntil: "networkidle" });
+await page.goto((process.env.DEV_URL ?? "http://localhost:5180"), { waitUntil: "networkidle" });
 await page.waitForFunction(() => window.__game?.isBooted, { timeout: 30000 });
 // ⚠️ 부팅 직후엔 첫 씬이 getScenes(true)에 안 잡힌다(0803 함정 2번) → 하나라도 뜰 때까지 기다린다.
 await page.waitForFunction(() => window.__game.scene.getScenes(true).length > 0, { timeout: 15000 });

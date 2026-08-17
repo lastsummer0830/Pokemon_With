@@ -9,8 +9,19 @@ import path from "path";
 
 const OUT = path.resolve("../../.claude/.verify");
 fs.mkdirSync(OUT, { recursive: true });
-const ROUTE1_OY = 40;                     // region.ts: route1은 리전에서 oy=40
-const L = (x, y) => [x, y + ROUTE1_OY];   // 1번도로 로컬 → 리전 글로벌
+// ⚠️ 2026-08-18: 22번도로가 붙으며 1번도로가 **ox=58**로도 밀렸다. 예전엔 oy만 더하면 됐지만
+//    이제 x도 밀린다 → 오프셋을 박지 말고 region.ts의 toGlobal을 그대로 쓴다.
+//    (안 고쳤을 때: 언덕 합계 단언이 무조건 실패하고, blocked[71][25]는 아무 맵도 없는 빈칸을 읽어
+//     언덕과 무관하게 통과하는 **위양성**이 됐다.)
+let L = (x, y) => [x, y + 40];            // readOffset() 전 임시값 — 아래에서 진짜 변환으로 바뀐다
+const readOffset = async (page) => {
+  const [ox, oy] = await page.evaluate(async () => {
+    const { regionMap } = await import("/src/data/region.ts");
+    const m = regionMap("route1");
+    return m ? [m.ox, m.oy] : [0, 40];
+  });
+  L = (x, y) => [x + ox, y + oy];
+};
 
 const browser = await chromium.launch({ headless: true,
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--no-sandbox"] });
@@ -19,8 +30,9 @@ const errors = [];
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 page.on("pageerror", (e) => errors.push(String(e)));
 
-await page.goto("http://localhost:5180", { waitUntil: "networkidle" });
+await page.goto((process.env.DEV_URL ?? "http://localhost:5180"), { waitUntil: "networkidle" });
 await page.waitForFunction(() => window.__game?.isBooted, { timeout: 30000 });
+await readOffset(page);   // 리전 오프셋을 게임에서 읽는다(L()이 이걸 쓴다)
 
 let fail = 0;
 const ok = (cond, msg) => { console.log(`  ${cond ? "OK " : "❌ "}${msg}`); if (!cond) fail++; };
@@ -86,10 +98,12 @@ const grid = await page.evaluate(() => {
 });
 console.log("\n[1] 리전 격자에 실린 언덕");
 console.log(`  방향별: ${JSON.stringify(grid.counts)} (2=아래 4=왼 6=오 8=위)  합계 ${grid.total}칸`);
-ok(grid.total === 100, "1번도로 61 + 상록시티 39 = 100칸이 실렸다");
-ok(grid.counts["2"] === 100, "우리 3맵의 언덕은 전부 '아래로' 방향이다(원본 실측과 같음)");
-ok(await page.evaluate(() => window.__game.scene.getScene("WorldScene").blocked[71][25] === 1),
-   "언덕 칸은 blocked로도 막혀 있다(그 위에 설 수 없다)");
+// 22번도로 언덕 64칸이 더해져 164칸이다(원본 실측 — extract-map.py 출력과 같은 값).
+ok(grid.total === 164, `1번도로 61 + 상록시티 39 + 22번도로 64 = 164칸이 실렸다 (받은 값 ${grid.total})`);
+ok(grid.counts["2"] === grid.total, `우리 4맵의 언덕 ${grid.total}칸은 전부 '아래로' 방향이다(원본 실측과 같음)`);
+ok(await page.evaluate(([x, y]) => window.__game.scene.getScene("WorldScene").blocked[y][x] === 1,
+     L(25, 31)),
+   `언덕 칸(1번도로 로컬 25,31 = 글로벌 ${L(25, 31)})은 blocked로도 막혀 있다(그 위에 설 수 없다)`);
 
 // ── 2. 아래로 → 2칸 점프 ──────────────────────────────────────────────────
 console.log("\n[2] ↓ 입력 = 언덕 뛰어내리기");
@@ -103,7 +117,7 @@ await page.waitForFunction(() => window.__landed, { timeout: 90000 });
 await page.keyboard.up("ArrowDown");
 const after = await page.evaluate(() => window.__landed);
 await page.screenshot({ path: path.join(OUT, "0802_언덕_3_착지.png") });
-ok(after[1] === L(25, 32)[1] && after[0] === 25,
+ok(after[1] === L(25, 32)[1] && after[0] === L(25, 32)[0],
    `언덕(y=71)을 건너뛰어 (25,32)에 착지 — 글로벌 y ${before.ty}→${after[1]} (2칸)`);
 ok((await page.evaluate(() => window.__sfx)).includes("sfx_jump"), "AR 'Player jump' 효과음이 울렸다");
 

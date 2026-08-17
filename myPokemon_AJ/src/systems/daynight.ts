@@ -130,7 +130,9 @@ export function currentTone(reg?: Reg, now: Date = new Date()): { color: number;
  *  원본 파일명 규칙 그대로다: `route_bg` / `route_eve_bg` / `route_night_bg`.
  *  ⚠️ 실내(체육관)는 원본에도 변형이 없다 → 아래 목록에 없으면 그냥 기본 그림을 쓴다.
  */
-const HAS_TIME_VARIANT = new Set(["route", "town"]);
+//  mountain(22번도로) = 원본에 mountain_night_bg와 mountain__eve_bg가 둘 다 있다.
+//  ⚠️ 원본 저녁판 파일명이 `mountain__eve_bg`(밑줄 두 개)로 오타 나 있어 복사할 때 `mountain_eve_bg`로 맞췄다.
+const HAS_TIME_VARIANT = new Set(["route", "town", "mountain"]);
 
 export function backdropName(backdrop: string, band: TimeBand): string {
   if (!HAS_TIME_VARIANT.has(backdrop)) return `${backdrop}_bg`;

@@ -30,7 +30,8 @@ AR_CANDIDATES = [
     "/mnt/d/Pokemon Another Red_PWT_250829",
     "/mnt/c/Users/ONE/Desktop/Pokemon Another Red_PWT_250829",
 ]
-MAPS = {10: "route1", 55: "pallet_town", 56: "viridian_city"}
+# ⚠️ 22번도로(Map49)도 상록시티와 같은 `STILL`(11프레임)을 쓴다 — 원본 실측이라 여기 넣어야 물이 움직인다.
+MAPS = {10: "route1", 55: "pallet_town", 56: "viridian_city", 49: "route22"}
 OUT_DIR = os.path.normpath(os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "..", "public", "assets", "world"))
 

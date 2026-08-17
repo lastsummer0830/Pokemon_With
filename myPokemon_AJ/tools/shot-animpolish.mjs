@@ -33,7 +33,7 @@ const boot = async (fps) => {
   }, { timeout: 10000 });
 };
 
-await page.goto("http://localhost:5180", { waitUntil: "networkidle" });
+await page.goto((process.env.DEV_URL ?? "http://localhost:5180"), { waitUntil: "networkidle" });
 await page.waitForFunction(() => window.__game?.isBooted, { timeout: 15000 });
 
 // ── ① 실제 배틀 흐름: 커맨드 → 기술 → "OO의 기술!" 대사 → 애니. 그 동안 대사창이 떠 있어야 한다 ──

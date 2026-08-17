@@ -83,7 +83,7 @@ const waitEv = () => until(([map, id]) => {
   return !!(s?.events2 ?? []).find((x) => x.map === map && x.ev.id === id)?.sprite;
 }, [MAP, EV_ID], 20000);
 
-await page.goto("http://localhost:5180", { waitUntil: "networkidle" });
+await page.goto((process.env.DEV_URL ?? "http://localhost:5180"), { waitUntil: "networkidle" });
 await boot();
 
 // ── 0. 깨끗한 시작 ───────────────────────────────────────────────────────
@@ -187,11 +187,15 @@ await section("3. 새로 켜서 불러오기 — 경호가 p1부터 시작하는
   ok(restored.gate === false,
     `강제로 켠 게이트는 안 되살아났다 (arSwitches: ${JSON.stringify(restored.ar)}, debug: ${JSON.stringify(restored.dbg)})`);
 
-  const at = await page.evaluate(() => {
+  // ⚠️ s.tx/ty는 **글로벌**이다. 22번도로가 붙으며 상록시티가 ox=58로 밀렸으므로 로컬로 되돌려 비교한다
+  //    (오프셋을 박지 않고 region.ts에서 읽는다 — 또 밀려도 안 깨지게).
+  const at = await page.evaluate(async (map) => {
+    const { regionMap } = await import("/src/data/region.ts");
+    const m = regionMap(map);
     const s = window.__game.scene.getScene("WorldScene");
-    return [s.tx, s.ty];
-  });
-  ok(at[0] === SPAWN[0] && at[1] === SPAWN[1], `저장했던 칸 (${SPAWN})에서 시작한다 (받은 값: ${at})`);
+    return [s.tx - (m?.ox ?? 0), s.ty - (m?.oy ?? 0)];
+  }, MAP);
+  ok(at[0] === SPAWN[0] && at[1] === SPAWN[1], `저장했던 칸 (${SPAWN})에서 시작한다 (로컬 환산: ${at})`);
 
   // ⭐ 진짜 증거 — 말을 걸면 p0이 아니라 p1이 돈다.
   await press("c", 700);

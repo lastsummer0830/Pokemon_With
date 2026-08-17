@@ -5,7 +5,7 @@ import { playBgm } from "../game/bgm";
 import { playSfx, playMe, preloadCommonAudio, SFX, BGM } from "../game/sfx";
 import { autoSaveWithToast } from "../game/saveIndicator";
 import DialogBox from "../ui/DialogBox";
-import { REGION_MAPS, REGION_COLS, REGION_ROWS, mapAtGlobal, toGlobal, toLocal, assertRegionMatches, RegionMap } from "../data/region";
+import { REGION_MAPS, REGION_COLS, REGION_ROWS, mapAtGlobal, toGlobal, toLocal, assertRegionMatches, cameraBounds, RegionMap } from "../data/region";
 import { getEncounters, getMapTrainers, loadArDb } from "../data/ar";
 import type { TrainerPlacement } from "../data/ar";
 import { encounterTriggered, chooseWildPokemon, resetEncounterSteps } from "../systems/encounter";
@@ -19,7 +19,7 @@ import type { EventPage, MapEvent, MapEventFile } from "../systems/mapEvents";
 import { applyEventSprite, loadEventSheet, playArBgm, preloadEventAudio, runEventPage } from "../systems/fieldEventRunner";
 import type { EventHost } from "../systems/fieldEventRunner";
 
-// 야외 = 어나더레드에서 그대로 추출한 맵 3장을 **하나로 이어붙인 리전**(52×100칸).
+// 야외 = 어나더레드에서 그대로 추출한 맵 4장을 **하나로 이어붙인 리전**(110×100칸, 2026-08-18 22번도로 추가로 L자).
 //  - 위에서부터 상록시티(0~39) · 1번도로(40~79) · 태초마을(80~99). 배치 근거는 src/data/region.ts 주석 참고
 //    (AR map_connections.dat에서 셋 다 오프셋 0으로 수직 연결인 걸 확인함).
 //  - 맵 경계에 암전·로딩이 없다. 그냥 걸어서 넘어간다(HGSS 감성).
@@ -77,7 +77,7 @@ const TURN_DIR: Record<string, number | undefined> = { turnDown: 2, turnLeft: 4,
  * 자동실행을 켜는 거리(칸, 체비셰프).
  *
  * 원본은 "그 맵에 들어서면 바로"다 — 맵 전환마다 암전이 있으니 그래도 된다.
- * 우리 야외는 맵 3장이 **이어붙어 있어** 경계에 암전이 없다(region.ts) → 그대로 옮기면
+ * 우리 야외는 맵들이 **이어붙어 있어** 경계에 암전이 없다(region.ts) → 그대로 옮기면
  * 상록시티 끝자락에 발만 들여도 화면 밖 이벤트가 시작된다. 그래서 **이벤트가 화면에 들어오는 거리**에서 켠다.
  * (화면은 세로 12칸이라 중심에서 6칸이 끝 — 그보다 짧게 잡아 '갑자기 시작'을 막는다.)
  */
@@ -112,7 +112,7 @@ export default class WorldScene extends Phaser.Scene {
   private facing: Dir = "down";
   private shiftKey?: Phaser.Input.Keyboard.Key;   // 취소키와 함께 눌러 두면 반대 속도(걷기↔달리기)
 
-  // 리전 전체 격자(맵 3장을 이어붙인 것). 좌표는 전부 글로벌.
+  // 리전 전체 격자(맵들을 이어붙인 것). 좌표는 전부 글로벌.
   private cols = REGION_COLS; private rows = REGION_ROWS;
   private blocked: number[][] = [];
   private grass: number[][] = [];   // 1 = 풀숲(야생 조우 판정 칸). 풀숲 없는 맵은 전부 0으로 남는다.
@@ -240,7 +240,7 @@ export default class WorldScene extends Phaser.Scene {
 
   preload(): void {
     this.gender = (this.registry.get("playerGender") as Gender) ?? "boy";
-    // 맵 3장을 각각 불러온다(큰 PNG를 새로 굽지 않는다 — region.ts 주석 참고).
+    // 맵을 각각 불러온다(큰 PNG를 새로 굽지 않는다 — region.ts 주석 참고).
     // ⚠️ 캐시에 남은 옛 격자를 먼저 지운다 — 안 지우면 맵 JSON을 고치고 씬을 다시 들어와도
     //    "고쳤는데 똑같다"가 된다(.claude/rules/maps-collision.md 5번).
     for (const m of REGION_MAPS) {
@@ -251,7 +251,7 @@ export default class WorldScene extends Phaser.Scene {
       // 원본 맵 이벤트(NPC 대사·팻말·바닥 아이템·열매나무) — tools/ar-map/extract-events.py가 뽑은 것.
       this.load.json(`${m.name}_events`, `${m.data.replace(".json", "_events.json")}?v=` + Date.now());
       // 움직이는 물결(오토타일) — tools/ar-map/extract-water.py.
-      //  ⚠️ 원본에서 실제로 움직이는 맵만 파일이 있다(상록시티뿐 — 태초마을 물은 원본도 정지 오토타일이다).
+      //  ⚠️ 원본에서 실제로 움직이는 맵만 파일이 있다(상록시티·22번도로 — 태초마을 물은 원본도 정지 오토타일이다).
       if (m.animWater) {
         this.cache.json.remove(`${m.name}_anim`);
         this.load.json(`${m.name}_anim`, `assets/world/${m.animFile}.json?v=` + Date.now());
@@ -278,7 +278,8 @@ export default class WorldScene extends Phaser.Scene {
     SCALE = fitScale(this.scale.gameSize.width, this.scale.gameSize.height);
     this.tile = 32 * SCALE;
 
-    // 리전 격자를 "전부 막힘"으로 깔고, 맵 3장의 blocked를 각자 오프셋 위치에 찍어 넣는다.
+    // 리전 격자를 "전부 막힘"으로 깔고, 각 맵의 blocked를 각자 오프셋 위치에 찍어 넣는다.
+    //  ⚠️ L자라서 **아무 맵도 안 덮는 칸**이 남는다 — 기본값 1(막힘) 그대로 두는 게 맞다(걸어 들어갈 수 없다).
     //  (맵이 안 덮는 칸은 막힌 채로 남아 밖으로 못 나간다 — 리전 가장자리 보호막 역할)
     this.blocked = Array.from({ length: REGION_ROWS }, () => new Array<number>(REGION_COLS).fill(1));
     // 풀숲은 반대로 "전부 아님(0)"으로 깔고 맵이 준 칸만 켠다(맵 밖은 풀숲이 아니다).
@@ -288,7 +289,13 @@ export default class WorldScene extends Phaser.Scene {
     for (const m of REGION_MAPS) {
       // grass·ledge는 그게 있는 맵에만 있다 — 없는 맵은 extract-map.py가 키를 아예 안 넣는다.
       const col = this.cache.json.get(`${m.name}_col`) as
-        { cols: number; rows: number; blocked: number[][]; grass?: number[][]; ledge?: number[][] };
+        { cols: number; rows: number; blocked: number[][]; grass?: number[][]; ledge?: number[][] } | undefined;
+      // ⚠️ 이게 undefined면 십중팔구 **dev 서버가 오래 떠 있어 새 파일을 index.html로 돌려준 것**이다
+      //    (JSON 파싱이 깨져 로더가 캐시에 못 넣는다). 그냥 두면 아래에서 "reading 'cols'"만 남아
+      //    원인이 안 보인다 — 2026-08-18에 실제로 이걸로 헤맸다.
+      if (!col) throw new Error(
+        `${m.name}_col(${m.data})을 못 읽었다 — dev 서버를 껐다 켤 것. ` +
+        `오래 떠 있던 vite는 새로 만든 public/assets 파일을 index.html로 폴백한다.`);
       assertRegionMatches(m.name, col.cols, col.rows);   // 크기가 어긋나면 조용히 깨지지 말고 여기서 죽어라
       for (let y = 0; y < col.rows; y++)
         for (let x = 0; x < col.cols; x++) {
@@ -352,7 +359,8 @@ export default class WorldScene extends Phaser.Scene {
     }
 
     // 카메라: 맵 경계 설정 + 주인공 추적, 픽셀 또렷하게
-    this.cameras.main.setBounds(0, 0, this.cols * this.tile, this.rows * this.tile);
+    //  ⚠️ 리전 전체 직사각형으로 잡지 않는다 — L자라서 빈 영역이 화면에 든다(region.ts cameraBounds 주석).
+    this.applyCameraBounds(this.curMap);
     this.cameras.main.setRoundPixels(true);
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15);
     this.cameras.main.fadeIn(400, 0, 0, 0);
@@ -432,7 +440,7 @@ export default class WorldScene extends Phaser.Scene {
    * 원본의 움직이는 오토타일을 그 칸 위에 얹어 돌린다.
    *  · 맵 PNG는 오토타일의 **첫 프레임**만 구워져 있다(extract-map.py) → 그 위에 같은 크기로 덮는다.
    *  · 속도는 원본 `TilemapRenderer.rb`의 `AUTOTILE_FRAME_DURATION = 5`(1/20초) = **프레임당 0.25초**.
-   *  · 상록시티 30칸뿐이다 — 태초마을 물(NOANIMSEA)은 **원본도 안 움직인다**(1프레임짜리 그림).
+   *  · 상록시티 30칸 + 22번도로 42칸 — 태초마을 물(NOANIMSEA)은 **원본도 안 움직인다**(1프레임짜리 그림).
    */
   private setupWater(): void {
     for (const m of REGION_MAPS) {
@@ -546,7 +554,7 @@ export default class WorldScene extends Phaser.Scene {
   /**
    * 지금 켤 자동실행 이벤트가 있나 — 첫 진입과 **한 칸 걸을 때마다** 본다.
    *
-   * 원본은 "그 맵에 들어서면 바로"지만 우리 야외는 맵 3장이 이어붙어 경계 암전이 없다(region.ts)
+   * 원본은 "그 맵에 들어서면 바로"지만 우리 야외는 맵들이 이어붙어 경계 암전이 없다(region.ts)
    *  → 이벤트가 화면에 들어오는 거리(AUTORUN_RANGE, 체비셰프)에서 켠다.
    * 이미 끝난 이벤트는 셀프스위치 A가 켜져 빈 페이지로 넘어가므로 activePage에서 저절로 빠진다.
    */
@@ -883,6 +891,12 @@ export default class WorldScene extends Phaser.Scene {
     return this.warps.find((w) => w.x === tx && w.y === ty);
   }
 
+  /** 지금 서 있는 맵이 볼 수 있는 범위로 카메라 경계를 맞춘다(L자 리전의 빈 영역을 안 비추게). */
+  private applyCameraBounds(m: RegionMap | undefined): void {
+    const b = cameraBounds(m?.name ?? "");
+    this.cameras.main.setBounds(b.x * this.tile, b.y * this.tile, b.w * this.tile, b.h * this.tile);
+  }
+
   /** 한 칸 움직일 때마다 호출. 맵이 바뀌면 이름을 띄우고 BGM을 갈아준다(암전·로딩 없음). */
   private onEnterTile(): void {
     const m = mapAtGlobal(this.tx, this.ty);
@@ -890,6 +904,8 @@ export default class WorldScene extends Phaser.Scene {
       const prev = this.curMap;
       this.curMap = m;
       this.showMapName(m.label);
+      // 리전이 L자라 카메라가 볼 수 있는 범위도 맵마다 다르다 — 안 갈아주면 빈 영역이 검게 보인다.
+      this.applyCameraBounds(m);
       // BGM은 곡이 실제로 바뀔 때만 갈아준다(태초마을↔집처럼 같은 곡이면 끊지 않는다).
       if (prev?.bgm !== m.bgm) playBgm(this, m.bgm, 0.35);
       // 날씨는 맵마다 다르다(원본도 맵 메타데이터에 적혀 있다) → 새 맵의 확률로 다시 굴린다.

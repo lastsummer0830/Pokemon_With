@@ -18,7 +18,8 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 page.on("pageerror", (e) => errors.push(String(e)));
-await page.goto("http://localhost:5180", { waitUntil: "networkidle" });
+// 새로 만든 public/assets 파일은 오래 떠 있던 dev 서버가 index.html로 폴백한다 → 다른 포트로 확인할 수 있게 열어 둔다.
+await page.goto(process.env.DEV_URL ?? "http://localhost:5180", { waitUntil: "networkidle" });
 await page.waitForFunction(() => window.__game?.isBooted, { timeout: 30000 });
 await page.waitForFunction(() => window.__game.scene.getScenes(true).length > 0, { timeout: 15000 });
 let fail = 0;

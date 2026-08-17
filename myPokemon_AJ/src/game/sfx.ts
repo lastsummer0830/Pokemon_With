@@ -46,6 +46,7 @@ const FILES: Record<string, string> = {
   bgm_town: "assets/audio/bgm_town.ogg",
   bgm_route1: "assets/audio/bgm_route1.ogg",       // 1번도로 (AR KM_Route1)
   bgm_viridian: "assets/audio/bgm_viridian.ogg",   // 상록시티 (AR KM_Pewter)
+  bgm_route3: "assets/audio/bgm_route3.ogg",       // 22번도로 (AR KM_Route3 원본 ogg 그대로 복사)
 };
 
 // 씬 preload에서 호출 — 아직 안 받은 효과음만 큐에 넣는다(중복 로드 방지).
@@ -83,6 +84,7 @@ export const BGM = {
   title: "bgm_title",       // 타이틀~인트로 (DP 호수 테마 — 사용자 지정)
   town: "bgm_town",         // 마을/집 (KM_Pallet)
   route1: "bgm_route1",     // 1번도로 (KM_Route1)
+  route3: "bgm_route3",     // 22번도로 (KM_Route3 — 곡 이름과 도로 번호가 다르다, 원본 Map49의 @bgm 그대로)
   viridian: "bgm_viridian", // 상록시티 (KM_Pewter)
   lab: "bgm_lab",           // 오박사 연구소 (Lab.mid → AR soundfont로 렌더)
   gym: "bgm_gym",           // 상록체육관 (Gym.mid → AR soundfont로 렌더 — tools/ar-audio/render-mid.py)
